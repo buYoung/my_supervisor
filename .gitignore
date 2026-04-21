@@ -1,0 +1,16 @@
+
+# system
+.DS_Store
+
+# tools
+.serena/
+
+# moon
+.moon/cache
+.moon/docker
+
+# node
+node_modules
+
+# rust
+target
