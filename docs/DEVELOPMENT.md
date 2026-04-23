@@ -65,9 +65,10 @@ crates/
 ├── shared/               # wire types (HTTP/WS DTO, 설정 스키마)
 ├── config/               # ConfigSource 구현 (TOML + watch)
 ├── infra/
-│   ├── sqlite/           # StateRepository
+│   ├── sqlite/           # StateRepository + JobRepository
 │   ├── http/             # HttpServer (axum + WS)
-│   └── logging/          # LogSink (로테이션·백프레셔)
+│   ├── logging/          # LogSink (로테이션·백프레셔; run 단위 아카이브)
+│   └── scheduler/        # Scheduler (cron/interval/one-shot/의존성)
 ├── platform/
 │   ├── linux/            # prctl, systemd, journald
 │   ├── macos/            # kqueue, launchd
@@ -81,13 +82,13 @@ crates/
 `packages/ui/src/` 는 feature 단위:
 
 ```
-features/{processes,logs,daemon,settings}/
-components/ui/            # shadcn 공용
+features/{processes,jobs,logs,daemon,settings}/
+components/ui/            # shadcn 공용 (다크·라이트 양립 CSS 변수)
 services/                 # HTTP/WS 클라이언트
-shared/                   # 훅·타입·유틸
+shared/                   # 훅·타입·유틸 (theme.css — 토큰 단일 출처)
 ```
 
-실제 디렉터리는 현재 **비어 있고** (`.gitkeep`만 존재), PoC 시작 시 위 구조로 crate 가 추가됩니다. 각 레이어의 책임과 의존성 방향은 `ARCHITECTURE.md §3`, 설계 근거는 `DESIGN_DECISIONS.md DD-017 ~ DD-020` 참조.
+실제 디렉터리는 현재 **비어 있고** (`.gitkeep`만 존재), PoC 시작 시 위 구조로 crate 가 추가됩니다. 각 레이어의 책임과 의존성 방향은 `ARCHITECTURE.md §3`, 설계 근거는 `DESIGN_DECISIONS.md DD-017 ~ DD-024` 참조.
 
 **Workspace members 선언 (루트 `Cargo.toml`):**
 
@@ -125,6 +126,7 @@ cargo build -p my-supervisor-core
 cargo build -p my-supervisor-application
 cargo build -p my-supervisor-platform-linux     # 타겟 OS 에 해당하는 것만
 cargo build -p my-supervisor-infra-sqlite
+cargo build -p my-supervisor-infra-scheduler    # cron/interval/one-shot/의존성 스케줄러
 
 # 바이너리 (app 레이어)
 cargo build -p my-supervisor-app-daemon         # → bin `msv-daemon`
@@ -217,7 +219,7 @@ moon run :test
 ```
 
 - **type**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`, `perf` 등 표준 타입
-- **scope**: 변경 영역. 레이어 / crate 경로를 간결히 표기 — `core`, `application`, `shared`, `config`, `infra-sqlite`, `infra-http`, `infra-logging`, `platform-linux`, `platform-macos`, `platform-windows`, `app-daemon`, `app-cli`, `app-desktop`, `ui`. 기능 영역(`프로세스 초기 설정`, `logging`) 이나 한국어도 허용
+- **scope**: 변경 영역. 레이어 / crate 경로를 간결히 표기 — `core`, `application`, `shared`, `config`, `infra-sqlite`, `infra-http`, `infra-logging`, `infra-scheduler`, `platform-linux`, `platform-macos`, `platform-windows`, `app-daemon`, `app-cli`, `app-desktop`, `ui`. 기능 영역(`jobs`, `theme`, `logging`) 이나 한국어도 허용
 - **summary**: 현재형 동사 한 줄 요약
 
 예시:
@@ -227,6 +229,8 @@ feat(app-daemon): 프로세스 신원 확인 3종 세트 구현
 fix(app-cli): ps 명령의 JSON 출력에서 null 필드 누락 수정
 docs(architecture): API 오류 포맷 §5.4 신설
 refactor(core): LifecycleController port 시그니처에 probe_alive 추가
+feat(infra-scheduler): cron 5-field + interval trigger 평가 초기 구현
+feat(ui/jobs): Job Runs 탭 가상화 테이블 추가
 ```
 
 ---

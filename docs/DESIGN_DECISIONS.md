@@ -363,8 +363,109 @@ app/*  ──▶ application ──▶ core
 
 ---
 
+## DD-021: 라이트/다크 테마 동등 지원
+
+**결정:** 다크 모드와 라이트 모드를 **동등**하게 1급 지원한다. 어느 한쪽이 "1순위" 가 아니며, 기본값은 `auto` (OS `prefers-color-scheme` 추종). 디자인 자산·시안 승인 시 두 모드 스크린샷을 반드시 동시 확인한다.
+
+**맥락:** 초기 기술 감각은 "개발자 대상, 다크 우선" 이었으나 실제 사용 맥락이 다양함 — 밝은 사무실 환경, 프로젝터 데모, 접근성 요구(대비), 그리고 외부 사용자 확대 시 라이트 선호층 비중이 무시 못 할 수준. 또한 UI 가 shadcn/ui 기반(DD-020)이라 두 모드 지원이 이미 기본기.
+
+**이유:**
+- **토큰 이원화 비용 < 후속 하드코드 제거 비용**: shadcn/ui 의 CSS 변수 규약을 따르면 두 모드 지원에 들어가는 증분 비용은 팔레트 2 세트 정의 + 시안 2 장 확인뿐. 반면 "다크 우선" 으로 출발해 하드코드 색이 컴포넌트에 누적되면 나중에 추출 비용이 급격히 커진다.
+- **접근성**: 라이트 모드는 대비·색맹 테스트 시 놓치기 쉬운 경계선을 드러내주는 2차 검증 수단이기도 하다.
+- **Tauri WebView·브라우저 양립과 무관**: 테마는 번들 내 CSS 변수 토글이므로 두 실행 환경 모두 동일.
+
+**운영 규약:**
+- 토큰 단일 출처: `packages/ui/src/shared/theme.css` 의 `:root` / `[data-theme="dark"]`
+- 허용 색 사용법: 오직 CSS 변수를 통해서만. 하드코드 `#rrggbb` 는 lint 금지
+- 시안 승인 절차: Figma 또는 Claude Design 초안이 들어오면 **두 모드 동시 스크린샷 필수**. 한쪽만 검토하고 다른 쪽은 나중에 맞추는 순서는 금지 (하드코드 유입 방지)
+- 접근성: 두 모드 모두 WCAG AA 기준 대비 확인
+
+**대안:**
+- 다크 전용. **기각** — 확장성·접근성·사용 맥락 다양성 상실.
+- 라이트 전용. **기각** — 주 사용자층(개발자) 의 장시간 세션에 눈 피로.
+
+---
+
+## DD-022: Cron/배치 기능은 데몬 내장 (OS 위임 배제)
+
+**결정:** `my-supervisor` 는 cron/interval/one-shot/dependency 기반 배치 스케줄링을 **데몬 자체에 내장**한다. Linux crontab / systemd-timer / macOS launchd calendar / Windows Task Scheduler 에 위임하지 않는다.
+
+**맥락:** 제품 범위 확장 요구 — "PM2 유형 + cron 배치 겸용". 실행 모델을 두 가지로 좁혀 검토: (A) 자체 내장 vs (B) OS 위임.
+
+**이유:**
+- **포지셔닝 일관성**: 이 제품의 가치 명제가 "systemd/launchd/Task Scheduler 를 GUI 로 감춘다" 인데, Jobs 에서만 다시 OS 도구로 내려가는 건 스토리 불일치.
+- **로그·이벤트 파이프라인 단일화**: Job 실행 로그를 기존 `LogSink` / WebSocket 이벤트 버스 / SQLite 이력과 동일 경로로 흘려보낼 수 있다. OS 위임 시 `journalctl` · Task Scheduler 로그 · launchd logs 를 각각 끌어와 정규화해야 함.
+- **cross-platform 동일성**: cron 5-field 문법을 모든 OS 에서 동일하게 파싱. OS 위임 시 Task Scheduler XML 과 crontab 문법 변환 레이어가 필요.
+- **UX 통합**: Process 와 Job 을 같은 UI 에서 관리 가능. Trigger Now, Cancel Run, Run Detail 같은 상호작용이 네이티브로 붙는다.
+
+**감수한 트레이드오프:**
+- **Daemon 다운 시 스케줄 미실행**: 데몬이 내려가 있으면 예약된 run 이 발화하지 않는다. 이는 Phase 3 의 "missed-runs 백필" 기능으로 완화 예정 (daemon 재기동 시 건너뛴 run 재실행 옵션). MVP 단계에선 감수.
+- **타이머 정확도**: tokio 기반 타이머가 OS 커널 타이머보다 정밀도가 낮지만, cron ± 1 s 수준이면 배치 워크로드에 충분.
+
+**DD-010(시스템 서비스 통합) 과의 관계:** DD-010 은 **데몬 자체를 OS 서비스로 등록**하는 얘기 (부팅 시 자동 기동). DD-022 는 데몬 안의 **Job 스케줄링** 얘기. 충돌하지 않으며, DD-010 과 결합했을 때 "OS 가 데몬을 살려두고, 데몬이 Job 을 실행" 으로 자연스러움.
+
+**대안 (B) OS 위임.** **기각** — 위 로그·UX·포지셔닝 이유.
+
+---
+
+## DD-023: Job 과 Process 는 별도 도메인 엔티티
+
+**결정:** `Job` 과 `Process` 를 구분되는 도메인 엔티티로 모델링한다. 공통 상위 `SpawnSpec` 추상화는 Phase 3 까지 보류.
+
+**맥락:** 두 개념은 표면적으로 비슷하다 (command, args, env, cwd, 로그 수집). 그러나 **라이프사이클·UX·이력 의미가 다르다**.
+
+| 속성 | Process | Job |
+|---|---|---|
+| 기대 수명 | 무기한 (내려가면 장애) | 유한 (실행→종료 정상) |
+| 재시작 | 크래시 시 자동 + backoff | 다음 trigger 에서 재실행 |
+| 상태 머신 | `starting → running → stopping → stopped` (+ `crashed`) | `pending → running → succeeded \| failed \| cancelled \| skipped` |
+| 이력 의미 | "얼마나 오래 살았나" + 재시작 횟수 | "각 실행의 성공/실패, 소요 시간" |
+| UX | 목록·상태 뱃지·로그 follow | 스케줄 테이블·Run 이력·Trigger Now |
+
+**이유:**
+- **상태 머신 혼합 금지**: 한 엔티티에 두 머신을 섞으면 UI 가 "지금은 어떤 의미의 running 인가?" 를 계속 판단해야 함. Type-safe 분리가 유리.
+- **이력 쿼리 분리**: `SELECT * FROM processes WHERE restart_count > 0` 와 `SELECT * FROM job_runs WHERE state = 'failed'` 는 전혀 다른 도메인 질문. 테이블 분리가 자연스러움.
+- **UI 모듈 대칭**: `features/processes` vs `features/jobs` 가 백엔드 엔티티 분리와 1:1 대응.
+
+**공통 속성 중복에 대한 대응:**
+- Phase 2 MVP: 두 엔티티에 spawn 관련 필드(command/args/env/cwd/timeout) 를 각자 가짐. 중복 ~5 필드, 관리 가능한 수준.
+- Phase 3 이후 중복이 늘면 `SpawnSpec` 으로 추출 검토. 섣부른 추상화 금지.
+
+**대안:**
+- 단일 `Process` + `trigger: autostart | manual | cron | …` 필드. **기각** — 상태 머신 혼합 문제.
+- 상위 `Schedulable` trait 추상화. **기각** — MVP 에는 복잡도만 증가.
+
+---
+
+## DD-024: Job 의존성은 MVP 에 AND + on-success 만
+
+**결정:** Job 의 의존성 트리거 (`DependsOn([job_id, …])`) 는 MVP 에서 다음 형태만 지원:
+
+- 다중 의존: **AND 시맨틱** (모두 성공해야 실행). OR 은 Phase 3.
+- 상태 조건: 기본 **on-success**. 실패 시 기본 skip. `on_dependency_failure = "run_anyway"` 옵션으로 실패 무시 실행 가능.
+- 등록 시 **순환 감지** → `422 cycle_detected`. 수락된 Job 그래프는 항상 DAG.
+- Job 삭제 시 downstream 의존 존재하면 `409 has_dependents`. `--force` 시 의존 해제 후 삭제.
+- 한 Job 은 **단일 trigger 타입**만 선택 (cron/interval/one_shot/depends_on 중 하나). 혼합 (예: "cron 스케줄 + 의존 완료 중 먼저 오는 쪽") 은 Phase 3.
+
+**맥락:** 사용자 요구로 의존성 트리거가 추가되었다. DAG 스케줄러 영역은 범위가 빠르게 커지므로 (시각화, OR, on-failure 폭포, 부분 의존, 재시도, …) MVP 는 안전한 최소 형태만 포함.
+
+**이유:**
+- **AND + on-success 가 "보통의 배치 파이프라인" 시맨틱**: 백업 → 검증 → 업로드 같은 체인에서 "앞 단계 성공 시 다음" 이 압도적 다수.
+- **순환 감지는 필수**: 데이터 무결성 · 데드락 방지. 등록 시 수행하면 런타임 비용 0.
+- **혼합 trigger 배제**: 문법·UX·엣지 케이스가 기하급수적. MVP 에서 없어도 대부분 사용자 시나리오 커버.
+- **Phase 3 확장 여지 확보**: OR, on-failure, DAG 시각화, 백필 은 이후 점진 추가. 모델 레벨에서 깨지지 않게 오늘 자리만 마련.
+
+**트레이드오프:** on-failure 분기가 필요한 워크플로우(예: "정상이면 A, 실패면 B") 는 MVP 에선 shell 스크립트 래퍼로 우회해야 함. Phase 3 에 정식 지원.
+
+**대안:**
+- MVP 부터 OR + on-failure 까지 포함. **기각** — 스코프 폭주.
+- 의존성 자체를 Post-Production 으로 미루기. **기각** — 사용자 요구가 명시적.
+
+---
+
 ## 변경 로그
 
 - 2026-04-21: 초기 작성 (DD-001 ~ DD-015)
 - 2026-04-21: DD-005 갱신 및 DD-016 추가 (프론트엔드 프레임워크를 React + Vite로 확정)
 - 2026-04-21: DD-017 ~ DD-020 추가 (Hexagonal 채택, OS별 crate 분리, Infra crate 카테고리 분리, 프론트엔드 feature-based 모듈)
+- 2026-04-23: DD-021 ~ DD-024 추가 (테마 동등 지원, Cron 데몬 내장, Job≠Process 모델링, Job 의존성 MVP 범위)

@@ -4,15 +4,17 @@
 
 ## 개요
 
-`my-supervisor` (CLI 명령어 `msv`) 는 개인 개발자와 소규모 운영 환경을 위한 프로세스 자동 시작/관리 도구입니다. PM2처럼 프로세스를 감시·재시작하되, **GUI 우선**으로 설계되어 설정과 운영이 쉽고, 서버 환경에서는 **CLI와 WebUI**로 동일한 경험을 제공합니다.
+`my-supervisor` (CLI 명령어 `msv`) 는 개인 개발자와 소규모 운영 환경을 위한 **프로세스 + 배치(cron) 통합 관리 도구**입니다. PM2 처럼 장시간 실행 프로세스를 감시·재시작하고, cron 처럼 예약·주기·의존성 기반 배치 Job 도 같은 UI 에서 관리합니다. **GUI 우선**으로 설계되어 설정과 운영이 쉽고, 서버 환경에서는 **CLI 와 WebUI** 로 동일한 경험을 제공합니다.
 
 ### 핵심 가치
 
 - **GUI 우선**: Tauri 기반 네이티브 데스크톱 앱. 설정·모니터링·로그 확인이 전부 클릭 단위.
 - **크로스 플랫폼**: Windows / macOS / Linux 동일하게 동작.
+- **Process + Job 이원 모델**: 장시간 실행 프로세스와 cron/interval/one-shot/의존성 기반 Job 을 **하나의 GUI** 에서 관리. Job 스케줄링은 OS crontab · Task Scheduler 에 위임하지 않고 데몬이 자체 실행.
+- **테마 동등 지원**: 다크/라이트 모드를 1 급 지원 (shadcn/ui CSS 변수 기반).
 - **Production 품질**: 로그 로테이션, crash loop 감지, 좀비 처리, graceful shutdown 등 production 기본기 내장.
-- **서버 친화**: 헤드리스 환경에서도 CLI + WebUI로 동일한 제어 가능.
-- **시스템 통합**: systemd / launchd / Windows Service와 opt-in 연동.
+- **서버 친화**: 헤드리스 환경에서도 CLI + WebUI 로 동일한 제어 가능.
+- **시스템 통합**: systemd / launchd / Windows Service 와 opt-in 연동 (데몬 자체의 자동 시작 — Job 과는 별개).
 
 ## 아키텍처 한눈에
 
@@ -61,8 +63,9 @@
 - **언어**: Rust (전 컴포넌트)
 - **UI 셸**: Tauri v2
 - **데몬**: tokio + axum
-- **프론트엔드**: React + Vite + Tailwind (`packages/ui`, feature 단위 모듈 — DD-020)
-- **영속화**: TOML (설정) + SQLite (런타임 상태)
+- **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`packages/ui`, feature 단위 모듈 — DD-020). 상위 IA 5 개: **Processes · Jobs · Logs · Daemon · Settings**. 다크/라이트 양립.
+- **영속화**: TOML (설정) + SQLite (런타임 상태 · JobRun 이력)
+- **배치 스케줄러**: 데몬 내장 (`infra/scheduler`, `tokio-cron-scheduler` 기반). cron 5-field + interval + one-shot + 의존성.
 - **모듈 구조**: Hexagonal 5-레이어 Cargo workspace — `core` / `application` / `shared`·`config` / `infra/*` / `platform/*` / `app/*`. Cargo 패키지 prefix `my-supervisor-`, 바이너리는 `msv` · `msv-daemon`.
 
 ## 문서

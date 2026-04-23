@@ -84,9 +84,9 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 
 ### 범위
 
-#### A. 핵심 기능
-- Port trait 셋 1차 확정 — `LifecycleController`, `ShutdownSignaler`, `StateRepository`, `LogSink`, `ConfigSource`. 시그니처 breaking change 는 Phase 3 시작 전까지 허용, 그 이후는 minor 로만.
-- `application` use case 1차 셋 — `StartProcess`, `StopProcess`, `RestartProcess`(단순 backoff), `ReloadConfig`
+#### A. 핵심 기능 (Process)
+- Port trait 셋 1차 확정 — `LifecycleController`, `ShutdownSignaler`, `StateRepository`, `LogSink`, `ConfigSource`, `Scheduler`, `JobRepository`, `JobRunner`. 시그니처 breaking change 는 Phase 3 시작 전까지 허용, 그 이후는 minor 로만.
+- `application` Process use case 1차 셋 — `StartProcess`, `StopProcess`, `RestartProcess`(단순 backoff), `ReloadConfig`
 - TOML 설정 파일 로드·파싱 (`config` crate 의 `TomlConfigSource`)
 - 프로세스 CRUD (추가·조회·수정·삭제)
 - 프로세스 제어 (start / stop / restart)
@@ -94,8 +94,19 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - `SIGTERM` → grace period → `SIGKILL` 시퀀스 (Unix `ShutdownSignaler`, Windows 는 Phase 3 에서 완성)
 - 기본 재시작 정책 (`on-failure` + 단순 backoff, crash loop 는 미포함)
 
+#### A'. Jobs (배치 스케줄러) — 최소 기능
+- `application` Job use case — `RegisterJob`, `UpdateJob`, `DeleteJob`, `TriggerJobManual`, `ScheduleTick`, `ObserveJobRunCompleted`, `CancelJobRun`
+- Job CRUD
+- Trigger 4 종 구현: `cron` (5-field) / `interval` / `one_shot` / `depends_on` (AND + on-success)
+- 동시성 정책 `on_overlap: skip | queue | parallel`, 기본 `skip`
+- 의존성 트리거 — 등록 시 순환 감지 (`cycle_detected`), 삭제 시 `has_dependents` 검사 + `--force`
+- JobRun 이력 — 최근 100 회 유지 (Job 별 `log_retention.max_runs` 기본값)
+- 수동 트리거 (`trigger now`)
+- `infra/scheduler` crate 구현 — `tokio-cron-scheduler` 기반
+
 #### B. 로깅
 - 프로세스별 로그 파일 (append-only, 로테이션 없음)
+- Job Run 별 로그 파일 (run 단위 아카이브, 로테이션 없음)
 - 기본 텍스트 포맷 (JSON은 Production에서)
 
 #### C. Desktop (Tauri)
@@ -103,16 +114,23 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - 트레이 아이콘 + 기본 메뉴 (열기 / 종료)
 - user-level 자동 시작 등록 (`tauri-plugin-autostart`)
 - 최소 WebUI:
-  - 프로세스 목록 (이름, 상태, PID, 업타임)
-  - start / stop / restart 버튼
-  - 로그 뷰어 (최근 N줄)
-  - 프로세스 추가·수정·삭제 폼
+  - 상위 IA 5 개 탭: **Processes · Jobs · Logs · Daemon · Settings**
+  - 프로세스 목록 (이름, 상태, PID, 업타임) + start/stop/restart 버튼 + 프로세스 추가·수정·삭제 폼
+  - Job 목록 (이름, trigger 요약, 마지막 run, 다음 예정 시각) + Trigger Now 버튼 + Run 이력 테이블 + Job 추가·수정·삭제 폼
+  - 로그 뷰어 (최근 N 줄, 프로세스/Job Run 공용)
+  - 테마 토글 (auto / dark / light) — 두 모드 동등 지원 (DD-021)
 
 #### D. CLI
 - `msv ps`
 - `msv start/stop/restart <n>`
 - `msv logs <n> [-f]`
 - `msv daemon start/stop/status`
+- `msv jobs ls`
+- `msv jobs add -c job.toml`
+- `msv jobs trigger <name>`
+- `msv jobs runs <name> [--limit 20]`
+- `msv jobs logs <name> <run-id> [-f]`
+- `msv jobs rm <name> [--force]`
 - JSON 출력 (`-o json`) 기본 지원
 
 #### E. 배포
@@ -120,9 +138,9 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - 나머지는 `cargo build` 수준
 
 ### 완료 조건
-- 본인의 평소 프로세스 2~3 개를 my-supervisor 로 대체하여 **1주일 연속 무탈 운영**
+- 본인의 평소 프로세스 2~3 개 + Job 1 개 이상을 my-supervisor 로 대체하여 **1주일 연속 무탈 운영**
 - 설치·사용 중 명확한 블로커가 없음
-- Server 배포를 가정한 최소 시나리오 통과: 별도 머신에 데몬(`msv-daemon`)+CLI(`msv`)만 복사해서 `msv add` → `msv start` 로 프로세스 1 개 관리 성공
+- Server 배포를 가정한 최소 시나리오 통과: 별도 머신에 데몬(`msv-daemon`)+CLI(`msv`)만 복사해서 `msv add` → `msv start` 로 프로세스 1 개, `msv jobs add` → `msv jobs trigger` 로 Job 1 개 관리 성공
 
 ### 벗어나야 할 범위
 - Crash loop 감지
@@ -133,6 +151,10 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - 알림
 - 리소스 제한
 - 좀비/고아 reconciliation
+- Job OR 의존성·on-failure·on-any
+- Job DAG 비주얼라이저
+- Job 백필 (missed-runs 재실행)
+- Job pause/resume, templates
 
 ### 산출물
 - 실사용 가능한 데몬·CLI·Desktop 앱
@@ -198,7 +220,16 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 
 #### H. 알림
 - 네이티브 데스크톱 알림 (`tauri-plugin-notification`)
-- 트리거: crash loop 진입, 헬스체크 실패, 프로세스 장기 미기동
+- 트리거: crash loop 진입, 헬스체크 실패, 프로세스 장기 미기동, Job run 실패, Job run 장시간 대기 (queue 병목)
+
+#### H'. Jobs 확장
+- OR 의존성 시맨틱 (`{ type: "depends_on_any", jobs: […] }`)
+- `on_dependency_failure: run_anyway` 외에 `trigger_on_failure` 추가 (실패를 트리거로 사용)
+- Job DAG 비주얼라이저 (upstream·downstream 그래프, 병목 하이라이트)
+- 백필 (missed-runs) — 데몬 다운 구간의 cron/interval 예약된 run 을 재기동 시 사용자 선택으로 재실행
+- Job pause / resume (스케줄 일시 정지)
+- Job run 아카이브 로그를 별도 디렉터리로 ( `~/.local/share/my-supervisor/job-runs/<name>/<run-id>/`)
+- Job templates / cloning
 
 #### I. 배포 완성
 - 3개 OS 설치 프로그램 (Windows MSI, macOS DMG, Linux deb + AppImage)
@@ -291,6 +322,10 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 | R6 | PID 재사용으로 인한 오탐지 | Production | 신원 확인 3종 세트 |
 | R7 | 로그 파일 무한 증가 | Production | 로테이션·삭제 정책 기본값 보수적으로 |
 | R8 | 시스템 서비스 등록 실패 / 권한 문제 | Production | 사전 진단 메시지, rollback 경로 |
+| R11 | cron 평가 타이머 정확도 (tokio 기반이라 ±1 s 오차) | MVP | "배치 워크로드 기준 허용치" 로 명시, 초당 정밀도 필요 시 사용자 안내 |
+| R12 | Job 의존 그래프 순환 등록 — 런타임 deadlock 가능 | MVP | **등록 시** DFS 기반 순환 감지, 감지 시 `422 cycle_detected` 로 거부 (DD-024) |
+| R13 | daemon 다운 중 예약된 Job run 누락 | MVP → Production | MVP 는 감수, Phase 3 에 백필 기능 추가 (H' 참조) |
+| R14 | Job run 로그 무한 누적 | MVP | `log_retention.max_runs` 기본 100, `max_age_days` 옵션; Phase 3 아카이브 디렉터리 분리 |
 | R9 | SQLite 락 경합 (많은 프로세스 + 잦은 이벤트) | Production | WAL 모드, 배치 쓰기 |
 | R10 | 데몬 크래시 시 관리 중이던 자식의 고아화 | Production | subreaper + write-ahead state |
 
@@ -304,8 +339,9 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - 5개 기술 검증 항목의 pass/fail
 
 ### MVP
-- 본인 실사용 연속 일수 (목표: 7일)
+- 본인 실사용 연속 일수 (목표: 7일) — Process 2~3 + Job 1 개 이상 포함
 - 외부 도움 없이 설치→첫 프로세스 기동까지 시간 (목표: 5분 이내)
+- Job 등록 → 첫 trigger 실행까지 지연 (목표: 500ms 이내, cron 평가 오차 ±1s)
 
 ### Production
 - 3개 OS 설치 성공률 100%
