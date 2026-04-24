@@ -11,6 +11,7 @@
 - **GUI 우선**: Tauri 기반 네이티브 데스크톱 앱. 설정·모니터링·로그 확인이 전부 클릭 단위.
 - **크로스 플랫폼**: Windows / macOS / Linux 동일하게 동작.
 - **Process + Job 이원 모델**: 장시간 실행 프로세스와 cron/interval/one-shot/의존성 기반 Job 을 **하나의 GUI** 에서 관리. Job 스케줄링은 OS crontab · Task Scheduler 에 위임하지 않고 데몬이 자체 실행.
+- **프로세스 관리 모드 이원화**: 각 Process 를 **Direct** (데몬이 직접 관리) 또는 **SystemRegistered** (OS 서비스 매니저에 등록해 OS 가 관리) 중 선택. 짧은 개발 서버는 Direct 로 가볍게, 장기 실행 서비스는 SystemRegistered 로 OS 의 성숙한 supervisor 인프라 재활용. 런타임에 양방향 전환 가능.
 - **테마 동등 지원**: 다크/라이트 모드를 1 급 지원 (shadcn/ui CSS 변수 기반).
 - **Production 품질**: 로그 로테이션, crash loop 감지, 좀비 처리, graceful shutdown 등 production 기본기 내장.
 - **서버 친화**: 헤드리스 환경에서도 CLI + WebUI 로 동일한 제어 가능.

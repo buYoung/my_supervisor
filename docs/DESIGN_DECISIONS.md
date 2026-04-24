@@ -463,9 +463,55 @@ app/*  ──▶ application ──▶ core
 
 ---
 
+## DD-025: 프로세스 관리 모드 이원화 (Direct / SystemRegistered) — MVP 포함
+
+**결정:** 각 Process 는 프로세스별로 **두 가지 관리 모드** 중 하나를 선택한다. 둘 다 MVP (Phase 2) 에 포함.
+
+- **Direct** *(기본)* — 데몬이 프로세스를 직접 spawn, 감시, 재시작, 로그 수집. `LifecycleController` · `ShutdownSignaler` · `LogSink` 경로.
+- **SystemRegistered** — 데몬이 OS 서비스 매니저 (systemd user unit / launchd agent / Windows Service) 에 프로세스를 등록하고, 이후 제어·상태는 OS 경유. 재시작·감시는 OS, 데몬은 조회·UI·로그 집계.
+
+**맥락:** 사용자 층의 "알긴 아는데 매번 귀찮다" 문제를 해결하려면 (1) 데몬이 전부 대신해주는 경로와 (2) OS 의 검증된 supervisor 인프라 (systemd 등) 를 GUI 로 편하게 쓰는 경로 둘 다 필요하다. 둘 중 하나만 지원하면 "왜 내 기존 systemd unit 을 여기서 못 보나" 또는 "GUI 로 간단히 띄우고 싶을 뿐인데 왜 unit 파일을 강제하나" 같은 불만이 생긴다.
+
+**이유:**
+- **선택 유연성**: 짧게 띄웠다 내리는 개발 서버는 Direct, 장기 실행 production-grade 프로세스는 SystemRegistered 같이 맥락별 최적.
+- **OS supervisor 재활용**: systemd 의 `Restart=on-failure`, `OOMPolicy`, 리소스 제한, 종속성 그래프 같은 성숙한 기능을 재구현하지 않고 위임.
+- **데몬 크래시 내성**: SystemRegistered 프로세스는 my-supervisor 데몬이 내려가도 OS 가 계속 관리. "supervisor 를 supervisor 하는" 문제 해결.
+- **Hexagonal 와 정합**: `LifecycleController` 와 `ProcessServiceRegistrar` 를 별개 port 로 두어 application 레이어 분기는 `match management_mode` 한 줄.
+
+**핵심 위험 — 재시작 엔진 충돌 (엄수 규칙):**
+
+SystemRegistered 모드에서 my-supervisor 내부의 backoff/crash-loop 로직을 **반드시 비활성** 화한다. 두 재시작 엔진이 동시에 돌면 상태 머신이 깨지고 "재시작이 두 번 일어나는 것처럼 보이는" 유령 버그가 발생한다. 규칙:
+
+1. `ProcessConfig.restart` 는 unit 파일 생성 시 OS native 지시어로 **변환되어 주입** (예: `Restart=on-failure`, `RestartSec=5`). OS 가 재시작 담당.
+2. `application::RestartProcess` use case 는 `management_mode = SystemRegistered` 프로세스에 대해 **no-op** 반환. 사용자 UI 에는 "OS 가 자동 재시작을 담당합니다" 안내.
+3. `StateRepository` 는 두 경로의 상태를 서로 구분해 저장 (Direct 는 PID + UUID, System 은 `unit_name`).
+
+**다른 핵심 규칙:**
+
+- **유닛 이름 네임스페이스 분리**: 데몬용 unit (`my-supervisor.service`) 과 프로세스용 unit (`my-supervisor-managed-<name>.service`) 이 충돌하지 않도록 prefix 규약.
+- **전환 원자성**: Direct ↔ SystemRegistered 전환 중 실패하면 원래 모드로 롤백. 부분 상태 (unit 파일은 생겼는데 registry 업데이트 실패) 를 남기지 않음.
+- **유닛 잔재 청소 의무**: `unregister` 실패 시 잔재 unit 파일이 남는다. Phase 3 에 `msv repair system-registrations` CLI 제공. my-supervisor 네임스페이스 prefix 를 기준으로 스캔·정리.
+- **로그 경로 이원화**: Direct 는 stdout 파이프 캡처, SystemRegistered 는 journald/launchd logs/Event Log 읽기. `LogSink` port 가 양쪽 다 커버.
+
+**MVP 범위 (Phase 2):**
+- 데이터 모델·port·API 자리 확정
+- 사용자 주 사용 OS **1 개** 에 SystemRegistered 3 메서드 (register/start/stop) + query_status + tail_logs 완성
+- Direct ↔ SystemRegistered 양방향 전환
+- 나머지 2 OS adapter 는 Phase 3. MVP 에서는 port 구현만 stub 또는 "not supported" 에러.
+
+**대안:**
+- Direct 만 지원. **기각** — OS supervisor 를 GUI 로 다루고 싶은 시나리오 무시, "supervisor 를 supervisor 하는" 문제 미해결.
+- SystemRegistered 만 지원. **기각** — OS 서비스 등록은 권한·부수효과·잔재 리스크가 있어 간단한 데브 프로세스에 비용 과다.
+- Phase 3 에 SystemRegistered 추가. **기각** — 사용자가 명시적으로 "이 기능까지가 MVP 최소" 로 결정. 단 MVP 에 모든 OS adapter 까지 강제는 범위 폭주라 1 OS 완성 + 모델 자리 확보로 타협.
+
+**DD-010 (시스템 서비스 통합은 Opt-in) 과의 관계:** DD-010 은 (A) 데몬 자체 의 OS 등록 = `AutoStartService`. DD-025 는 (B) 관리 대상 프로세스 의 OS 등록 = `ProcessServiceRegistrar`. 두 축은 독립이며 자유롭게 조합된다 (ARCHITECTURE §11 도입부 참조). DD-010 의 "개별 프로세스를 데몬 외부 시스템 서비스로 등록" 이란 한 줄 언급을 DD-025 가 구체화한다.
+
+---
+
 ## 변경 로그
 
 - 2026-04-21: 초기 작성 (DD-001 ~ DD-015)
 - 2026-04-21: DD-005 갱신 및 DD-016 추가 (프론트엔드 프레임워크를 React + Vite로 확정)
 - 2026-04-21: DD-017 ~ DD-020 추가 (Hexagonal 채택, OS별 crate 분리, Infra crate 카테고리 분리, 프론트엔드 feature-based 모듈)
 - 2026-04-23: DD-021 ~ DD-024 추가 (테마 동등 지원, Cron 데몬 내장, Job≠Process 모델링, Job 의존성 MVP 범위)
+- 2026-04-23: DD-025 추가 (프로세스 관리 모드 이원화 — Direct/SystemRegistered, MVP 포함, 재시작 엔진 충돌 회피)

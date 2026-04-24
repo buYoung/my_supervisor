@@ -11,7 +11,8 @@
 5. **Opt-in 시스템 통합** — 시스템 서비스 등록은 기본이 아니며 사용자가 명시적으로 활성화한다.
 6. **Hexagonal 아키텍처 (Ports & Adapters)** — 도메인 로직은 OS·DB·네트워크 세부를 모른다. 모든 외부 의존은 `core` crate 의 port trait 로 추상화되고, `platform-*` · `infra-*` crate 가 adapter 로 구현한다. `#[cfg(target_os)]` 분기는 최상위 bin(`app/daemon` 등)에만 존재한다. 근거: DD-017 ~ DD-019.
 7. **Process + Job 이원 모델** — 장시간 실행 supervisor 대상인 **Process** 와 예약/주기/의존성으로 트리거되어 실행 후 종료를 기대하는 **Job** 은 별도 도메인 엔티티로 모델링한다. Job 스케줄링은 OS cron/Task Scheduler 에 위임하지 않고 데몬이 자체 수행한다. 근거: DD-022 ~ DD-024.
-8. **테마 동등 지원** — 다크 모드와 라이트 모드를 동등하게 지원한다. 토큰은 shadcn/ui CSS 변수를 단일 출처로 쓰고, 디자인 시안 승인 시 두 모드 스크린샷을 동시 확인한다. 근거: DD-021.
+8. **프로세스 관리 모드 이원화** — 각 Process 는 **Direct** (데몬이 직접 spawn·감시·재시작) 또는 **SystemRegistered** (OS 서비스 매니저 — systemd user unit / launchd agent / Windows Service — 에 등록 후 OS 가 감시, 데몬은 제어·조회·로그 집계) 중 하나를 프로세스별로 선택한다. 두 모드는 port 레벨에서 분리되며 재시작 엔진 충돌은 설계 시점에 차단한다. 근거: DD-025.
+9. **테마 동등 지원** — 다크 모드와 라이트 모드를 동등하게 지원한다. 토큰은 shadcn/ui CSS 변수를 단일 출처로 쓰고, 디자인 시안 승인 시 두 모드 스크린샷을 동시 확인한다. 근거: DD-021.
 
 ### 지원 OS 최소 버전
 
@@ -284,19 +285,28 @@ pub struct ProcessSpec {
     pub args: Vec<String>,
     pub cwd: Option<PathBuf>,
     pub env: BTreeMap<String, String>,
-    pub lifecycle: LifecycleMode,       // Tied | Detached
-    pub restart: RestartPolicy,
+    pub management_mode: ManagementMode, // Direct | SystemRegistered
+    pub lifecycle: LifecycleMode,        // Tied | Detached (Direct 모드에서만 의미)
+    pub restart: RestartPolicy,          // SystemRegistered 시 OS 에 위임, 본 policy 는 비활성
     pub shutdown: ShutdownPolicy,
     /* … */
+}
+
+pub enum ManagementMode {
+    /// 데몬이 직접 spawn·감시·재시작. 기본값.
+    Direct,
+    /// OS 서비스 매니저에 등록하고 제어·상태는 OS 경유.
+    /// unit_name 은 systemd unit / launchd label / Windows Service 이름으로 매핑.
+    SystemRegistered { unit_name: String },
 }
 
 pub enum ProcessState { Starting, Running, Stopping, Crashed, Stopped }
 
 pub struct ChildHandle {
-    pub process_id: Uuid,       // MYSUPERVISOR_PROCESS_ID
+    pub process_id: Uuid,       // MYSUPERVISOR_PROCESS_ID (Direct 모드)
     pub pid: u32,
     pub started_at: DateTime<Utc>,
-    /* opaque OS 핸들은 platform crate 가 소유 */
+    /* opaque OS 핸들은 platform crate 가 소유. SystemRegistered 에서는 unit_name 이 주 식별자. */
 }
 ```
 
@@ -332,9 +342,10 @@ pub enum JobRunState { Pending, Running, Succeeded, Failed, Cancelled, Skipped }
 
 | Port trait | 역할 | adapter 위치 |
 |---|---|---|
-| `LifecycleController` | tied/detached spawn, process group 제어, alive 확인 | `platform/*` |
-| `ShutdownSignaler` | graceful → force kill 시퀀스 | `platform/*` |
-| `AutoStartService` | OS 자동 시작 등록/해제 | `platform/*` |
+| `LifecycleController` | tied/detached spawn, process group 제어, alive 확인 (**Direct 모드 전용**) | `platform/*` |
+| `ShutdownSignaler` | graceful → force kill 시퀀스 (**Direct 모드 전용**) | `platform/*` |
+| `AutoStartService` | **데몬 자체** 의 OS 자동 시작 등록/해제 | `platform/*` |
+| `ProcessServiceRegistrar` | **SystemRegistered 모드 전용**. 개별 프로세스를 OS 서비스 매니저에 register/unregister, start/stop/query_status/tail_logs | `platform/*` |
 | `StateRepository` | 프로세스·히스토리·메트릭 영속화 | `infra/sqlite` (+ 테스트용 in-memory) |
 | `JobRepository` | Job 정의 + JobRun 이력 영속. 등록 시 순환 감지 포함 | `infra/sqlite` 확장 |
 | `Scheduler` | cron/interval/one-shot 트리거를 평가해 "실행 시점 이벤트" 를 application 으로 발행. 의존성 트리거는 `JobRepository` run 이벤트 구독으로 전파 | `infra/scheduler` |
@@ -388,9 +399,14 @@ pub struct ProcessStatusDto {
 
 | Crate | 대표 구현 | OS-native API |
 |---|---|---|
-| `platform/linux` | `LinuxLifecycle`, `UnixShutdown`, `SystemdUserUnit`, `JournaldLogSink`(선택) | `prctl`(`nix`), `signal-hook`, `systemd` + `tracing-journald` |
-| `platform/macos` | `MacLifecycle`, `UnixShutdown`, `LaunchdAgent` | `kqueue`, `launchctl`, `plist` |
-| `platform/windows` | `WindowsLifecycle`, `WindowsShutdown`, `TaskSchedulerEntry`/`WindowsService`, `EventLogSink`(선택) | Job Object, `CTRL_BREAK_EVENT`, `sc`/Task Scheduler, Event Log (`windows` crate) |
+| `platform/linux` | `LinuxLifecycle`, `UnixShutdown`, `SystemdUserUnit` (데몬용), `SystemdUserUnitProcess` (프로세스용), `JournaldLogSink`(선택) | `prctl`(`nix`), `signal-hook`, `systemctl --user`, `systemd` + `tracing-journald` |
+| `platform/macos` | `MacLifecycle`, `UnixShutdown`, `LaunchdAgent` (데몬용), `LaunchdAgentProcess` (프로세스용) | `kqueue`, `launchctl bootstrap/bootout`, `plist` |
+| `platform/windows` | `WindowsLifecycle`, `WindowsShutdown`, `TaskSchedulerEntry`/`WindowsService` (데몬용), `WindowsServiceProcess` (프로세스용), `EventLogSink`(선택) | Job Object, `CTRL_BREAK_EVENT`, `sc create/delete/start/stop`, Event Log (`windows` crate) |
+
+`AutoStartService` 와 `ProcessServiceRegistrar` 는 **서로 다른 port** 지만 같은 OS 서비스 매니저를 쓴다. 둘의 차이:
+
+- `AutoStartService` — **데몬 자체** 를 부팅 시 기동하기 위한 단일 unit (예: `my-supervisor.service`)
+- `ProcessServiceRegistrar` — **관리 대상 프로세스마다** 하나씩의 unit (예: `my-supervisor-managed-<name>.service`). 이름 네임스페이스로 충돌 방지.
 
 세 crate 가 같은 port trait (`LifecycleController` 등) 을 구현하기 때문에 `app/daemon` 에서는:
 
@@ -540,25 +556,35 @@ pub trait LifecycleController: Send + Sync {
 | `platform/windows` (`WindowsLifecycle`) | Job Object 생성 → `SetInformationJobObject` 에 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` → 자식 할당 | `DETACHED_PROCESS` 플래그 + Job Object breakaway 허용 | Job Object 가 Linux 의 subreaper 와 동일한 역할을 자연스럽게 수행 |
 | `platform/macos` (`MacLifecycle`) | `PR_SET_PDEATHSIG` 없음 → 데몬 shutdown hook 에서 전체 자식 정리 + 자식이 `kqueue` 로 부모 PID 감시해 자발 종료 옵션 | `setsid()` (Unix 공통) | reconciliation 루프(§10)가 subreaper 부재를 보완 |
 
-`application::StartProcess` 는 위 표의 어느 항목도 직접 알지 않는다:
+`application::StartProcess` 는 위 표의 어느 항목도 직접 알지 않는다. 또한 `management_mode` 에 따라 `LifecycleController` (Direct) 또는 `ProcessServiceRegistrar` (SystemRegistered) 로 분기한다 (§6.4 참조):
 
 ```rust
 // crates/application/src/start_process.rs 발췌
 pub async fn start_process(
     spec: &ProcessSpec,
     lifecycle: &dyn LifecycleController,
+    registrar: &dyn ProcessServiceRegistrar,
     repo: &dyn StateRepository,
-) -> Result<ChildHandle, StartError> {
-    let handle = match spec.lifecycle {
-        LifecycleMode::Tied     => lifecycle.spawn_tied(spec).await?,
-        LifecycleMode::Detached => lifecycle.spawn_detached(spec).await?,
-    };
-    repo.save_started(&handle).await?;
-    Ok(handle)
+) -> Result<ProcessState, StartError> {
+    match &spec.management_mode {
+        ManagementMode::Direct => {
+            let handle = match spec.lifecycle {
+                LifecycleMode::Tied     => lifecycle.spawn_tied(spec).await?,
+                LifecycleMode::Detached => lifecycle.spawn_detached(spec).await?,
+            };
+            repo.save_started_direct(&handle).await?;
+            Ok(ProcessState::Running)
+        }
+        ManagementMode::SystemRegistered { unit_name } => {
+            registrar.start(unit_name).await?;
+            repo.save_started_system(unit_name).await?;
+            Ok(ProcessState::Running)
+        }
+    }
 }
 ```
 
-### 6.3 시작 시퀀스
+### 6.3 시작 시퀀스 (Direct 모드)
 
 1. 설정에서 프로세스 정의 로드
 2. 작업 디렉터리 확인
@@ -567,6 +593,34 @@ pub async fn start_process(
 5. Windows: Job Object 생성 → 프로세스 spawn (suspended) → Job에 할당 → resume
 6. stdout/stderr 파이프를 비동기 reader로 연결
 7. SQLite에 시작 기록 (pid, start_time, uuid, command hash)
+
+### 6.4 관리 모드 분기 — Direct vs SystemRegistered
+
+각 Process 는 `management_mode` 로 두 모드 중 하나를 선택한다 (DD-025). 아래 표가 모드별 동작 차이를 요약한다. `application` 레이어는 `management_mode` 로 분기하지만, **OS별 분기는 여전히 각 port 의 adapter 내부에만** 존재한다.
+
+| 항목 | **Direct** *(기본)* | **SystemRegistered** |
+|---|---|---|
+| spawn 경로 | `LifecycleController::spawn_tied` / `spawn_detached` | `ProcessServiceRegistrar::register` → `start` |
+| 상태 조회 | `LifecycleController::probe_alive` + 신원 3종 세트 (§10) | `ProcessServiceRegistrar::query_status` (내부적으로 `systemctl show` / `launchctl list` / `sc query`) |
+| 종료 | `ShutdownSignaler::request_graceful` → `force_kill` | `ProcessServiceRegistrar::stop` (OS 가 자체 graceful 수행) |
+| **재시작** | `application::RestartProcess` — backoff + crash loop 감지 | `RestartProcess` 는 **no-op + 사용자 안내** 반환. OS 의 `Restart=on-failure` 같은 지시어가 재시작 담당 |
+| 로그 수집 | `LogSink` 의 stdout/stderr 파이프 캡처 | `LogSink` 의 OS-native 읽기 경로 — journald (Linux) / `~/Library/Logs` (macOS) / Event Log (Windows) |
+| 신원 식별 | `MYSUPERVISOR_PROCESS_ID` UUID 태그 + PID + start_time | `unit_name` (예: `my-supervisor-managed-api.service`) |
+| 데몬 재시작 시 | reconciliation 루프 (§10) 로 입양 | OS 가 이미 살아있을 수 있음 — `query_status` 로 동기화만 |
+| 데몬 크래시 영향 | `tied` 이면 자식도 죽음 / `detached` 이면 고아 | **무관** — OS 가 계속 관리 |
+| 등록·제거 비용 | 즉시 | unit 파일 생성·삭제 + `systemctl daemon-reload` 같은 부수효과 |
+
+**재시작 엔진 충돌 회피 규칙 (엄수)**: `management_mode = SystemRegistered` 인 프로세스의 `ProcessConfig.restart` 는 OS unit 파일 생성 시 `Restart=` 지시어로 **변환되어 적용**된다. 데몬 내부의 `RestartProcess` use case 는 이 모드에서 호출돼도 실제 재시작을 수행하지 않고 `Ok(Noop { reason: "managed by system" })` 반환. 이것이 문서화되지 않으면 "왜 재시작이 두 번 시도되는가" 같은 버그가 생긴다 (DD-025 근거).
+
+**Direct ↔ SystemRegistered 전환**: 런타임에 가능 (`POST /api/v1/processes/{name}/convert`). 전환 순서:
+
+1. 현재 실행 중이면 현재 모드로 stop
+2. 현재 모드의 흔적 정리 (Direct → 상태 테이블 정리 / System → `unit_name` unregister + 파일 삭제)
+3. 새 모드로 register 또는 설정만 반영
+4. `ProcessSpec.management_mode` 업데이트 및 저장
+5. 요청에 `auto_start: true` 가 있으면 새 모드로 start
+
+전환 실패 시 **원래 모드 유지** (atomic 보장). 실패 원인은 API 에러 응답으로 반환.
 
 ## 7. 시그널 처리
 
@@ -623,6 +677,8 @@ pub trait ShutdownSignaler: Send + Sync {
 ## 8. 재시작 정책
 
 재시작 정책 자체는 **OS 공통 로직**이다. `application::RestartProcess` use case 가 backoff 계산과 crash loop 감지를 수행하고, 실제 spawn/kill 은 `LifecycleController` · `ShutdownSignaler` port 를 호출한다. 따라서 이 섹션에는 `#[cfg(target_os)]` 분기가 없다.
+
+**주의**: 본 §8 전체는 `management_mode = Direct` 프로세스에만 적용된다. `SystemRegistered` 프로세스는 재시작을 OS 서비스 매니저가 담당하며 (systemd `Restart=`, launchd `KeepAlive`, Windows Service `FailureActions`), `ProcessConfig.restart` 값은 unit 파일 생성 시 그쪽 지시어로 변환되어 적용된다 (§6.4, DD-025).
 
 ### 8.1 정책 종류
 
@@ -719,20 +775,20 @@ Windows는 Job Object가 같은 역할 수행.
 
 데몬은 상태 변경 **전에** SQLite에 기록. 비정상 종료 후 재시작해도 마지막으로 알려진 자식 목록을 복원 가능.
 
-## 11. 시스템 서비스 통합 (Opt-in)
+## 11. 시스템 서비스 통합
 
-사용자가 UI 또는 CLI에서 토글로 활성화/비활성화. OS 별 파일 포맷·명령이 완전히 다르기 때문에 `AutoStartService` port 로 묶고 `platform/*` crate 가 구현한다 (DD-018).
+OS 서비스 매니저(systemd user unit / launchd agent / Windows Service) 와의 연동은 **두 가지 독립적인 결정**으로 구성된다. 둘을 혼동하면 설계가 꼬인다:
 
-### 11.1 두 가지 모드
+- **(A) 데몬 자체의 기동 모드** — my-supervisor 데몬 자체를 부팅 시 OS 서비스로 자동 기동할지 여부 → `AutoStartService` port. **Opt-in**, 기본 off.
+- **(B) 관리 대상 프로세스의 관리 모드** — 각 Process 를 데몬이 직접 관리(Direct) 할지, OS 서비스 매니저에 맡길(SystemRegistered) 지 → `ProcessServiceRegistrar` port. **프로세스별 선택**, 기본 Direct.
 
-| 모드 | 데몬이 관리 | 시스템이 관리 |
-|---|---|---|
-| **Process-managed** *(기본)* | 데몬이 프로세스를 supervisor로 직접 관리 | 시스템 서비스 등록 안 함 |
-| **System-integrated** *(opt-in)* | 데몬 자체를 시스템 서비스로 등록 | 시스템이 데몬을 관리, 데몬이 자식을 관리 |
+두 축은 독립적으로 조합된다. 예: (A off, B Direct) = 기본. (A on, B Direct) = 데몬은 부팅 시 기동되지만 자식은 직접 관리. (A on, B SystemRegistered) = 데몬과 자식 모두 OS 가 관리. (A off, B SystemRegistered) = 흔치 않지만 가능 (데몬은 수동 기동, 자식은 OS 등록).
 
-사용자는 **프로세스별로도** System-integrated 모드 선택 가능 (개별 프로세스를 systemd unit 등으로 등록하여 데몬 밖에서도 살아있게).
+### 11.1 (A) 데몬 자체 기동 모드
 
-### 11.2 Port: `AutoStartService`
+데몬 자체를 OS 서비스로 등록할지는 사용자가 UI/CLI 토글로 켠다. 기본은 off.
+
+#### Port: `AutoStartService`
 
 ```rust
 // crates/core/src/ports/autostart.rs
@@ -746,7 +802,7 @@ pub trait AutoStartService: Send + Sync {
 pub enum AutoStartScope { User, System } // user-level vs 시스템 전역
 ```
 
-### 11.3 OS별 adapter
+#### OS별 adapter
 
 | OS Crate | 구현체 | 파일 경로 | 제어 |
 |---|---|---|---|
@@ -754,14 +810,49 @@ pub enum AutoStartScope { User, System } // user-level vs 시스템 전역
 | `platform/macos` | `LaunchdAgent` | `~/Library/LaunchAgents/com.my-supervisor.daemon.plist` | `launchctl bootstrap gui/$(id -u) ...` |
 | `platform/windows` | `TaskSchedulerEntry` 또는 `WindowsService` | Task Scheduler XML · `sc create my-supervisor` | `sc start/stop my-supervisor` |
 
-UI/CLI는 `AutoStartService` trait 만 호출 → OS 분기는 `app/daemon` 의 DI 지점에만 존재.
+UI/CLI 는 `AutoStartService` trait 만 호출 → OS 분기는 `app/daemon` DI 지점에만 존재.
 
-### 11.4 로깅 연동
+### 11.2 (B) 관리 대상 프로세스 관리 모드
 
-각 OS crate 가 `LogSink` port 의 보조 구현을 선택적으로 제공할 수 있다.
+각 Process 는 `management_mode = Direct | SystemRegistered` 를 선택한다 (§6.4, DD-025). SystemRegistered 선택 시 해당 프로세스는 OS 서비스로 등록되고 이후 제어는 `ProcessServiceRegistrar` port 를 통해 이뤄진다.
 
-- `platform/linux` · `JournaldLogSink`: `tracing-journald`로 journald 병행 출력. `journalctl --user -u my-supervisor`로 조회.
-- `platform/macos`: launchd 가 stdout/stderr 를 `~/Library/Logs/` 로 리디렉트. Unified logs 연동은 Post-Production.
+#### Port: `ProcessServiceRegistrar`
+
+```rust
+// crates/core/src/ports/process_service.rs
+#[async_trait]
+pub trait ProcessServiceRegistrar: Send + Sync {
+    /// unit 파일 생성 + register (daemon-reload 등 부수 절차 포함).
+    /// ProcessConfig.restart 는 OS native 지시어로 변환되어 unit 에 주입된다.
+    async fn register(&self, spec: &ProcessSpec) -> Result<(), RegistrarError>;
+    /// unit 해제 + 파일 삭제. 실패 시 잔재 정리용 `repair` 경로 제공.
+    async fn unregister(&self, unit_name: &str) -> Result<(), RegistrarError>;
+    async fn start(&self, unit_name: &str) -> Result<(), RegistrarError>;
+    async fn stop(&self, unit_name: &str) -> Result<(), RegistrarError>;
+    async fn query_status(&self, unit_name: &str) -> Result<ProcessState, RegistrarError>;
+    /// OS-native 로그 경로에서 최근 N 줄 읽기 (journald / launchd logs / Event Log).
+    async fn tail_logs(&self, unit_name: &str, tail: usize) -> Result<Vec<LogLine>, RegistrarError>;
+}
+```
+
+#### OS별 adapter
+
+| OS Crate | 구현체 | unit 파일 경로 | 제어 |
+|---|---|---|---|
+| `platform/linux` | `SystemdUserUnitProcess` | `~/.config/systemd/user/my-supervisor-managed-<name>.service` | `systemctl --user start/stop/status …` |
+| `platform/macos` | `LaunchdAgentProcess` | `~/Library/LaunchAgents/com.my-supervisor.managed.<name>.plist` | `launchctl bootstrap/bootout`, `kickstart` |
+| `platform/windows` | `WindowsServiceProcess` | Windows Service 레지스트리 엔트리 `my-supervisor-managed-<name>` | `sc create/start/stop/delete` |
+
+**이름 네임스페이스**: 데몬용 unit (`my-supervisor.service`) 와 프로세스용 unit (`my-supervisor-managed-<name>.service`) 이 충돌하지 않도록 prefix 를 분리한다.
+
+**유닛 잔재 청소**: `unregister` 가 실패하면 (권한·잠금 등) 잔재 unit 파일이 남는다. Production 단계에 `msv repair system-registrations` CLI 로 my-supervisor 네임스페이스 unit 을 스캔해 정리한다 (ROADMAP Phase 3).
+
+### 11.3 로깅 연동
+
+각 OS crate 가 `LogSink` port 의 보조 구현을 제공한다. Direct 모드는 stdout/stderr 파이프 캡처 (`infra/logging`) 를 쓰지만, SystemRegistered 모드는 OS 의 native 로그 저장소를 읽어야 한다.
+
+- `platform/linux` · `JournaldLogSink`: Direct 는 `tracing-journald` 로 병행 출력, SystemRegistered 는 `journalctl --user -u my-supervisor-managed-<name>` 로 조회.
+- `platform/macos` · `LaunchdLogSink`: launchd 가 stdout/stderr 를 `~/Library/Logs/` 로 리디렉트한 파일을 읽음. Unified logs 연동은 Post-Production.
 - `platform/windows` · `EventLogSink`: Event Log 연동 (`eventlog` 크레이트).
 
 ## 12. Jobs (배치 스케줄러)
@@ -851,7 +942,8 @@ command = "node"
 args = ["dist/server.js"]
 cwd = "/home/user/projects/api"
 env = { NODE_ENV = "production", PORT = "3000" }
-lifecycle = "tied"
+management_mode = "direct"        # "direct" | { system_registered = { unit_name = "…" } }
+lifecycle = "tied"                # Direct 모드에서만 유효
 autostart = true
 
 [process.restart]
@@ -880,6 +972,20 @@ format = "json"
 max_file_size_mb = 100
 max_files = 10
 compress = true
+
+[[process]]
+name = "db"
+command = "/usr/bin/postgres"
+args = ["-D", "/var/lib/postgres"]
+management_mode = { system_registered = { unit_name = "my-supervisor-managed-db" } }
+
+# SystemRegistered 모드에서 restart 는 OS unit 파일의
+# `Restart=on-failure` 같은 지시어로 변환되어 적용된다.
+# 데몬 내부 RestartProcess use case 는 이 프로세스에 대해 no-op (§6.4).
+[process.restart]
+policy = "on-failure"
+backoff_initial_ms = 5000
+backoff_max_ms = 60000
 
 [[job]]
 name = "nightly-backup"

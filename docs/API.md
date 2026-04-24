@@ -31,8 +31,9 @@
 | `DELETE` | `/api/v1/processes/{name}` | 프로세스 등록 해제 (실행 중이면 409) |
 | `POST` | `/api/v1/processes/{name}/start` | 시작 |
 | `POST` | `/api/v1/processes/{name}/stop` | 중지 (graceful → force) |
-| `POST` | `/api/v1/processes/{name}/restart` | 재시작 (crash loop 카운터 리셋) |
-| `GET` | `/api/v1/processes/{name}/logs` | 최근 로그. 쿼리: `tail`, `since` |
+| `POST` | `/api/v1/processes/{name}/restart` | 재시작 (crash loop 카운터 리셋). **`management_mode = SystemRegistered` 시 no-op + 안내 메시지** — OS 가 재시작 담당 (DD-025) |
+| `GET` | `/api/v1/processes/{name}/logs` | 최근 로그. 쿼리: `tail`, `since`. SystemRegistered 는 journald/launchd logs/Event Log 에서 집계 |
+| `POST` | `/api/v1/processes/{name}/convert` | 관리 모드 전환. body: `{ to: "direct" \| "system_registered", unit_name?: string, auto_start?: boolean }` |
 
 #### GET /api/v1/processes
 
@@ -94,6 +95,35 @@
 
 - `202 Accepted`. crash loop 상태여도 이 호출은 카운터를 리셋.
 - `404 process_not_found`.
+- `management_mode = SystemRegistered` 인 경우 `200 OK` + `{ "noop": true, "reason": "managed_by_system" }` 응답. 실제 재시작은 OS `Restart=` 지시어에 위임 (§6.4, DD-025).
+
+#### POST /api/v1/processes/{name}/convert
+
+관리 모드를 Direct ↔ SystemRegistered 로 전환한다 (§6.4, DD-025).
+
+요청:
+
+```json
+{
+  "to": "system_registered",
+  "unit_name": "my-supervisor-managed-api-server",   // to=system_registered 시 필수 (기본값: 자동 생성)
+  "auto_start": true                                  // 전환 후 즉시 기동 여부, 기본 false
+}
+```
+
+절차:
+1. 현재 실행 중이면 현재 모드 경로로 stop
+2. 현재 모드 흔적 정리 (System → `unregister`, unit 파일 삭제)
+3. 새 모드로 등록 (Direct 면 단순 설정 변경, System 이면 `register`)
+4. `ProcessSpec.management_mode` 업데이트·저장
+5. `auto_start: true` 면 새 모드로 start
+
+응답:
+- `200 OK` — 전환 성공. 바디: `ProcessStatus`
+- `404 process_not_found`
+- `400 invalid_request` — `to` 값이 지원 범위 밖이거나 `unit_name` 포맷 오류
+- `409 unit_name_conflict` — 지정된 `unit_name` 이 이미 다른 곳에 존재
+- `500 service_registration_failed` — OS 서비스 매니저 등록 실패. 원래 모드로 자동 롤백된 뒤 반환
 
 #### GET /api/v1/processes/{name}/logs
 
@@ -330,12 +360,18 @@
 interface ProcessStatus {
   name: string;
   state: ProcessState;
-  pid: number | null;
+  management_mode: ManagementMode;
+  pid: number | null;              // Direct 모드에서만 값 존재
+  unit_name: string | null;        // SystemRegistered 모드에서만 값 존재
   restart_count: number;
-  started_at: string | null;   // RFC3339
+  started_at: string | null;       // RFC3339
   cpu_percent: number;
   memory_bytes: number;
 }
+
+type ManagementMode =
+  | { type: "direct" }
+  | { type: "system_registered"; unit_name: string };
 ```
 
 ### 4.2 ProcessState
@@ -360,16 +396,17 @@ interface ProcessConfig {
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
-  lifecycle?: "tied" | "detached";   // 기본 "tied"
+  management_mode?: ManagementMode;   // 기본 { type: "direct" }
+  lifecycle?: "tied" | "detached";    // 기본 "tied", Direct 모드에서만 의미
   autostart?: boolean;
-  restart?: RestartPolicy;
+  restart?: RestartPolicy;             // SystemRegistered 시 OS unit 의 Restart= 로 변환
   shutdown?: ShutdownPolicy;
   health_check?: HealthCheck;
   logging?: LoggingPolicy;
 }
 ```
 
-하위 객체의 필드는 `ARCHITECTURE.md` §15 / §7 / §8 / §9 / §13 과 일치한다.
+하위 객체의 필드는 `ARCHITECTURE.md` §15 / §7 / §8 / §9 / §13 과 일치한다. `management_mode` 의 시맨틱은 §6.4.
 
 ### 4.4 JobConfig · JobStatus · JobRun
 
@@ -458,7 +495,9 @@ type JobRunState =
 | `has_dependents` | 409 | Job 삭제 시 downstream 의존 존재. `?force=true` 로 의존 해제 후 삭제 |
 | `run_already_finished` | 409 | 이미 종료된 Run 에 대한 cancel 시도 |
 | `cycle_detected` | 422 | `JobConfig.trigger.type = "depends_on"` 이 순환을 형성 |
+| `unit_name_conflict` | 409 | Direct → SystemRegistered 전환 시 지정된 `unit_name` 이 다른 곳에 이미 존재 |
 | `spawn_failed` | 500 | OS 레벨 spawn 실패 (권한·바이너리 부재 등) |
+| `service_registration_failed` | 500 | OS 서비스 매니저 등록·해제 실패 (권한·시스템 상태 문제). 원래 모드로 롤백된 뒤 반환 (DD-025) |
 | `internal_error` | 500 | 그 외 데몬 내부 오류 |
 
 오류 응답 바디 예시는 `ARCHITECTURE.md` §5.4 참조.

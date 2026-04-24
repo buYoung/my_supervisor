@@ -85,12 +85,17 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 ### 범위
 
 #### A. 핵심 기능 (Process)
-- Port trait 셋 1차 확정 — `LifecycleController`, `ShutdownSignaler`, `StateRepository`, `LogSink`, `ConfigSource`, `Scheduler`, `JobRepository`, `JobRunner`. 시그니처 breaking change 는 Phase 3 시작 전까지 허용, 그 이후는 minor 로만.
-- `application` Process use case 1차 셋 — `StartProcess`, `StopProcess`, `RestartProcess`(단순 backoff), `ReloadConfig`
+- Port trait 셋 1차 확정 — `LifecycleController`, `ShutdownSignaler`, `StateRepository`, `LogSink`, `ConfigSource`, `Scheduler`, `JobRepository`, `JobRunner`, **`ProcessServiceRegistrar`**. 시그니처 breaking change 는 Phase 3 시작 전까지 허용, 그 이후는 minor 로만.
+- `application` Process use case 1차 셋 — `StartProcess`, `StopProcess`, `RestartProcess`(단순 backoff, Direct 전용), `ReloadConfig`, `ConvertManagementMode`
+- **Process 관리 모드 이원화 (DD-025)**:
+  - `Direct` 모드 완전 구현 — 3 OS 전부
+  - `SystemRegistered` 모드 — **사용자 주 사용 OS 1 개** 에 `ProcessServiceRegistrar` 완전 구현 (register/unregister/start/stop/query_status/tail_logs). 나머지 2 OS 는 Phase 3
+  - Direct ↔ SystemRegistered 양방향 전환 (`POST /api/v1/processes/{name}/convert`)
+  - 재시작 엔진 충돌 회피 — SystemRegistered 에서 `RestartProcess` 는 no-op 반환, `ProcessConfig.restart` 는 unit 파일 생성 시 OS native `Restart=` 지시어로 변환
 - TOML 설정 파일 로드·파싱 (`config` crate 의 `TomlConfigSource`)
 - 프로세스 CRUD (추가·조회·수정·삭제)
 - 프로세스 제어 (start / stop / restart)
-- `tied` / `detached` 생명주기 (3 OS `LifecycleController` 구현 완성)
+- `tied` / `detached` 생명주기 (3 OS `LifecycleController` 구현 완성, Direct 모드에서만 의미)
 - `SIGTERM` → grace period → `SIGKILL` 시퀀스 (Unix `ShutdownSignaler`, Windows 는 Phase 3 에서 완성)
 - 기본 재시작 정책 (`on-failure` + 단순 backoff, crash loop 는 미포함)
 
@@ -115,15 +120,17 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - user-level 자동 시작 등록 (`tauri-plugin-autostart`)
 - 최소 WebUI:
   - 상위 IA 5 개 탭: **Processes · Jobs · Logs · Daemon · Settings**
-  - 프로세스 목록 (이름, 상태, PID, 업타임) + start/stop/restart 버튼 + 프로세스 추가·수정·삭제 폼
+  - 프로세스 목록 (이름, 상태, **관리 모드 뱃지 — Direct / System**, PID 또는 unit, 업타임) + start/stop/restart 버튼 + 프로세스 추가·수정·삭제 폼 (Add Process 폼에 관리 모드 라디오)
+  - Process Detail 에 관리 모드 전환 버튼 (Direct ↔ SystemRegistered), 전환 시 진행 상태 및 실패 시 롤백 표시
   - Job 목록 (이름, trigger 요약, 마지막 run, 다음 예정 시각) + Trigger Now 버튼 + Run 이력 테이블 + Job 추가·수정·삭제 폼
-  - 로그 뷰어 (최근 N 줄, 프로세스/Job Run 공용)
+  - 로그 뷰어 (최근 N 줄, 프로세스/Job Run 공용). SystemRegistered 프로세스는 journald/launchd logs/Event Log 에서 집계되어 보임
   - 테마 토글 (auto / dark / light) — 두 모드 동등 지원 (DD-021)
 
 #### D. CLI
-- `msv ps`
+- `msv ps` (관리 모드 컬럼 포함)
 - `msv start/stop/restart <n>`
 - `msv logs <n> [-f]`
+- `msv convert <n> --to direct` / `--to system --unit-name <name>` (관리 모드 전환)
 - `msv daemon start/stop/status`
 - `msv jobs ls`
 - `msv jobs add -c job.toml`
@@ -139,6 +146,8 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 
 ### 완료 조건
 - 본인의 평소 프로세스 2~3 개 + Job 1 개 이상을 my-supervisor 로 대체하여 **1주일 연속 무탈 운영**
+- 그중 **최소 1 개 프로세스는 `management_mode = SystemRegistered`** 로 운영 (사용자 주 사용 OS 에서)
+- Direct ↔ SystemRegistered 양방향 전환 시나리오 성공 (convert API + CLI 양쪽)
 - 설치·사용 중 명확한 블로커가 없음
 - Server 배포를 가정한 최소 시나리오 통과: 별도 머신에 데몬(`msv-daemon`)+CLI(`msv`)만 복사해서 `msv add` → `msv start` 로 프로세스 1 개, `msv jobs add` → `msv jobs trigger` 로 Job 1 개 관리 성공
 
@@ -200,14 +209,22 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - Windows graceful shutdown 경로 완성 (`CTRL_BREAK_EVENT` + Named pipe 옵션)
 - Shutdown 진행 상황 로깅
 
-#### E. 시스템 서비스 통합 (Opt-in)
-- `AutoStartService` port 최종 확정 (`core::ports::autostart`)
-- 3 OS adapter 구현 완성:
-  - `platform/linux` · `SystemdUserUnit` — `~/.config/systemd/user/my-supervisor.service` 생성·enable·disable
-  - `platform/macos` · `LaunchdAgent` — `~/Library/LaunchAgents/com.my-supervisor.daemon.plist` 생성·bootstrap
-  - `platform/windows` · `TaskSchedulerEntry` 또는 `WindowsService` 등록
-- 각 OS 네이티브 로깅 `LogSink` 보조 구현 (journald / launchd logs / Event Log)
+#### E. 시스템 서비스 통합 (Opt-in) — 두 축
+
+**(A) 데몬 자체 기동 모드** — `AutoStartService` port 최종 확정 + 3 OS adapter 완성:
+- `platform/linux` · `SystemdUserUnit` — `~/.config/systemd/user/my-supervisor.service` 생성·enable·disable
+- `platform/macos` · `LaunchdAgent` — `~/Library/LaunchAgents/com.my-supervisor.daemon.plist` 생성·bootstrap
+- `platform/windows` · `TaskSchedulerEntry` 또는 `WindowsService` 등록
 - UI·CLI 에서 one-click 토글 (`msv autostart enable/disable`)
+
+**(B) 관리 대상 프로세스 관리 모드 — SystemRegistered 나머지 2 OS 완성** (MVP 에서 주 사용 OS 1 개는 이미 완성):
+- `platform/linux` · `SystemdUserUnitProcess` — `~/.config/systemd/user/my-supervisor-managed-<name>.service`
+- `platform/macos` · `LaunchdAgentProcess` — `~/Library/LaunchAgents/com.my-supervisor.managed.<name>.plist`
+- `platform/windows` · `WindowsServiceProcess` — `sc create/delete/start/stop`
+- **유닛 잔재 정리 커맨드**: `msv repair system-registrations` — my-supervisor 네임스페이스 prefix 를 기준으로 잔재 unit 스캔·정리
+- 전환 실패 복구 UX — `service_registration_failed` 발생 시 UI 에 원인·복구 제안 표시
+
+각 OS 네이티브 로깅 `LogSink` 보조 구현 (journald / launchd logs / Event Log) 도 이 단계에 완성. Direct·SystemRegistered 양쪽에 적용.
 
 #### F. 헬스체크
 - HTTP / TCP / exec 3종
@@ -326,6 +343,8 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 | R12 | Job 의존 그래프 순환 등록 — 런타임 deadlock 가능 | MVP | **등록 시** DFS 기반 순환 감지, 감지 시 `422 cycle_detected` 로 거부 (DD-024) |
 | R13 | daemon 다운 중 예약된 Job run 누락 | MVP → Production | MVP 는 감수, Phase 3 에 백필 기능 추가 (H' 참조) |
 | R14 | Job run 로그 무한 누적 | MVP | `log_retention.max_runs` 기본 100, `max_age_days` 옵션; Phase 3 아카이브 디렉터리 분리 |
+| R15 | SystemRegistered 유닛 잔재 — `unregister` 실패 시 OS 에 고아 unit 파일 누적 | MVP, Production | 전환은 atomic (실패 시 롤백), Phase 3 에 `msv repair system-registrations` CLI. 네임스페이스 prefix 로 스캔 |
+| R16 | 재시작 엔진 이중 발화 — 데몬 backoff + OS `Restart=` 가 동시 동작하면 상태 깨짐 | MVP | `management_mode = SystemRegistered` 에서 `RestartProcess` use case 를 no-op 로 강제 (DD-025), 테스트로 회귀 방지 |
 | R9 | SQLite 락 경합 (많은 프로세스 + 잦은 이벤트) | Production | WAL 모드, 배치 쓰기 |
 | R10 | 데몬 크래시 시 관리 중이던 자식의 고아화 | Production | subreaper + write-ahead state |
 
