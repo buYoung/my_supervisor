@@ -1,0 +1,256 @@
+/**
+ * HTTP fetch + WebSocket adapter for the OperationsClient interface (standalone path).
+ * Talks to the daemon at VITE_API_BASE_URL (default http://127.0.0.1:9876). Loopback,
+ * no-auth — no token is ever sent (DD-011). All wire shapes are mapped through the shared
+ * wire-mapping layer; this adapter holds no domain logic.
+ */
+
+import type { ProcessStatus } from "../shared/types";
+import {
+  type FollowLogsHandlers,
+  type JobRunsResult,
+  OperationsError,
+  type OperationsClient,
+  type ProcessLogsTail,
+} from "./operations-client";
+import {
+  mapDaemonStatus,
+  mapJobRun,
+  mapJobStatus,
+  mapLogLine,
+  mapProcessStatus,
+} from "./wire-mapping";
+import type {
+  DaemonStatusDto,
+  JobConfigDto,
+  JobStatusDto,
+  ListJobsDto,
+  ListProcessesDto,
+  ListRunsDto,
+  LogDroppedFrameDto,
+  LogLineDto,
+  ProcessConfigDto,
+  ProcessLogsDto,
+  ProcessStatusDto,
+  TriggerJobDto,
+} from "./wire-types";
+
+const DEFAULT_BASE_URL = "http://127.0.0.1:9876";
+
+function resolveBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL;
+  return (configured ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+}
+
+/** Build the ws(s):// origin from the http(s):// base URL. */
+function toWebSocketOrigin(baseUrl: string): string {
+  return baseUrl.replace(/^http(s?):\/\//, (_match, secure: string) => `ws${secure}://`);
+}
+
+interface ErrorEnvelope {
+  error?: { code?: string; message?: string; details?: unknown };
+}
+
+async function parseErrorEnvelope(response: Response): Promise<OperationsError> {
+  let code = "internal_error";
+  let message = `HTTP ${response.status}`;
+  let details: unknown;
+  try {
+    const body = (await response.json()) as ErrorEnvelope;
+    if (body?.error) {
+      code = body.error.code ?? code;
+      message = body.error.message ?? message;
+      details = body.error.details;
+    }
+  } catch {
+    // Non-JSON or empty error body — keep the status-based defaults.
+  }
+  return new OperationsError(code, message, details);
+}
+
+export function createHttpClient(): OperationsClient {
+  const baseUrl = resolveBaseUrl();
+  const webSocketOrigin = toWebSocketOrigin(baseUrl);
+
+  /** fetch wrapper: normalizes transport failures and error envelopes to OperationsError. */
+  async function request(path: string, init?: RequestInit): Promise<Response> {
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers: { "Content-Type": "application/json", ...init?.headers },
+      });
+    } catch (cause) {
+      throw new OperationsError(
+        "transport_error",
+        cause instanceof Error ? cause.message : "데몬에 연결할 수 없습니다.",
+        cause,
+      );
+    }
+    if (!response.ok) {
+      throw await parseErrorEnvelope(response);
+    }
+    return response;
+  }
+
+  async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+    const response = await request(path, init);
+    return (await response.json()) as T;
+  }
+
+  /** For 202/204 endpoints with empty or ignorable bodies — never parses the body. */
+  async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+    await request(path, init);
+  }
+
+  const encode = (name: string) => encodeURIComponent(name);
+
+  return {
+    transport: "http",
+
+    async listProcesses() {
+      const dto = await requestJson<ListProcessesDto>("/api/v1/processes");
+      return dto.processes.map(mapProcessStatus);
+    },
+
+    async getProcess(name) {
+      const dto = await requestJson<ProcessStatusDto>(`/api/v1/processes/${encode(name)}`);
+      return mapProcessStatus(dto);
+    },
+
+    async addProcess(config: ProcessConfigDto) {
+      const dto = await requestJson<ProcessStatusDto>("/api/v1/processes", {
+        method: "POST",
+        body: JSON.stringify(config),
+      });
+      return mapProcessStatus(dto);
+    },
+
+    async startProcess(name) {
+      await requestNoContent(`/api/v1/processes/${encode(name)}/start`, { method: "POST" });
+    },
+
+    async stopProcess(name, force = false) {
+      const query = force ? "?force=true" : "";
+      await requestNoContent(`/api/v1/processes/${encode(name)}/stop${query}`, { method: "POST" });
+    },
+
+    async restartProcess(name) {
+      // 202 (Direct) or 200 {noop, reason} (SystemRegistered) — body is ignored either way.
+      await requestNoContent(`/api/v1/processes/${encode(name)}/restart`, { method: "POST" });
+    },
+
+    async removeProcess(name, force = false) {
+      const query = force ? "?force=true" : "";
+      await requestNoContent(`/api/v1/processes/${encode(name)}${query}`, { method: "DELETE" });
+    },
+
+    async convertProcess(name, to, options = {}) {
+      const dto = await requestJson<ProcessStatusDto>(
+        `/api/v1/processes/${encode(name)}/convert`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            to,
+            unit_name: options.unitName,
+            auto_start: options.autoStart,
+          }),
+        },
+      );
+      return mapProcessStatus(dto);
+    },
+
+    async processLogsTail(name, tail = 100) {
+      const dto = await requestJson<ProcessLogsDto>(
+        `/api/v1/processes/${encode(name)}/logs?tail=${tail}`,
+      );
+      const lines = dto.lines.map((line, index) => mapLogLine(line, name, index));
+      const result: ProcessLogsTail = {
+        lines,
+        truncated: dto.truncated,
+        droppedCount: dto.dropped_count,
+      };
+      return result;
+    },
+
+    followProcessLogs(name, handlers: FollowLogsHandlers) {
+      const socket = new WebSocket(`${webSocketOrigin}/api/v1/processes/${encode(name)}/logs`);
+      let counter = 0;
+      let closedByCaller = false;
+
+      socket.addEventListener("message", (event) => {
+        let parsed: LogLineDto | LogDroppedFrameDto;
+        try {
+          parsed = JSON.parse(event.data as string);
+        } catch {
+          return;
+        }
+        // Branch on the control-frame shape (§3.2): drop frames carry no log line.
+        if ("type" in parsed && parsed.type === "log.dropped") {
+          handlers.onDropped?.(parsed.payload.count);
+          return;
+        }
+        handlers.onLine(mapLogLine(parsed as LogLineDto, name, counter));
+        counter += 1;
+      });
+
+      socket.addEventListener("error", () => {
+        if (!closedByCaller) {
+          handlers.onError?.(
+            new OperationsError("transport_error", "로그 스트림 연결에 실패했습니다."),
+          );
+        }
+      });
+
+      return () => {
+        closedByCaller = true;
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+          socket.close();
+        }
+      };
+    },
+
+    async listJobs() {
+      const dto = await requestJson<ListJobsDto>("/api/v1/jobs");
+      return dto.jobs.map(mapJobStatus);
+    },
+
+    async addJob(config: JobConfigDto) {
+      const dto = await requestJson<JobStatusDto>("/api/v1/jobs", {
+        method: "POST",
+        body: JSON.stringify(config),
+      });
+      return mapJobStatus(dto);
+    },
+
+    async removeJob(name, force = false) {
+      const query = force ? "?force=true" : "";
+      await requestNoContent(`/api/v1/jobs/${encode(name)}${query}`, { method: "DELETE" });
+    },
+
+    async triggerJob(name) {
+      // 202 Accepted with a `{ run_id }` body (also Location header). Reading the
+      // body is robust across origins where Location isn't an exposed header.
+      const dto = await requestJson<TriggerJobDto>(`/api/v1/jobs/${encode(name)}/trigger`, {
+        method: "POST",
+      });
+      return { runId: dto.run_id };
+    },
+
+    async listRuns(name, limit = 50) {
+      const dto = await requestJson<ListRunsDto>(
+        `/api/v1/jobs/${encode(name)}/runs?limit=${limit}`,
+      );
+      const result: JobRunsResult = {
+        runs: dto.runs.map(mapJobRun),
+        truncated: dto.truncated,
+      };
+      return result;
+    },
+
+    async daemonStatus() {
+      const dto = await requestJson<DaemonStatusDto>("/api/v1/daemon/status");
+      return mapDaemonStatus(dto);
+    },
+  } satisfies OperationsClient & { listProcesses(): Promise<ProcessStatus[]> };
+}

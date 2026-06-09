@@ -12,15 +12,18 @@ import {
   Settings,
   Sun,
   TerminalSquare,
+  XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DaemonView } from "./features/daemon/DaemonView";
 import { JobsView } from "./features/jobs/JobsView";
 import { LogsView } from "./features/logs/LogsView";
 import { ProcessesView } from "./features/processes/ProcessesView";
 import { SettingsView } from "./features/settings/SettingsView";
-import { processes } from "./shared/mock-data";
+import { useOperationsClient, usePolledResource } from "./services/use-operations";
 import type { NavigationKey, ThemePreference } from "./shared/types";
+
+const DAEMON_STATUS_POLL_INTERVAL_MS = 2000;
 
 const navigationItems: Array<{
   key: NavigationKey;
@@ -45,8 +48,21 @@ function resolveSystemTheme() {
 }
 
 function App() {
+  const client = useOperationsClient();
   const [activeNavigationKey, setActiveNavigationKey] = useState<NavigationKey>("processes");
   const [themePreference, setThemePreference] = useState<ThemePreference>("auto");
+
+  const fetchDaemonStatus = useCallback(() => client.daemonStatus(), [client]);
+  const { data: daemonStatus, errorMessage: daemonError } = usePolledResource(
+    fetchDaemonStatus,
+    DAEMON_STATUS_POLL_INTERVAL_MS,
+  );
+  const fetchProcesses = useCallback(() => client.listProcesses(), [client]);
+  const { data: processes } = usePolledResource(fetchProcesses, DAEMON_STATUS_POLL_INTERVAL_MS);
+
+  const isDaemonConnected = daemonStatus !== null && daemonError === null;
+  const processList = processes ?? [];
+  const runningProcessCount = processList.filter((process) => process.state === "running").length;
 
   useEffect(() => {
     const rootElement = document.documentElement;
@@ -66,11 +82,6 @@ function App() {
     mediaQueryList.addEventListener("change", applyTheme);
     return () => mediaQueryList.removeEventListener("change", applyTheme);
   }, [themePreference]);
-
-  const runningProcessCount = useMemo(
-    () => processes.filter((process) => process.state === "running").length,
-    [],
-  );
 
   const content = {
     processes: <ProcessesView />,
@@ -127,8 +138,12 @@ function App() {
             <div className="mt-auto hidden border-t border-border p-4 lg:block">
               <div className="rounded-lg border border-border bg-panel p-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <CheckCircle2 aria-hidden="true" className="text-success" size={17} />
-                  데몬 연결됨
+                  {isDaemonConnected ? (
+                    <CheckCircle2 aria-hidden="true" className="text-success" size={17} />
+                  ) : (
+                    <XCircle aria-hidden="true" className="text-danger" size={17} />
+                  )}
+                  {isDaemonConnected ? "데몬 연결됨" : "데몬 연결 안 됨"}
                 </div>
                 <p className="mt-2 font-mono text-xs text-muted">127.0.0.1:9876</p>
               </div>
@@ -141,8 +156,12 @@ function App() {
             <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 py-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted">
-                  <CircleDot aria-hidden="true" className="text-success" size={14} />
-                  로컬 데몬
+                  <CircleDot
+                    aria-hidden="true"
+                    className={isDaemonConnected ? "text-success" : "text-danger"}
+                    size={14}
+                  />
+                  {isDaemonConnected ? "로컬 데몬" : "데몬 연결 끊김"}
                   <span className="font-mono">127.0.0.1:9876</span>
                 </div>
                 <h1 className="mt-1 truncate text-lg font-semibold text-foreground">
@@ -152,7 +171,7 @@ function App() {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="hidden items-center gap-2 rounded-md border border-border bg-panel px-3 py-2 text-xs text-muted sm:flex">
                   <ListTree aria-hidden="true" size={15} />
-                  {runningProcessCount}/{processes.length} 실행 중
+                  {runningProcessCount}/{processList.length} 실행 중
                 </div>
                 <button className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-panel px-3 text-sm text-muted transition-colors duration-200 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   <RefreshCw aria-hidden="true" size={16} />
