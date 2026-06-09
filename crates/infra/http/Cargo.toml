@@ -1,0 +1,20 @@
+[package]
+name = "my-supervisor-infra-http"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+my-supervisor-core = { workspace = true }
+my-supervisor-application = { workspace = true }
+my-supervisor-shared = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
+tokio = { version = "1", default-features = false, features = ["rt", "sync", "macros"] }
