@@ -11,6 +11,8 @@
 
 # node
 node_modules
+dist
+*.tsbuildinfo
 
 # rust
 target

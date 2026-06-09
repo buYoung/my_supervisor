@@ -1,0 +1,46 @@
+@import "./shared/theme.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background: rgb(var(--color-background));
+    color: rgb(var(--color-foreground));
+    font-family: Inter, "Fira Sans", system-ui, sans-serif;
+  }
+
+  button,
+  [role="tab"],
+  input,
+  select {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgb(var(--color-primary) / 0.24);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

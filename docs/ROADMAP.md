@@ -14,9 +14,24 @@
 
 ---
 
+## 구현 전략 (범위·순서·품질)
+
+본 로드맵의 단계들은 아래 전략 위에서 읽는다 (DD-026 동등 이원, DD-002 호스트 이원).
+
+- **동등 이원 범위**: **운영**(`Process` + `Job`)과 **자동화**(`Rule`)를 동등한 두 기둥으로 만든다. 자동화는 부가 기능이 아니다.
+- **macOS 우선, 구조는 크로스플랫폼**: 구현은 macOS 호스트(`app/desktop`)를 먼저 완성한다. 단 `core`/`application` 과 port 구조는 크로스플랫폼을 유지하고 Linux/Windows 운영 어댑터는 자리만 확보(stub)한다. 윈도우·핫키 자동화는 macOS **단일 구현 seam** (DD-027).
+- **버리는 PoC 없음 — walking skeleton 부터**: 던져버릴 프로토타입을 만들지 않는다. 실제 crate 구조 위에서 얇은 수직 슬라이스를 production 품질로 만들고 그대로 확장한다. (아래 "PoC" 단계는 이 의미의 walking skeleton 으로 읽는다.)
+- **품질 기준 — 일상 개인 사용에 견고**: 공개 1.0 의 풀 스펙(로그 gzip·메트릭 차트·3-OS 인스톨러 등)은 후순위. **단 자동화(윈도우·핫키)는 "견고하거나 없거나"** — 오작동하는 핫키·윈도우 매니저는 일상 사용에 파괴적이므로 얕게 내지 않는다.
+- **슬라이스 순서**:
+  1. **① 운영** — 프로세스 + 배치(Job). 호스트 이원(코어 임베드) 위에서.
+  2. **② 이벤트 트리거 자동화** — `EventSource`(파일/폴더 watch·타이머) → 프로세스/Job/명령 액션. 크로스플랫폼.
+  3. **③ 윈도우·핫키 자동화** — macOS 전용 seam(AX API·event tap·시스템 이벤트) + 권한 모델(DD-029). "견고하거나 없거나".
+
+---
+
 ## Phase 1: PoC (Proof of Concept)
 
-**목적:** 아키텍처의 **기술적 리스크를 사전에 찌른다.** 완성도·UX는 신경 쓰지 않는다.
+**목적:** 아키텍처의 **기술적 리스크를 walking skeleton 으로 먼저 찌른다.** 단 **버리는 코드가 아니라** 실제 crate 구조 위에서 production 품질로 만들어 그대로 확장한다. 이 단계는 호스트 이원(코어 임베드, DD-002)과 **슬라이스 ① 운영** 의 얇은 수직 경로를 세우는 데 집중한다.
 
 ### 진입 조건
 - 아키텍처 문서 확정
@@ -24,13 +39,13 @@
 
 ### 범위 (검증 대상)
 
-#### 1. Tauri–Daemon 분리 구조
-- Tauri 앱 (`app/desktop`) 실행 → 별도 데몬 프로세스 (`msv-daemon`, `app/daemon`) spawn
-- Tauri 창 닫아도 데몬·자식 프로세스 유지
-- single-instance 동작 확인
-- 데몬 중복 실행 방지
-- React + Vite 번들 (`packages/ui`) 이 Tauri WebView 와 외부 브라우저에서 동일 렌더링·동작 검증 (3개 OS 교차)
-- `app/daemon` bin 이 타겟 OS 에 따라 `platform/linux` · `platform/macos` · `platform/windows` 중 하나의 `LifecycleController` 구현을 `#[cfg(target_os)]` 로 DI 조립하는 경로 확인
+#### 1. 호스트 이원 구조 (코어 임베드 / 헤드리스 데몬)
+- `app/desktop` (Tauri) 가 `core`/`application` 을 **인프로세스 임베드** + 내장 axum HTTP/WS 서버 기동 (별도 `msv-daemon` spawn 없음 — DD-002)
+- 창을 닫아도 tray 상주로 자식 프로세스 유지 → 다시 열면 복귀
+- `tauri-plugin-single-instance` 로 앱 이중 실행 방지
+- `app/daemon` (헤드리스) 이 같은 코어를 임베드해 GUI 없이 동일 API 제공 — **두 호스트가 서로 의존하지 않음** 을 확인 (Tauri 는 데몬을 필요로 하지 않음)
+- React + Vite 번들 (`packages/ui`) 이 Tauri WebView 와 외부 브라우저에서 동일 렌더링·동작
+- 호스트 bin 이 타겟 OS 에 따라 `platform/*` 의 `LifecycleController` 구현을 `#[cfg(target_os)]` 로 DI 조립하는 경로 확인
 
 #### 2. `LifecycleController` port 구현 검증 (OS 별)
 
@@ -109,21 +124,32 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - 수동 트리거 (`trigger now`)
 - `infra/scheduler` crate 구현 — `tokio-cron-scheduler` 기반
 
+#### A''. 자동화 (Rules) — 슬라이스 ②
+
+- `application` Rule use case — `RegisterRule`, `UpdateRule`, `DeleteRule`, `TriggerRuleManual`, `ObserveEvent`
+- Rule CRUD
+- **이벤트 트리거 (크로스플랫폼)**: `FileChange`(파일/폴더 watch — `EventSource`/`notify`) + 타이머
+- **액션**: `StartProcess` / `StopProcess` / `TriggerJob` / `RunCommand` (운영 기둥 연계)
+- 수동 시험 발화 (`msv rule run`, Rules 탭)
+- RuleFire 이력 (SQLite, 최근 N 회 유지)
+- **윈도우·핫키·macOS 시스템 이벤트 트리거/액션은 Phase 3 (슬라이스 ③)** — MVP 는 port(seam) 자리만 확보하고, 미구현 트리거/액션은 등록 거부 (DD-027)
+
 #### B. 로깅
 - 프로세스별 로그 파일 (append-only, 로테이션 없음)
 - Job Run 별 로그 파일 (run 단위 아카이브, 로테이션 없음)
 - 기본 텍스트 포맷 (JSON은 Production에서)
 
 #### C. Desktop (Tauri)
-- 앱 실행 → 데몬 spawn → WebView 로드
+- 앱 실행 → 코어 임베드 + 내장 서버 기동 → WebView 로드 (별도 데몬 spawn 없음)
 - 트레이 아이콘 + 기본 메뉴 (열기 / 종료)
 - user-level 자동 시작 등록 (`tauri-plugin-autostart`)
 - 최소 WebUI:
-  - 상위 IA 5 개 탭: **Processes · Jobs · Logs · Daemon · Settings**
+  - 상위 IA (동등 이원, DD-026): **운영 — Processes · Jobs · Logs** / **자동화 — Rules** / **공통 — Daemon · Settings**
   - 프로세스 목록 (이름, 상태, **관리 모드 뱃지 — Direct / System**, PID 또는 unit, 업타임) + start/stop/restart 버튼 + 프로세스 추가·수정·삭제 폼 (Add Process 폼에 관리 모드 라디오)
   - Process Detail 에 관리 모드 전환 버튼 (Direct ↔ SystemRegistered), 전환 시 진행 상태 및 실패 시 롤백 표시
   - Job 목록 (이름, trigger 요약, 마지막 run, 다음 예정 시각) + Trigger Now 버튼 + Run 이력 테이블 + Job 추가·수정·삭제 폼
   - 로그 뷰어 (최근 N 줄, 프로세스/Job Run 공용). SystemRegistered 프로세스는 journald/launchd logs/Event Log 에서 집계되어 보임
+  - **Rule 목록** (이름, 트리거 요약, 마지막 발화, enabled) + 시험 발화 버튼 + Rule 추가·수정·삭제 폼 (트리거: 파일/폴더 watch·타이머 / 액션: 프로세스·Job·명령). 윈도우·핫키 트리거/액션은 Phase 3 (슬라이스 ③)
   - 테마 토글 (auto / dark / light) — 두 모드 동등 지원 (DD-021)
 
 #### D. CLI
@@ -138,6 +164,7 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - `msv jobs runs <name> [--limit 20]`
 - `msv jobs logs <name> <run-id> [-f]`
 - `msv jobs rm <name> [--force]`
+- `msv rule ls` / `msv rule add -c rule.toml` / `msv rule run <name>` / `msv rule rm <name>` (자동화 — 슬라이스 ②)
 - JSON 출력 (`-o json`) 기본 지원
 
 #### E. 배포
@@ -146,6 +173,7 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 
 ### 완료 조건
 - 본인의 평소 프로세스 2~3 개 + Job 1 개 이상을 my-supervisor 로 대체하여 **1주일 연속 무탈 운영**
+- **이벤트 트리거 Rule 1 개 이상** (예: 폴더 변경 → 프로세스 재시작/명령 실행) 등록·동작 (슬라이스 ②, DD-026)
 - 그중 **최소 1 개 프로세스는 `management_mode = SystemRegistered`** 로 운영 (사용자 주 사용 OS 에서)
 - Direct ↔ SystemRegistered 양방향 전환 시나리오 성공 (convert API + CLI 양쪽)
 - 설치·사용 중 명확한 블로커가 없음
@@ -248,6 +276,14 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 - Job run 아카이브 로그를 별도 디렉터리로 ( `~/.local/share/my-supervisor/job-runs/<name>/<run-id>/`)
 - Job templates / cloning
 
+#### H''. 자동화 확장 (Rules) — 슬라이스 ③ (윈도우·핫키, macOS)
+
+- macOS 단일 구현 seam 완성 (DD-027): `WindowAutomation`(AX API), `HotkeyBinder`(event tap), `SystemEventWatcher`(NSWorkspace/IOKit)
+- Rule 트리거에 `SystemEvent` · `Hotkey` 추가, 액션에 `Window`(이동·리사이즈·레이아웃) 추가
+- **권한 모델 (DD-029)**: Accessibility / Input Monitoring 권한 요청·상태 표시·graceful degradation (`enabled = false (permission_required)`)
+- **"견고하거나 없거나"**: 윈도우·핫키는 얕게 내지 않는다. 오작동 시 사용자 작업을 방해하므로 견고하게 완성하거나 비활성으로 둔다
+- 비-macOS 호스트는 이 영역 비활성 (등록 거부 유지)
+
 #### I. 배포 완성
 - 3개 OS 설치 프로그램 (Windows MSI, macOS DMG, Linux deb + AppImage)
 - Server용 `curl \| sh` 설치 스크립트
@@ -347,6 +383,10 @@ spec 테스트는 `application` 레이어에서 trait object 로 작성하여 3 
 | R16 | 재시작 엔진 이중 발화 — 데몬 backoff + OS `Restart=` 가 동시 동작하면 상태 깨짐 | MVP | `management_mode = SystemRegistered` 에서 `RestartProcess` use case 를 no-op 로 강제 (DD-025), 테스트로 회귀 방지 |
 | R9 | SQLite 락 경합 (많은 프로세스 + 잦은 이벤트) | Production | WAL 모드, 배치 쓰기 |
 | R10 | 데몬 크래시 시 관리 중이던 자식의 고아화 | Production | subreaper + write-ahead state |
+| R17 | 자동화 권한 미부여 — AX/핫키 권한 없으면 윈도우·핫키 Rule 무동작 | MVP→Production | graceful degradation: `enabled = false (permission_required)` + UI 상태·설정 안내, 조용한 실패 금지 (DD-029) |
+| R18 | 윈도우 자동화 누수 — AX API 가 앱·Space·디스플레이 변화에 취약 | Production | "견고하거나 없거나" 원칙, macOS 단일 구현으로 케이스 집중, 실패 시 명확한 사유 노출 |
+| R19 | 글로벌 핫키 충돌 — 다른 앱·OS 단축키와 겹침 | Production | 등록 시 충돌 감지·경고, 사용자 재바인딩 UX |
+| R20 | 비-macOS 호스트에 윈도우/핫키 Rule 등록 시도 | MVP→Production | 등록 시점 `not_supported_on_platform` 거부, seam 미주입(`None`) (DD-027) |
 
 ---
 

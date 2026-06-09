@@ -28,18 +28,33 @@
 
 ---
 
-## DD-002: 데몬과 UI의 분리
+## DD-002: 데몬과 UI — core 공유, 호스트 이원 (개정)
 
-**결정:** Tauri 앱 안에 데몬 로직을 넣지 않는다. 데몬은 별도 바이너리.
+**결정(개정):** 핵심 로직은 `core` + `application` **공유 라이브러리 crate** 에 둔다. 이 코어를 **두 호스트** 가 각각 임베드한다.
 
-**맥락:** UI 창을 닫았을 때 관리 중인 프로세스가 죽어선 안 됨. 동시에 서버 배포(Tauri 없이)도 지원해야 함.
+- **`app/desktop` (Tauri, 데스크톱)** — 코어를 **인프로세스로 임베드** 하고 tray 로 상주한다. **별도 데몬 프로세스를 spawn 하지 않는다.** WebView UI · macOS 자동화 권한 · tray · 알림 · autostart 담당.
+- **`app/daemon` (헤드리스 바이너리, 서버)** — 같은 코어를 임베드한다. Tauri · GUI 의존 없음. SSH/컨테이너에서 운영 기둥을 돌린다.
 
-**이유:**
-- UI 프로세스 ≠ supervisor 프로세스. 생명주기 독립 보장.
-- Server 배포에서 GUI 의존성 제거 필요.
-- 같은 데몬을 Tauri든 브라우저든 동일하게 소비.
+양쪽 호스트 모두 axum HTTP/WebSocket 서버를 내장하며, CLI · 외부 브라우저가 동일 API 로 접속한다(DD-003 유지).
 
-**대안:** Tauri 단일 프로세스 구조. **기각** — 요구사항 위반.
+**맥락(개정 배경):** 초기 결정은 "데몬은 **항상** 별도 바이너리이고 Tauri 가 그 데몬을 spawn·접속" 이었다. 그러나 (1) 제품을 운영 + 자동화 **동등 이원**(DD-026)으로 재정의하면서 자동화(윈도우/핫키)는 **GUI 세션 전용** 이 되었고, (2) 데스크톱에서 별도 데몬을 spawn·중복방지·재연결하는 복잡도가 개인용 도구에는 과했다.
+
+**핵심 분할 (이 개정의 근거):**
+
+| 기둥 | 헤드리스 | 자연스러운 호스트 |
+|---|---|---|
+| 자동화 (윈도우/핫키) | **불가** (GUI 세션 · TCC 권한 필수) | `app/desktop` (권한 받는 네이티브 프로세스) |
+| 운영 (프로세스/Job) | 가능 | 데스크톱은 `app/desktop`, 서버는 `app/daemon` |
+
+자동화는 GUI 세션을 요구하므로 데스크톱 Tauri 호스트가 자연스럽고, 운영만 필요한 서버는 헤드리스 데몬으로 간다. **둘 다 같은 코어** 라 Hexagonal 로 거의 공짜다.
+
+**창 닫힘 / 생명주기:** 데스크톱에서 창을 닫아도 Tauri 가 tray 로 상주하므로 supervision 이 유지된다(`tauri-plugin-single-instance` 단일 인스턴스, `tauri-plugin-autostart` 로그인 재실행). **포기하는 것은 UI 크래시로부터의 프로세스 격리 하나** 뿐이며, 이는 "시스템앱 수준 견고함" 으로 일상 개인용 기준에서 수용한다.
+
+**대안:**
+- Tauri 가 별도 데몬을 spawn·접속(원안). **기각** — 데스크톱에 불필요한 spawn/중복방지/재연결 복잡도.
+- Tauri 폐기 + 데몬 + 브라우저(SSR/CSR). **기각** — 자동화 권한 · 패키징(.app) · tray 를 데몬이 직접 떠안게 되어 복잡도가 사라지지 않고 이동할 뿐이고, 데스크톱 "앱" 경험도 상실. SSR 은 로컬 단일 사용자에 실익이 없다.
+
+**DD-003 과의 관계:** DD-003(HTTP/WS 통신)은 유지. "별도 프로세스 spawn 여부(DD-002)" 와 "프론트가 HTTP 를 쓰는가(DD-003)" 는 분리된 결정이다.
 
 ---
 
@@ -228,10 +243,10 @@
 
 ## DD-015: 배포 형태 — Desktop과 Server 두 트랙
 
-**결정:** 같은 데몬 바이너리를 두 방식으로 패키징.
+**결정:** 같은 `core`/`application` 을 두 호스트로 패키징 (DD-002).
 
-- Desktop: Tauri 앱 + 데몬 + CLI (통합 인스톨러)
-- Server: 데몬 + CLI (경량 설치 스크립트 / Docker)
+- Desktop: Tauri 앱 (코어 임베드) + CLI (통합 인스톨러)
+- Server: 헤드리스 데몬 (코어 임베드) + CLI (경량 설치 스크립트 / Docker)
 
 **이유:**
 - 본서비스는 Desktop이지만 서버 수요 무시 불가
@@ -508,6 +523,95 @@ SystemRegistered 모드에서 my-supervisor 내부의 backoff/crash-loop 로직�
 
 ---
 
+## DD-026: 자동화 도메인 추가 — `Rule` 단일 엔티티 (동등 이원)
+
+**결정:** 제품을 **운영(Operations)** 과 **자동화(Automation)** 의 **동등한 두 기둥** 으로 재정의한다. 자동화는 `Rule` **단일 도메인 엔티티** 로 모델링하며, `Process` · `Job` 과 병렬인 제3 엔티티다. 자동화는 부가 기능이 아니라 운영과 같은 1 급 영역이다.
+
+**맥락:** 초기 범위는 PM2 형 프로세스 관리 + cron 형 배치였다. 사용자 결정으로 범위를 Hammerspoon 영역(이벤트 기반 OS 자동화, 윈도우 관리, 글로벌 핫키)까지 확장하고, 무게중심을 한쪽에 두지 않는 **동등 이원** 으로 잡았다.
+
+**모델:** `Rule = Trigger(이벤트) + Action[]`.
+
+| 구성 | 종류 (MVP 방향) |
+|---|---|
+| Trigger | 파일/폴더 변경, 시스템 이벤트(USB · WiFi · 화면 잠금 · 앱 실행), 글로벌 핫키 |
+| Action | 프로세스 start/stop, Job 트리거, 명령 실행, 윈도우 액션(이동 · 리사이즈 · 레이아웃) |
+
+**이유:**
+- **단일 엔티티의 일관성**: "이벤트 → 액션" 이라는 한 가지 멘탈 모델로 자동화 전체를 표현. 윈도우 · 핫키도 별도 도메인으로 쪼개지 않고 Rule 의 트리거/액션으로 흡수한다.
+- **DD-023 의 연장**: `Process`(무기한 수명) ≠ `Job`(유한 run 의 성공/실패) ≠ `Rule`(이벤트 발화 → 액션). 라이프사이클·이력 의미가 셋 다 달라 별도 엔티티가 타입 안전하다.
+- **이력 의미 분리**: Rule 은 활성/비활성 상태 + **발화별 실행 이력**(언제 어떤 이벤트로 발화했고 액션이 성공했는가)을 가진다. Process 의 "얼마나 살았나", Job 의 "각 run 의 성패" 와 또 다른 도메인 질문이라 테이블·쿼리가 분리된다.
+
+**동등 이원 IA:** 운영(Processes · Jobs · Logs) + 자동화(Rules) + 공통(Daemon · Settings).
+
+**대안:**
+- 윈도우 관리 · 핫키를 각각 독립 도메인으로 분리. **기각** — 도메인이 3~4 개로 분화되어 MVP 복잡도만 증가. 단일 Rule 로 충분히 표현된다.
+- Rule 을 Job 에 흡수(트리거 종류만 추가). **기각** — 시간 기반과 이벤트 기반 트리거의 의미·이력이 섞인다 (DD-028).
+
+**관련:** DD-027(자동화 OS 정책), DD-028(트리거 분리), DD-029(권한 모델).
+
+---
+
+## DD-027: 자동화 OS 정책 — 윈도우/핫키는 macOS 전용 (단일 구현 seam, stub 없음)
+
+**결정:** 윈도우 관리 · 글로벌 핫키 · macOS 고유 시스템 이벤트는 **여러 OS 가 구현하도록 강제하는 크로스 플랫폼 port 로 만들지 않는다.** 대신 `core::ports` 에 trait 를 두되 **구현자가 `platform/macos` 하나뿐이고 Linux/Windows stub 을 만들지 않는** *단일 구현 seam* 으로 둔다. 프로세스·배치 코어와 크로스 플랫폼 이벤트 소스(파일/폴더 watch, 타이머)는 기존대로 여러 OS 가 구현하는 port 로 둔다.
+
+**맥락:** 이 저장소의 Hexagonal 원칙(DD-017)은 *"같은 개념을 OS 마다 다른 커널 API 로 구현한다"* 를 전제한다. 이 전제는 프로세스 코어에는 성립하지만(같은 "tied 모드" 를 Linux `PR_SET_PDEATHSIG` / Windows Job Object / macOS shutdown hook 으로 구현), **윈도우/핫키에는 깨진다** — macOS Accessibility(AX API) · X11/Wayland · Windows 는 윈도우·입력 모델의 패러다임 자체가 다르다. 크로스 플랫폼 윈도우 추상화는 누수가 심하기로 악명 높다.
+
+**미러링 함정과 그 회피:** 함정은 *여러 OS 가 구현해야 하는 trait + 빈 stub* 을 만들어 **존재하지 않는 공통 개념을 강제** 하는 것이다(DD-023 "섣부른 추상화 금지" 위반). 이를 피하되 DD-017/018 의 두 불변식을 깨지 않으려면 **DI seam 과 크로스 플랫폼 port 를 구분** 한다:
+
+- **trait 는 `core::ports` 에 둔다** — `WindowAutomation` · `HotkeyBinder` · `SystemEventWatcher`. **단 구현자는 `platform/macos` 단 하나이고 Linux/Windows stub 을 만들지 않는다.** 이것이 "여러 OS 구현 강제 + 빈 stub"(미러링 함정)과의 결정적 차이다.
+- **`application` 은 `Option<&dyn WindowAutomation>` 형태로 소비한다** — `#[cfg]` 없음, `platform/*` 의존 없음. (DD-017: `application` 은 `core` 만 의존 / DD-018: cfg 는 `application` 에 등장하지 않음 — **둘 다 보존**)
+- **`app/daemon` 의 DI 조립부에서만 `#[cfg(target_os = "macos")]`** 로 macOS 에선 `Some(MacWindowAutomation)`, 그 외 OS 에선 `None` 을 주입한다. cfg 는 여기에만 등장한다(DD-018 의 "cfg 는 `app/daemon` 에만" 규칙 준수).
+- **비-macOS 빌드** 에선 주입이 `None` 이므로, 윈도우/핫키 액션은 Rule **등록 시점에** `not supported on this platform` 으로 거부된다(조용한 무시 금지).
+
+**경계 (port 종류 · 구현):**
+
+| 영역 | port 종류 | 구현 |
+|---|---|---|
+| 프로세스 액션 (start/stop) | 크로스 플랫폼 port (다중 OS 구현) | 기존 `LifecycleController` · `ShutdownSignaler` 재사용 |
+| 이벤트 소스 — 파일/폴더 watch, 타이머 | 크로스 플랫폼 port (다중 OS 구현) | `core::ports::EventSource` (adapter: `notify` 기반) |
+| 윈도우 제어 | 단일 구현 seam (stub 없음) | `core::ports::WindowAutomation` → `platform/macos` (AX API) |
+| 글로벌 핫키 | 단일 구현 seam (stub 없음) | `core::ports::HotkeyBinder` → `platform/macos` (event tap) |
+| macOS 고유 시스템 이벤트 | 단일 구현 seam (stub 없음) | `core::ports::SystemEventWatcher` → `platform/macos` (NSWorkspace/IOKit) |
+
+**트레이드오프:** 향후 Windows/Linux 윈도우 관리 수요가 생기면, 그때 해당 trait 에 OS 별 구현을 **실제로 추가** 한다(빈 stub 을 미리 만들지 않는다). 누수 추상화를 선제적으로 만드는 것보다 정직하다.
+
+**관련:** 앞서 검토된 `LifecycleController` 의 `ChildHandle`/trait 시그니처를 Windows Job Object 모델까지 수용하도록 확정하는 작업은 **프로세스 코어에만** 해당하며(슬라이스 ①), 단일 구현 seam 인 자동화 trait 에는 적용하지 않는다.
+
+---
+
+## DD-028: 트리거 모델 — `Job`(시간 기반) 과 `Rule`(이벤트 기반) 분리
+
+**결정:** 시간 기반 트리거(cron / interval / one_shot / depends_on)는 `Job` 이, 이벤트 기반 트리거(파일·시스템 이벤트·핫키)는 `Rule` 이 담당한다. 둘을 단일 통합 트리거 추상으로 합치지 않는다.
+
+**맥락:** 자동화 추가로 트리거 종류가 시간 + 이벤트로 늘었다. (A) 통합 트리거 추상 vs (B) Job/Rule 분리 를 검토했다.
+
+**이유:**
+- **도메인 경계 명확**: `Job` 은 "예정된 시각에 유한 작업 실행"(run 성공/실패 이력 중심), `Rule` 은 "이벤트 발생 시 액션 실행"(발화 이력 중심). 의미가 다르다.
+- **DD-023 정신 일관**: `Process` ≠ `Job` ≠ `Rule`. 트리거를 통합하면 런타임마다 "이 트리거는 시간인가 이벤트인가" 를 판단해야 하고 상태/이력 의미가 섞인다.
+- **이득 < 비용**: 통합 추상의 유연성 이득보다 경계 흐림 비용이 크다.
+
+**트레이드오프:** "매일 2 시 + 폴더 변경 중 먼저 오는 쪽" 같은 혼합 트리거는 직접 표현 불가. 필요 시 **Rule 이 Job 을 트리거(action)** 하는 식으로 조합한다. 정식 혼합 트리거는 향후 검토.
+
+**대안:** 통합 트리거 모델. **기각** — 경계 흐림, 상태/이력 의미 혼합.
+
+---
+
+## DD-029: macOS 자동화 권한 모델 — Accessibility / Input Monitoring, graceful degradation
+
+**결정:** 윈도우 제어는 **Accessibility 권한**, 글로벌 핫키는 **Input Monitoring 권한** 을 요구한다. 권한 미부여 시 해당 기능만 **graceful degradation**(비활성 + 명확한 안내)으로 처리하고, 나머지 기능은 정상 동작시킨다.
+
+**맥락:** macOS 는 윈도우·입력 제어에 사용자 명시적 권한 부여(TCC)를 요구한다. 권한 없이는 AX API · event tap 이 동작하지 않는다.
+
+**이유:**
+- **부분 실패 격리**: 권한 미부여가 앱 전체를 막으면 안 된다. 운영(프로세스/배치)과 크로스 플랫폼 트리거는 권한과 무관하게 동작한다.
+- **상태 가시화**: 권한 필요 기능은 UI 에서 상태(부여됨 / 필요함)를 표시하고, 원클릭 시스템 설정 안내를 제공한다.
+- **"견고하거나 없거나" 원칙(README 핵심 가치)**: 권한이 없으면 윈도우/핫키 Rule 을 "비활성(권한 필요)" 으로 명확히 표기한다. **조용한 실패는 금지** — 사용자가 "왜 핫키가 안 먹지" 를 추측하게 만들지 않는다.
+
+**DD-011(localhost 바인딩) 과의 관계:** DD-011 은 WebUI 접근 통제 축이고, DD-029 는 OS 자원 접근 권한 축이다. 서로 독립이며, 자동화 권한은 OS TCC 에 위임한다.
+
+---
+
 ## 변경 로그
 
 - 2026-04-21: 초기 작성 (DD-001 ~ DD-015)
@@ -515,3 +619,5 @@ SystemRegistered 모드에서 my-supervisor 내부의 backoff/crash-loop 로직�
 - 2026-04-21: DD-017 ~ DD-020 추가 (Hexagonal 채택, OS별 crate 분리, Infra crate 카테고리 분리, 프론트엔드 feature-based 모듈)
 - 2026-04-23: DD-021 ~ DD-024 추가 (테마 동등 지원, Cron 데몬 내장, Job≠Process 모델링, Job 의존성 MVP 범위)
 - 2026-04-23: DD-025 추가 (프로세스 관리 모드 이원화 — Direct/SystemRegistered, MVP 포함, 재시작 엔진 충돌 회피)
+- 2026-06-09: DD-026 ~ DD-029 추가 (자동화 도메인/`Rule` 동등 이원, 자동화 OS 정책 — 윈도우·핫키 macOS 전용, 트리거 `Job`/`Rule` 분리, macOS 자동화 권한 모델)
+- 2026-06-09: DD-002 개정 (데몬은 항상 별도 바이너리 → `core` 공유 + 호스트 이원: Tauri 데스크톱 임베드 / 헤드리스 데몬. 데스크톱의 별도 데몬 spawn 제거, DD-003 유지)

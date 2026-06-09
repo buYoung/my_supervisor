@@ -4,9 +4,9 @@
 
 ## 1. 설계 원칙
 
-1. **데몬과 UI의 분리** — UI 창을 닫거나 Tauri 앱이 종료되어도 관리 중인 프로세스는 영향을 받지 않는다.
-2. **단일 통신 프로토콜** — Tauri WebView·브라우저·CLI가 모두 동일한 HTTP/WebSocket API를 사용한다.
-3. **단일 코어 바이너리** — Desktop·Server 배포는 동일한 데몬 바이너리를 공유한다.
+1. **GUI 호스트와 헤드리스 호스트 (독립)** — `core`/`application` 을 공유 라이브러리로 두고, **GUI 가 있는 my-supervisor**(`app/desktop`, Tauri)와 **GUI 가 없는 my-supervisor**(`app/daemon`, 헤드리스)가 각각 이 코어를 임베드한다. **둘은 독립이며 Tauri 는 데몬을 spawn 하지도, 필요로 하지도 않는다**(DD-002). 데스크톱에서 창을 닫아도 tray 로 상주해 관리 중인 프로세스는 유지된다.
+2. **단일 통신 프로토콜** — Tauri WebView·브라우저·CLI가 모두 동일한 HTTP/WebSocket API를 사용한다(각 호스트가 내장 서버로 제공).
+3. **단일 코어, 두 호스트** — Desktop·Server 배포는 동일한 `core`/`application` 라이브러리를 공유하고, 호스트 바이너리(`app/desktop` · `app/daemon`)만 다르다.
 4. **GUI 우선, CLI 동등** — 주 사용자는 데스크톱 GUI, 그러나 CLI로도 동일 기능을 수행할 수 있어야 한다.
 5. **Opt-in 시스템 통합** — 시스템 서비스 등록은 기본이 아니며 사용자가 명시적으로 활성화한다.
 6. **Hexagonal 아키텍처 (Ports & Adapters)** — 도메인 로직은 OS·DB·네트워크 세부를 모른다. 모든 외부 의존은 `core` crate 의 port trait 로 추상화되고, `platform-*` · `infra-*` crate 가 adapter 로 구현한다. `#[cfg(target_os)]` 분기는 최상위 bin(`app/daemon` 등)에만 존재한다. 근거: DD-017 ~ DD-019.
@@ -30,11 +30,12 @@ PoC의 교차 검증 환경은 이 기준선에서 선정한다.
 
 ### Desktop 배포 (본서비스)
 
-단일 설치 프로그램이 세 개의 아티팩트를 설치:
+단일 설치 프로그램이 두 개의 아티팩트를 설치한다 — **데스크톱은 Tauri 앱이 코어를 임베드하므로 별도 `msv-daemon` 을 설치하지 않는다** (DD-002):
 
-- `msv-daemon` — 실제 supervisor 프로세스 (crate: `my-supervisor-app-daemon`)
+- Tauri 앱 — **GUI 가 있는 my-supervisor**. `core`/`application` 임베드 + 내장 HTTP/WS 서버 (crate: `my-supervisor-app-desktop`)
 - `msv` — CLI 클라이언트 (crate: `my-supervisor-app-cli`, PATH에 등록)
-- Tauri 앱 — 데스크톱 GUI 셸 (crate: `my-supervisor-app-desktop`)
+
+> 헤드리스 `msv-daemon` (crate: `my-supervisor-app-daemon`) 은 **Server 배포** 전용이다 (아래).
 
 패키지 형식:
 
@@ -81,10 +82,13 @@ my-supervisor/
 │   ├── core/                        # 도메인 + port trait (std/serde/uuid 수준만 의존)
 │   │   └── src/
 │   │       ├── domain/              # Process·ProcessState·RestartPolicy·ChildHandle,
-│   │       │                        #  Job·JobTrigger·JobRun·JobRunState·OverlapPolicy, …
+│   │       │                        #  Job·JobTrigger·JobRun·JobRunState·OverlapPolicy,
+│   │       │                        #  Rule·RuleTrigger·RuleAction·RuleFire, …
 │   │       └── ports/               # LifecycleController, ShutdownSignaler, AutoStartService,
 │   │                                #  LogSink, StateRepository, HealthChecker, ConfigSource,
-│   │                                #  Scheduler, JobRepository, JobRunner, …
+│   │                                #  Scheduler, JobRepository, JobRunner,
+│   │                                #  EventSource(크로스플랫폼), WindowAutomation·HotkeyBinder·
+│   │                                #  SystemEventWatcher(macOS 단일 구현 seam — DD-027), …
 │   ├── application/                 # use case (ports 에만 의존)
 │   │   └── src/
 │   │       ├── start_process.rs
@@ -231,12 +235,13 @@ msv ui                     # 브라우저로 WebUI 열기
 
 #### 4.1.3 `app/desktop` (Tauri bin)
 
-데몬의 프론트엔드 셸. 로직은 최소화하고 대부분 Rust 단에서는 "데몬 관리"만 담당.
+**GUI 가 있는 my-supervisor.** `core`/`application` 을 **인프로세스로 임베드** 하고, 내장한 axum HTTP/WS 서버를 자신의 WebView 가 소비한다. **별도 `msv-daemon` 을 spawn 하지 않으며 데몬을 필요로 하지 않는다**(DD-002). `app/daemon` 과는 같은 코어를 공유할 뿐, 서로 의존하지 않는 독립 호스트다.
 
 **책임:**
-- 앱 시작 시 데몬 헬스체크 → 없으면 `msv-daemon` spawn
+- 코어 임베드 + 내장 axum HTTP/WS 서버 기동 (`127.0.0.1:<port>`)
 - WebView 에 `http://127.0.0.1:<port>` 로드 (번들된 `packages/ui` 를 서빙)
-- 트레이 아이콘 + 메뉴
+- 트레이 아이콘 + 메뉴 (창을 닫아도 tray 로 상주 → supervision 유지)
+- **macOS 자동화 권한(Accessibility / Input Monitoring) 보유 주체** — 윈도우·핫키 Rule 실행 (DD-027 · DD-029). 헤드리스 `app/daemon` 은 이 경로가 비활성
 - 네이티브 알림 (crash loop 진입 등)
 - OS 자동 시작 등록 (user-level) — `platform/*` 의 `AutoStartService` adapter 재사용 가능
 
@@ -269,7 +274,13 @@ msv ui                     # 브라우저로 WebUI 열기
 - `ObserveJobRunCompleted` — 완료 시 의존 Job (downstream) 순회. `on_dependency_failure` 에 따라 skip/run 결정
 - `CancelJobRun` — 진행 중 Run 중단. 내부적으로 `ShutdownSignaler` 사용
 
-Use case 는 OS 를 모른다 (#[cfg] 없음). 모든 플랫폼 차이는 port 호출로 위임한다. Job 영역도 동일 — cron 파싱·타이머는 `Scheduler` adapter, spawn 은 `LifecycleController` 에 위임.
+**Rule 영역 use case** (§13 참조):
+
+- `RegisterRule` / `UpdateRule` / `DeleteRule` — CRUD. 등록 시 트리거·액션 유효성 검증. **윈도우·핫키 액션이 포함됐는데 호스트가 비-macOS(자동화 seam 미주입)면 `not supported on this platform` 으로 거부** (DD-027)
+- `TriggerRuleManual` — 트리거 무관하게 액션을 즉시 1회 실행 (Rules 탭의 시험 발화 / `msv rule run <name>`)
+- `ObserveEvent` — `EventSource`(파일/폴더·타이머) 또는 macOS 이벤트 seam 이 이벤트를 발행하면 수신 → 매칭 Rule 의 액션 실행. 액션은 `LifecycleController`(프로세스)·`JobRunner`(Job)·`WindowAutomation`(윈도우) 등 기존/신규 port 로 위임
+
+Use case 는 OS 를 모른다 (#[cfg] 없음). 모든 플랫폼 차이는 port 호출로 위임한다 — **시간 트리거는 `Scheduler`(Job), 이벤트 트리거는 `EventSource`(Rule)** 로 분리되며(DD-028), 윈도우·핫키 자동화는 `Option<&dyn WindowAutomation>` 같은 **단일 구현 seam** 으로 소비한다(macOS 외 호스트에는 `None`, DD-027). spawn 은 `LifecycleController` 에 위임.
 
 ### 4.3 Core — 도메인 + Ports
 
@@ -338,6 +349,34 @@ pub enum JobTrigger {
 pub enum JobRunState { Pending, Running, Succeeded, Failed, Cancelled, Skipped }
 ```
 
+Rule(자동화) 영역의 도메인 타입은 §13 에 상세. 요약:
+
+```rust
+// crates/core/src/domain/rule.rs 발췌
+pub struct Rule {
+    pub id: RuleId,
+    pub name: String,
+    pub trigger: RuleTrigger,        // one-of (이벤트 기반 — Job 의 시간 기반과 분리, DD-028)
+    pub actions: Vec<RuleAction>,    // 순차 실행
+    pub enabled: bool,               // 비활성 시 트리거 무시 (권한 미부여 윈도우/핫키 Rule 포함, DD-029)
+}
+
+pub enum RuleTrigger {
+    FileChange { path: PathBuf, kind: FsEventKind }, // 크로스플랫폼 (EventSource)
+    SystemEvent(SystemEventKind),  // USB·WiFi·화면잠금·앱 실행 — macOS 전용 seam (DD-027)
+    Hotkey(HotkeySpec),            // 글로벌 핫키 — macOS 전용 seam (DD-027)
+}
+
+pub enum RuleAction {
+    StartProcess(String), StopProcess(String),      // 운영 기둥 연계
+    TriggerJob(JobId),                               // Job 수동 트리거
+    RunCommand { command: String, args: Vec<String> },
+    Window(WindowActionSpec),      // 이동·리사이즈·레이아웃 — macOS 전용 seam (DD-027)
+}
+
+pub enum RuleFireState { Fired, ActionsSucceeded, ActionsFailed, Skipped }
+```
+
 **`core::ports`** — trait 목록.
 
 | Port trait | 역할 | adapter 위치 |
@@ -355,6 +394,12 @@ pub enum JobRunState { Pending, Running, Succeeded, Failed, Cancelled, Skipped }
 | `ConfigSource` | TOML 로드·검증·watch | `config` |
 | `HealthChecker` | HTTP / TCP / exec 헬스체크 | `infra/*` (Phase 3) |
 | `SystemClock` | 시간 의존 (테스트 가짜 주입용) | `infra/*` |
+| `EventSource` | **Rule 이벤트 트리거** — 파일/폴더 watch·타이머. 시간 기반 `Scheduler`(Job)와 분리 (DD-028) | `infra/*` (`notify` 기반, **크로스플랫폼**) |
+| `WindowAutomation` ✱ | Rule 의 윈도우 액션 (이동·리사이즈·레이아웃) | `platform/macos` (AX API) |
+| `HotkeyBinder` ✱ | Rule 의 글로벌 핫키 트리거 | `platform/macos` (event tap) |
+| `SystemEventWatcher` ✱ | Rule 의 macOS 시스템 이벤트 (USB·WiFi·화면잠금·앱 실행) | `platform/macos` (NSWorkspace/IOKit) |
+
+> ✱ **단일 구현 seam** — trait 는 `core::ports` 에 있으나 구현자가 `platform/macos` **하나뿐이며 Linux/Windows stub 을 만들지 않는다.** 여러 OS 가 구현하는 일반 port 와 달리, `application` 은 `Option<&dyn …>` 로 소비하고 `app/desktop`(macOS)만 `Some` 을 주입한다(비-macOS 호스트는 `None`). 근거·미러링 함정 회피: DD-027.
 
 ### 4.4 Shared — Wire Types
 
@@ -431,11 +476,12 @@ React + Vite 기반 단일 번들. feature 단위로 모듈화한다 (DD-020).
 ```
 packages/ui/src/
 ├── features/
-│   ├── processes/    # 목록 / 상세 / 시작·중지·재시작 버튼 / 설정 폼
-│   ├── jobs/         # Jobs 목록 / 상세(Overview·Runs·Config·Dependencies) / Run 상세 / 수동 트리거
-│   ├── logs/         # 로그 뷰어 + follow
-│   ├── daemon/       # 데몬 상태·리로드·종료
-│   └── settings/     # 전역 설정 편집
+│   ├── processes/    # [운영] 목록 / 상세 / 시작·중지·재시작 / 설정 폼
+│   ├── jobs/         # [운영] Jobs 목록 / 상세(Overview·Runs·Config·Dependencies) / Run 상세 / 수동 트리거
+│   ├── logs/         # [운영] 로그 뷰어 + follow
+│   ├── rules/        # [자동화] Rule 목록 / 상세(트리거·액션) / 시험 발화 / 권한 상태(macOS)
+│   ├── daemon/       # [공통] 데몬 상태·리로드·종료
+│   └── settings/     # [공통] 전역 설정 편집
 ├── components/ui/    # shadcn 공용 컴포넌트 (CSS 변수 토큰 기반)
 ├── services/         # api.ts (REST), events.ts (WS)
 └── shared/           # 훅·유틸·타입 (shared crate 의 API 타입을 TS 로 매핑)
@@ -443,7 +489,13 @@ packages/ui/src/
 
 각 feature 폴더는 자기 UI 컴포넌트, 자기 service 호출, 자기 훅을 가진다. 크로스 feature 공유가 필요하면 `shared/` 로 승격한다. Tauri 의 `invoke` IPC 에는 의존하지 않으므로 번들은 Tauri 내부·외부 브라우저에서 동일하게 작동.
 
-**상위 내비게이션 IA**: `Processes · Jobs · Logs · Daemon · Settings` 5 개 최상위 섹션. Jobs 탭이 MVP 부터 별도 존재한다 (DD-022, DD-023).
+**상위 내비게이션 IA (동등 이원, DD-026)**: 좌측 내비를 두 기둥 + 공통으로 그룹화한다.
+
+- **운영(Operations)**: `Processes · Jobs · Logs`
+- **자동화(Automation)**: `Rules` (이벤트→액션; 윈도우·핫키 포함. 윈도우·핫키 등 macOS 전용 기능은 비-macOS 호스트에서 비활성 + 안내)
+- **공통(Common)**: `Daemon · Settings`
+
+Jobs 탭은 MVP 부터 별도 존재(DD-022, DD-023), Rules 탭은 자동화 기둥의 진입점(DD-026)이다.
 
 **테마**: **다크 모드와 라이트 모드를 동등 지원** (DD-021). shadcn/ui 의 CSS 변수 규약 (`--background`, `--foreground`, `--primary`, `--muted`, `--destructive` 등) 을 토큰 단일 출처로 사용하고, 두 모드 모두 `:root` / `[data-theme="dark"]` 에 대칭 정의. `Settings → Theme` 의 `auto` 값은 OS `prefers-color-scheme` 을 추종한다. 디자인 시안 승인 절차에서는 **두 모드 스크린샷을 동시 확인**해야 한다 — 한쪽만 검토하고 다른 쪽을 나중에 맞추면 토큰 대신 하드코드 색이 스며드는 비용이 커진다.
 
@@ -902,7 +954,62 @@ pub trait ProcessServiceRegistrar: Send + Sync {
 - WS 이벤트: `job.registered`, `job.run_scheduled`, `job.run_started`, `job.run_succeeded`, `job.run_failed`, `job.run_skipped`, `job.run_cancelled`
 - CLI: `msv jobs ls / add / trigger / runs / logs / rm`
 
-## 13. 헬스체크
+## 13. Rules (자동화)
+
+프로세스·배치와 **동등한 제2 기둥**(DD-026)으로, **OS 이벤트에 반응해 액션을 실행** 한다. Hammerspoon 이 다루는 영역(파일·시스템 이벤트·핫키·윈도우)을 스크립팅 없이 GUI 로 제공한다. Job 이 **시간 기반**(예정된 시각·주기)인 데 반해 Rule 은 **이벤트 기반** 이며, 둘은 트리거 모델·이력 의미가 달라 별도 도메인 엔티티로 분리한다 (DD-023·DD-028). UI 상 `Rules` 는 자동화 기둥의 최상위 탭이다.
+
+### 13.1 개념
+
+- **Rule** — 사용자가 등록한 자동화 정의 (`trigger` + `actions[]` + `enabled`)
+- **RuleFire** — Rule 의 한 번 발화 인스턴스. 이벤트 발생마다 생성되며 `Fired → ActionsSucceeded | ActionsFailed | Skipped` 로 전이. (Job 의 JobRun 과 대칭이되, 성패의 의미는 "액션 수행 결과")
+- **RuleTrigger** — 3 종 one-of (모두 이벤트 기반):
+  - `FileChange { path, kind }` — 파일/폴더 변경. **크로스플랫폼** (`EventSource`, `notify`)
+  - `SystemEvent(kind)` — USB·WiFi·화면잠금·앱 실행 등. **macOS 전용 seam** (`SystemEventWatcher`)
+  - `Hotkey(spec)` — 글로벌 핫키. **macOS 전용 seam** (`HotkeyBinder`)
+- **RuleAction** — 순차 실행되는 액션 목록:
+  - `StartProcess` / `StopProcess` / `TriggerJob` — **운영 기둥과 연계** (같은 코어의 use case·port 재사용)
+  - `RunCommand` — 임의 명령 1회 실행
+  - `Window(spec)` — 윈도우 이동·리사이즈·레이아웃. **macOS 전용 seam** (`WindowAutomation`)
+
+### 13.2 Ports
+
+| Port | 역할 | 종류 |
+|---|---|---|
+| `EventSource` | 파일/폴더 watch·타이머 이벤트 발행 | 크로스플랫폼 (`notify`) |
+| `SystemEventWatcher` ✱ | macOS 시스템 이벤트 (NSWorkspace/IOKit) | 단일 구현 seam (macOS) |
+| `HotkeyBinder` ✱ | 글로벌 핫키 등록·발화 (event tap) | 단일 구현 seam (macOS) |
+| `WindowAutomation` ✱ | 윈도우 조작 (AX API) | 단일 구현 seam (macOS) |
+
+✱ 표시는 §4.3 의 **단일 구현 seam** — trait 는 `core::ports` 에 있으나 구현자는 `platform/macos` 하나뿐, Linux/Windows stub 없음 (DD-027).
+
+### 13.3 흐름
+
+1. `EventSource`(또는 macOS 이벤트 seam)가 이벤트를 발행
+2. `application::ObserveEvent` 가 수신 → `enabled = true` 이고 트리거가 매칭되는 Rule 선별
+3. Rule 의 `actions[]` 를 순차 실행 — 프로세스/Job 액션은 기존 use case·port, 윈도우 액션은 `WindowAutomation` 으로 위임
+4. 결과를 `RuleFire` 로 기록 (SQLite). 실패 액션은 `ActionsFailed` + 사유 저장
+
+> 시간 기반 트리거는 이 경로가 아니라 `Scheduler`(§12)를 탄다. **`EventSource`(Rule) ↔ `Scheduler`(Job) 는 의도적으로 분리** 되어 있다 (DD-028).
+
+### 13.4 macOS 전용 경계와 권한
+
+- 윈도우·핫키·macOS 시스템 이벤트는 **GUI 세션 + TCC 권한** 이 필요하므로 `app/desktop`(Tauri, macOS) 호스트에서만 동작한다. 헤드리스 `app/daemon` 이나 비-macOS 호스트는 해당 seam 이 `None` 이라, 그런 트리거·액션을 포함한 Rule 은 **등록 시점에 `not supported on this platform` 으로 거부** 된다 (DD-027).
+- 권한 모델 (DD-029): 윈도우 제어는 **Accessibility**, 글로벌 핫키는 **Input Monitoring** 권한이 필요하다. 미부여 시 해당 Rule 을 `enabled = false (권한 필요)` 로 표기하고 UI 에서 상태 + 시스템 설정 안내를 노출한다. **조용한 실패는 금지.**
+- 파일 watch·타이머 트리거와 프로세스/Job/명령 액션은 권한과 무관하게 모든 호스트에서 동작한다.
+
+### 13.5 API·CLI 요약
+
+- `GET/POST/PATCH/DELETE /api/v1/rules` · `/api/v1/rules/{name}` — Rule CRUD
+- `POST /api/v1/rules/{name}/fire` — 수동 시험 발화 (`TriggerRuleManual`)
+- `GET /api/v1/rules/{name}/fires` — 발화 이력
+- `GET /api/v1/automation/permissions` — macOS 권한 상태 (Accessibility / Input Monitoring)
+- CLI: `msv rule ls` · `msv rule add -c rule.toml` · `msv rule run <name>` · `msv rule rm <name>`
+
+상세 wire 스펙은 [API.md](./API.md).
+
+---
+
+## 14. 헬스체크
 
 | 타입 | 동작 |
 |---|---|
@@ -914,7 +1021,7 @@ pub trait ProcessServiceRegistrar: Send + Sync {
 - 실패 임계 초과 시 프로세스 재시작 트리거 (옵션)
 - 상태는 API를 통해 공개
 
-## 14. 리소스 제한 [Post-Production]
+## 15. 리소스 제한 [Post-Production]
 
 Post-Production 단계에서 추가 (ROADMAP Phase 4 §1 참고). 최소한 다음을 지원:
 
@@ -924,7 +1031,7 @@ Post-Production 단계에서 추가 (ROADMAP Phase 4 §1 참고). 최소한 다�
   - macOS: 제한적 (RLIMIT_AS)
 - CPU 쿼터는 복잡도 대비 수요가 낮아 후순위
 
-## 15. 설정 파일 예시
+## 16. 설정 파일 예시
 
 ```toml
 [supervisor]
@@ -1015,7 +1122,7 @@ type = "depends_on"
 jobs = ["nightly-backup"]         # AND 시맨틱, 기본 on-success
 ```
 
-## 16. 보안
+## 17. 보안
 
 요구사항이 "단일 유저 / localhost / 인증 없음"이지만 다음 원칙을 적용:
 
@@ -1025,7 +1132,7 @@ jobs = ["nightly-backup"]         # AND 시맨틱, 기본 on-success
 - 로그 파일도 동일 권한 기본값
 - 원격 접근이 필요해지는 시점에 인증 레이어 추가 (현 단계에선 구현 안 함)
 
-## 17. 관찰성 (Observability)
+## 18. 관찰성 (Observability)
 
 - `/api/v1/metrics` — Prometheus 포맷 *(Post-Production)*
 - 데몬 자체의 tracing 로그 (별도 파일)

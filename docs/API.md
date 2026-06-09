@@ -1,6 +1,6 @@
 # API Reference
 
-`msv-daemon` (crate: `my-supervisor-app-daemon`) 이 외부 클라이언트(데스크톱 Tauri 앱, 외부 브라우저, `msv` CLI, 스크립트) 에게 제공하는 HTTP / WebSocket API 를 정리합니다. 내부적으로는 `crates/infra/http` adapter 가 `core::ports::HttpServer` 를 구현하여 이 엔드포인트를 호스팅합니다.
+**호스트**(데스크톱 `app/desktop` Tauri 앱 또는 헤드리스 `app/daemon`)가 내장 HTTP / WebSocket 서버로 제공하는 API 를 정리합니다. 두 호스트는 같은 `core`/`application` 을 임베드하므로 API 는 동일합니다(DD-002). 클라이언트는 호스트의 WebView · 외부 브라우저 · `msv` CLI · 스크립트입니다. 내부적으로는 `crates/infra/http` adapter 가 `core::ports::HttpServer` 를 구현하여 이 엔드포인트를 호스팅합니다.
 
 > **현재 문서 상태**: **설계 레벨 스펙 초안**. 리포지토리는 아직 PoC 단계 이전이며, 본 문서는 `ARCHITECTURE.md` §5를 기반으로 엔드포인트·오류 포맷·타입을 선정의한 것입니다. request/response 세부 필드는 PoC·MVP 구현 시 확정되며, 구현 이후 Phase 3 §J에서 최종화합니다.
 
@@ -296,6 +296,23 @@
 
 ---
 
+### 2.4 Rules 리소스 (자동화)
+
+`ARCHITECTURE.md §13` (Rules) 의 wire 인터페이스. 이벤트→액션 자동화의 CRUD + 수동 발화 + 발화 이력 + macOS 권한 조회.
+
+| Method | Path | 설명 |
+|---|---|---|
+| `GET` | `/api/v1/rules` | 등록된 Rule 목록 |
+| `POST` | `/api/v1/rules` | Rule 등록 (body: `RuleConfig`). 윈도우·핫키 트리거/액션 포함 시 비-macOS 호스트는 `422 not_supported_on_platform` (DD-027) |
+| `GET` | `/api/v1/rules/{name}` | Rule 상세 |
+| `PATCH` | `/api/v1/rules/{name}` | Rule 수정 (부분 업데이트, `enabled` 토글 포함) |
+| `DELETE` | `/api/v1/rules/{name}` | Rule 제거 |
+| `POST` | `/api/v1/rules/{name}/fire` | 수동 시험 발화 (trigger 무관 즉시 액션 실행) |
+| `GET` | `/api/v1/rules/{name}/fires` | 발화 이력. 쿼리: `limit`, `since`, `state` |
+| `GET` | `/api/v1/automation/permissions` | macOS 자동화 권한 상태 (Accessibility / Input Monitoring). 비-macOS 호스트는 `supported: false` |
+
+**플랫폼 거부**: 윈도우·핫키·macOS 시스템 이벤트를 쓰는 Rule 을 비-macOS 호스트(헤드리스 데몬 포함)에 등록하면 `422 not_supported_on_platform` 을 반환한다 (DD-027). 권한 미부여 상태로 등록하면 수락하되 `enabled = false (permission_required)` 로 표기한다 (DD-029).
+
 ## 3. WebSocket 엔드포인트
 
 | 경로 | 설명 |
@@ -387,7 +404,7 @@ type ProcessState =
 
 ### 4.3 ProcessConfig (요약)
 
-`ARCHITECTURE.md` §15 설정 파일 예시의 `[[process]]` 블록과 대응.
+`ARCHITECTURE.md` §16 설정 파일 예시의 `[[process]]` 블록과 대응.
 
 ```ts
 interface ProcessConfig {
@@ -406,11 +423,11 @@ interface ProcessConfig {
 }
 ```
 
-하위 객체의 필드는 `ARCHITECTURE.md` §15 / §7 / §8 / §9 / §13 과 일치한다. `management_mode` 의 시맨틱은 §6.4.
+하위 객체의 필드는 `ARCHITECTURE.md` §16 / §7 / §8 / §9 / §14 과 일치한다. `management_mode` 의 시맨틱은 §6.4.
 
 ### 4.4 JobConfig · JobStatus · JobRun
 
-`ARCHITECTURE.md` §12 Jobs 섹션 및 §15 설정 예시의 `[[job]]` 블록과 대응.
+`ARCHITECTURE.md` §12 Jobs 섹션 및 §16 설정 예시의 `[[job]]` 블록과 대응.
 
 ```ts
 interface JobConfig {
@@ -473,6 +490,16 @@ type JobRunState =
 ```
 
 ---
+
+### 4.5 RuleConfig · RuleStatus · RuleFire
+
+`ARCHITECTURE.md §13` (Rules) 및 §16 설정 예시의 `[[rule]]` 블록과 대응.
+
+- **RuleConfig** (등록/수정 body): `name`, `trigger` (one-of: `file_change` | `system_event` | `hotkey`), `actions[]` (각 `start_process` | `stop_process` | `trigger_job` | `run_command` | `window`), `enabled`
+- **RuleStatus** (조회 응답): `name`, `trigger` 요약, `actions` 요약, `enabled`, `last_fire` (시각·결과), `fire_count_recent`, `permission` (`granted` | `required` | `not_applicable`)
+- **RuleFire** (발화 이력): `fire_id`, `rule_name`, `fired_at`, `triggered_by` (`event` | `manual`), `state` (`fired` | `actions_succeeded` | `actions_failed` | `skipped`), `action_results[]`
+
+트리거·액션의 플랫폼 가용성은 호스트에 따라 다르다 (§2.4, DD-027). request/response 세부 필드는 구현 시 확정.
 
 ## 5. 오류 응답
 

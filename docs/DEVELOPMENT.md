@@ -74,9 +74,9 @@ crates/
 │   ├── macos/            # kqueue, launchd
 │   └── windows/          # Job Object, Service, Event Log, Task Scheduler
 └── app/
-    ├── daemon/           # bin `msv-daemon` — DI 조립
+    ├── daemon/           # bin `msv-daemon` — 헤드리스 호스트 (코어 임베드, 서버용)
     ├── cli/              # bin `msv`
-    └── desktop/          # bin — Tauri shell
+    └── desktop/          # bin — Tauri 호스트 (GUI 있는 my-supervisor, 코어 임베드)
 ```
 
 `packages/ui/src/` 는 feature 단위:
