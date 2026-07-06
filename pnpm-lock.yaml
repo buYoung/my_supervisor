@@ -14,7 +14,7 @@ importers:
 
   apps/my_supervisor: {}
 
-  packages/ui:
+  apps/my_supervisor/desktop:
     dependencies:
       '@tauri-apps/api':
         specifier: ^2.0.0

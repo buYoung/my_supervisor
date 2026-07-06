@@ -44,7 +44,7 @@
 - 창을 닫아도 tray 상주로 자식 프로세스 유지 → 다시 열면 복귀
 - `tauri-plugin-single-instance` 로 앱 이중 실행 방지
 - `daemon` (헤드리스) 이 같은 코어를 임베드해 GUI 없이 동일 API 제공 — **두 호스트가 서로 의존하지 않음** 을 확인 (Tauri 는 데몬을 필요로 하지 않음)
-- React + Vite 번들 (`packages/ui`) 이 Tauri WebView 와 외부 브라우저에서 동일 렌더링·동작
+- React + Vite 번들 (`apps/my_supervisor/desktop`) 이 Tauri WebView 와 외부 브라우저에서 동일 렌더링·동작
 - 호스트 bin 이 타겟 OS 에 따라 `platform/*` 의 `LifecycleController` 구현을 `#[cfg(target_os)]` 로 DI 조립하는 경로 확인
 
 #### 2. `LifecycleController` port 구현 검증 (OS 별)

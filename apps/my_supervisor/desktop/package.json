@@ -1,11 +1,13 @@
 {
-  "name": "@my-supervisor/ui",
+  "name": "@my-supervisor/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "desktop:dev": "cargo tauri dev",
+    "desktop:build": "cargo tauri build",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false"
   },

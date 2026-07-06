@@ -6,6 +6,7 @@ readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly ROOT_PACKAGE_FILE="${REPOSITORY_ROOT}/package.json"
 readonly APP_PACKAGE_FILE="${REPOSITORY_ROOT}/apps/my_supervisor/package.json"
+readonly DESKTOP_PACKAGE_FILE="${REPOSITORY_ROOT}/apps/my_supervisor/desktop/package.json"
 readonly PNPM_WORKSPACE_FILE="${REPOSITORY_ROOT}/pnpm-workspace.yaml"
 readonly TURBO_FILE="${REPOSITORY_ROOT}/turbo.json"
 
@@ -21,7 +22,7 @@ ensure_pnpm_is_installed() {
 ensure_workspace_directories() {
   mkdir -p \
     "${REPOSITORY_ROOT}/apps/my_supervisor" \
-    "${REPOSITORY_ROOT}/packages"
+    "${REPOSITORY_ROOT}/apps/my_supervisor/desktop"
 }
 
 ensure_root_package_file() {
@@ -37,15 +38,15 @@ ensure_root_package_file() {
   "private": true,
   "packageManager": "pnpm@10.11.0",
   "scripts": {
-    "dev": "turbo run dev --filter=@my-supervisor/ui",
+    "dev": "turbo run dev --filter=@my-supervisor/desktop",
     "build": "turbo run build",
     "build:rust": "turbo run build --filter=@my-supervisor/my-supervisor",
-    "build:ui": "turbo run build --filter=@my-supervisor/ui",
+    "build:desktop": "turbo run build --filter=@my-supervisor/desktop",
     "typecheck": "turbo run typecheck",
     "typecheck:rust": "turbo run typecheck --filter=@my-supervisor/my-supervisor",
-    "typecheck:ui": "turbo run typecheck --filter=@my-supervisor/ui",
-    "desktop:dev": "pnpm --filter @my-supervisor/my-supervisor desktop:dev",
-    "desktop:build": "pnpm --filter @my-supervisor/my-supervisor desktop:build"
+    "typecheck:desktop": "turbo run typecheck --filter=@my-supervisor/desktop",
+    "desktop:dev": "pnpm --filter @my-supervisor/desktop desktop:dev",
+    "desktop:build": "pnpm --filter @my-supervisor/desktop desktop:build"
   },
   "devDependencies": {
     "turbo": "^2.10.3"
@@ -69,14 +70,38 @@ ensure_app_package_file() {
   "private": true,
   "scripts": {
     "build": "cargo build --workspace",
-    "typecheck": "cargo check --workspace",
-    "desktop:dev": "cargo tauri dev",
-    "desktop:build": "cargo tauri build"
+    "typecheck": "cargo check --workspace"
   }
 }
 EOF
 
   echo "apps/my_supervisor/package.json 파일을 생성했습니다."
+}
+
+ensure_desktop_package_file() {
+  if [[ -f "${DESKTOP_PACKAGE_FILE}" ]]; then
+    echo "apps/my_supervisor/desktop/package.json 파일을 재사용합니다."
+    return
+  fi
+
+  cat <<'EOF' > "${DESKTOP_PACKAGE_FILE}"
+{
+  "name": "@my-supervisor/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "desktop:dev": "cargo tauri dev",
+    "desktop:build": "cargo tauri build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false"
+  }
+}
+EOF
+
+  echo "apps/my_supervisor/desktop/package.json 파일을 생성했습니다."
 }
 
 ensure_pnpm_workspace_file() {
@@ -88,7 +113,7 @@ ensure_pnpm_workspace_file() {
   cat <<'EOF' > "${PNPM_WORKSPACE_FILE}"
 packages:
   - "apps/*"
-  - "packages/*"
+  - "apps/*/desktop"
 EOF
 
   echo "pnpm-workspace.yaml 파일을 생성했습니다."
@@ -134,6 +159,7 @@ main() {
   ensure_workspace_directories
   ensure_root_package_file
   ensure_app_package_file
+  ensure_desktop_package_file
   ensure_pnpm_workspace_file
   ensure_turbo_file
   print_next_step

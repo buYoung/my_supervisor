@@ -4,8 +4,6 @@
   "private": true,
   "scripts": {
     "build": "cargo build --workspace",
-    "typecheck": "cargo check --workspace",
-    "desktop:dev": "cargo tauri dev",
-    "desktop:build": "cargo tauri build"
+    "typecheck": "cargo check --workspace"
   }
 }

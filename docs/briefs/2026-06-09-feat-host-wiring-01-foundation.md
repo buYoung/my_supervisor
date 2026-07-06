@@ -6,7 +6,7 @@ feat
 ## Current State (As-Is)
 - `crates/` holds only `crates/.gitkeep`; there is no root `Cargo.toml`, so no Rust workspace exists yet.
 - The Hexagonal layering, crate names (`my-supervisor-*` prefix), and workspace member globs are specified in `docs/DEVELOPMENT.md` §3 and `docs/ARCHITECTURE.md` §3, but no code realizes them.
-- Frontend wire shapes already exist in `packages/ui/src/shared/types.ts` (`ProcessStatus`, `JobStatus`, `JobRun`, `LogLine`, `DaemonStatus`), but they do not literally match the documented wire: `docs/API.md` §4 is snake_case (`restart_count`, `started_at`, `cpu_percent`, `management_mode`, `triggered_by`) while `types.ts` is camelCase and carries derived/divergent fields: `ProcessStatus.uptime` and a nullable `unit_name`/`pid` (Direct mode → `management_mode: direct`, `unit_name: null`); `JobRun.triggeredBy` as a flat string vs the API's tagged `triggered_by` object; and log lines, where the wire is `{timestamp, stream, line}` only but `types.ts` `LogLine` adds `id`/`source`. The authoritative wire contract is `docs/API.md` §4 (snake_case JSON); the Rust `shared` DTO keeps the full §4 shape (including the nullable `unit_name` and `ManagementMode`) even though SystemRegistered *behavior* lands in child 06, and reconciling the FE camelCase is child 04's job, not a change to the wire.
+- Frontend wire shapes already exist in `apps/my_supervisor/desktop/src/shared/types.ts` (`ProcessStatus`, `JobStatus`, `JobRun`, `LogLine`, `DaemonStatus`), but they do not literally match the documented wire: `docs/API.md` §4 is snake_case (`restart_count`, `started_at`, `cpu_percent`, `management_mode`, `triggered_by`) while `types.ts` is camelCase and carries derived/divergent fields: `ProcessStatus.uptime` and a nullable `unit_name`/`pid` (Direct mode → `management_mode: direct`, `unit_name: null`); `JobRun.triggeredBy` as a flat string vs the API's tagged `triggered_by` object; and log lines, where the wire is `{timestamp, stream, line}` only but `types.ts` `LogLine` adds `id`/`source`. The authoritative wire contract is `docs/API.md` §4 (snake_case JSON); the Rust `shared` DTO keeps the full §4 shape (including the nullable `unit_name` and `ManagementMode`) even though SystemRegistered *behavior* lands in child 06, and reconciling the FE camelCase is child 04's job, not a change to the wire.
 - The HTTP/WS surface — routes, request/response bodies, error envelope — is fully specified in `docs/API.md` §2–§5 but unimplemented; WS log follow is per-process / per-run (`/api/v1/processes/{name}/logs`, `/api/v1/jobs/{name}/runs/{run_id}/logs`), not a single global tail.
 - No composition root exists that both hosts (`app/daemon`, `app/desktop`) can call to build the wired use cases and obtain a ready Router.
 
@@ -19,10 +19,10 @@ feat
 
 ## Scope
 ### In Scope
-- Root `Cargo.toml` workspace with member globs per `docs/DEVELOPMENT.md` §3 (`crates/core`, `crates/application`, `crates/shared`, `crates/config`, `crates/infra/*`, `crates/platform/*`, `crates/app/*`).
+- `apps/my_supervisor/Cargo.toml` workspace with member globs per `docs/DEVELOPMENT.md` §3 (`crates/core`, `crates/application`, `crates/shared`, `crates/config`, `crates/infra/*`, `crates/platform/*`, `crates/daemon`, `crates/cli`, `desktop/src-tauri`).
 - `core`: `Process`, `Job` (+ `JobRun` and trigger types), `Log` domain types and the port traits they need — `LifecycleController`/`ChildHandle`, `StateRepository`, `JobRepository`, `Scheduler`, `LogSink`, `ConfigSource`, `Clock`.
 - `application`: use cases for the operations surface, depending only on `core` ports (DD-017).
-- `shared`: wire DTOs matching `packages/ui/src/shared/types.ts` and `docs/API.md` §4, plus the error envelope from `docs/API.md` §5.
+- `shared`: wire DTOs matching `apps/my_supervisor/desktop/src/shared/types.ts` and `docs/API.md` §4, plus the error envelope from `docs/API.md` §5.
 - `infra/http`: the axum Router (REST + WS) translating HTTP/WS ↔ use-case facade; a concrete, enumerated route+type contract. The Router enumerates the in-scope operations endpoints (Process Direct lifecycle, Jobs CRUD incl. `PATCH /api/v1/jobs/{name}` update + trigger + runs history, per-process/per-run Logs WS, daemon status/reload/shutdown, a `GET /api/v1/health` liveness probe, and the global events WS); the `convert` route (`POST /api/v1/processes/{name}/convert`) is omitted from foundation's Router and added by child 06, the `/api/v1/rules*` family stays deferred (Phase 2), and `POST /api/v1/jobs/{name}/runs/{run_id}/cancel` is deferred (it needs transient-run process tracking) — none is stubbed.
 - `infra/sqlite`, `infra/scheduler`, `infra/logging`, `config`: concrete adapters at walking-skeleton depth (real enough to serve live data).
 - A composition/assembly function returning `(Router, lifecycle handles)` for hosts to consume. The Router is returned **unbound** — each host owns its bind address/port (the daemon binds `127.0.0.1:9876`; the Tauri devBridge binds its own configurable loopback port).
@@ -49,7 +49,7 @@ feat
 - `docs/DEVELOPMENT.md` — §3 is the authoritative crate tree, workspace member globs, and `my-supervisor-` package-name prefix.
 - `docs/ARCHITECTURE.md` — §3 (layer responsibilities), §4.2 (use-case list), §4.3 (domain + ports tables).
 - `docs/API.md` — §2 (operations endpoints), §4 (wire types), §5 (error envelope): the Router contract source of truth.
-- `packages/ui/src/shared/types.ts` — the TS wire shapes the Rust `shared` crate must mirror.
+- `apps/my_supervisor/desktop/src/shared/types.ts` — the TS wire shapes the Rust `shared` crate must mirror.
 - `docs/DESIGN_DECISIONS.md` — DD-017 ~ DD-024 are the layering invariants this work must satisfy.
 
 ## Side Effect Checkpoints

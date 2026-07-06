@@ -87,7 +87,7 @@
 - **언어**: Rust (전 컴포넌트)
 - **UI 셸**: Tauri v2
 - **데몬**: tokio + axum
-- **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`packages/ui`, feature 단위 모듈 — DD-020). 다크/라이트 양립.
+- **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`apps/my_supervisor/desktop`, feature 단위 모듈 — DD-020). 다크/라이트 양립.
 - **상위 IA (동등 이원)**:
   - **운영**: Processes · Jobs · Logs
   - **자동화**: Rules (이벤트→액션, 윈도우·핫키 포함)
