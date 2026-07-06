@@ -2,7 +2,7 @@
 //!
 //! This crate owns the backend wiring used by the CLI defaults, the desktop
 //! host, and the thin `msv-daemon` launcher. Cargo still owns Rust dependency
-//! resolution; Turborepo only orchestrates the workspace tasks.
+//! resolution and workspace task boundaries.
 
 use std::path::PathBuf;
 use std::sync::Arc;

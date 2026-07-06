@@ -9,7 +9,7 @@ members = [
     "crates/platform/*",
     "crates/daemon",
     "crates/cli",
-    "desktop/src-tauri",
+    "crates/desktop",
 ]
 
 [workspace.package]

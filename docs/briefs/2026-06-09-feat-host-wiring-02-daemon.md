@@ -5,7 +5,7 @@ feat
 
 ## Current State (As-Is)
 - `apps/my_supervisor/crates/daemon` does not exist; the headless host described in `docs/ARCHITECTURE.md` §4.1.1 and `docs/DEVELOPMENT.md` §3 is unimplemented.
-- The current mock UI header hardcodes a daemon at `127.0.0.1:9876` in `apps/my_supervisor/desktop/src/App.tsx`, which is the conventional local bind documented in `docs/DEVELOPMENT.md` §5.
+- The current mock UI header hardcodes a daemon at `127.0.0.1:9876` in `apps/my_supervisor/crates/desktop/ui/src/App.tsx`, which is the conventional local bind documented in `docs/DEVELOPMENT.md` §5.
 - No process supervises the assembled Router yet; child 01 produces the composition/assembly this host will consume.
 
 ## Desired Outcome (To-Be)
@@ -37,7 +37,7 @@ feat
 - `apps/my_supervisor/crates/daemon/` (proposed) — new headless host crate location.
 - `docs/ARCHITECTURE.md` — §4.1.1 defines the headless daemon host (core embed, no daemon spawn); §4.1.3 is the separate Tauri desktop host.
 - `docs/DEVELOPMENT.md` — §3 (crate placement, `msv-daemon` bin) and §5 (bind port, `RUST_LOG` filters).
-- `apps/my_supervisor/desktop/src/App.tsx` — the `127.0.0.1:9876` endpoint the UI expects to reach.
+- `apps/my_supervisor/crates/desktop/ui/src/App.tsx` — the `127.0.0.1:9876` endpoint the UI expects to reach.
 - `docs/briefs/2026-06-09-feat-host-wiring-01-foundation.md` — prerequisite; provides the assembly and Router this host serves.
 
 ## Side Effect Checkpoints

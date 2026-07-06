@@ -55,17 +55,13 @@ GUI 의존성 없이 데몬과 CLI만 배포:
 
 ## 3. 모노레포 구조
 
-Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. Turborepo는 `apps/my_supervisor/package.json`을 통해 Cargo workspace 전체를 상위 태스크 그래프에 포함한다. 폴더는 카테고리 하위 중첩(`apps/my_supervisor/crates/platform/linux/`, `apps/my_supervisor/crates/infra/sqlite/`, `apps/my_supervisor/crates/daemon/`).
+Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. 폴더는 카테고리 하위 중첩(`apps/my_supervisor/crates/platform/linux/`, `apps/my_supervisor/crates/infra/sqlite/`, `apps/my_supervisor/crates/daemon/`)을 사용한다. 데스크톱 앱도 Cargo workspace member인 `crates/desktop`으로 두고, React/Vite 프론트엔드는 그 하위 `ui/`에 둔다.
 
 ```
 my-supervisor/
 ├── README.md
 ├── docs/
-├── package.json                     # pnpm + Turborepo 루트 스크립트
-├── pnpm-workspace.yaml              # Node 패키지 경계 (apps/*, apps/*/desktop)
-├── turbo.json                       # Node 패키지 태스크 파이프라인
 ├── apps/my_supervisor/
-│   ├── package.json                 # Turborepo에서 Cargo workspace를 대표하는 작업 패키지
 │   ├── Cargo.toml                   # Rust workspace 루트
 │   ├── crates/
 │   │   ├── core/                    # 도메인 + port trait (std/serde/uuid 수준만 의존)
@@ -80,14 +76,14 @@ my-supervisor/
 │   │   ├── platform/
 │   │   │   └── macos/               # launchd, kqueue, macOS 프로세스 제어
 │   │   ├── daemon/                  # 공통 데몬 런타임 lib + thin bin (`msv-daemon`)
-│   │   └── cli/                     # bin (`msv`) — shared 타입 재사용
-│   └── desktop/                     # Tauri 데스크톱 앱
-│       ├── package.json             # React/Vite 앱 패키지
-│       ├── src/                     # React UI
-│       └── src-tauri/               # Tauri Rust crate
-│           ├── Cargo.toml
-│           ├── tauri.conf.json
-│           └── src/main.rs
+│   │   ├── cli/                     # bin (`msv`) — shared 타입 재사용
+│   │   └── desktop/                 # Tauri 데스크톱 앱 crate
+│   │       ├── Cargo.toml
+│   │       ├── tauri.conf.json
+│   │       ├── src/main.rs
+│   │       └── ui/                  # React/Vite UI
+│   │           ├── package.json
+│   │           └── src/
 └── scripts/
     ├── install-server.sh
     └── build-packages.sh
@@ -107,7 +103,7 @@ members = [
     "crates/platform/*",
     "crates/daemon",
     "crates/cli",
-    "desktop/src-tauri",
+    "crates/desktop",
 ]
 ```
 
@@ -140,7 +136,7 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 - **Infra 카테고리 분리**: SQLite → Postgres, axum → 다른 서버 프레임워크로의 교체가 `infra-sqlite` · `infra-http` 만 손대면 된다. `infra-logging` 도 같은 이유로 분리 — Phase 3 의 JSON 로테이션·백프레셔 변경이 다른 crate 를 건드리지 않는다.
 - **Server 배포 크기 최소화**: `cargo build -p my-supervisor-app-daemon` 은 `desktop` (Tauri, GTK/WebView2) 을 건드리지 않는다. 플랫폼별로도 `platform/<현재_OS>` 만 링크된다.
 - **`shared` 와 `core` 의 역할 분리**: `shared` 는 네트워크·파일로 나가는 **wire format** 만 (DTO, 설정 파일 스키마). `core` 는 **도메인 모델** 과 **port trait**. 둘을 섞지 않아야 API 스펙이 도메인 변경에 휘둘리지 않고, 역으로 도메인이 wire 포맷 호환성에 묶이지 않는다.
-- **Feature 단위 프론트엔드**: `apps/my_supervisor/desktop` 의 `features/*` 가 백엔드 port 분리와 대칭. 각 feature 폴더는 자기 UI + service 호출 + 훅을 자기 안에 둔다. 공용 shadcn 컴포넌트는 `components/ui`, HTTP/WS 클라이언트는 `services/` 에 분리.
+- **Feature 단위 프론트엔드**: `apps/my_supervisor/crates/desktop/ui` 의 `features/*` 가 백엔드 port 분리와 대칭. 각 feature 폴더는 자기 UI + service 호출 + 훅을 자기 안에 둔다. 공용 shadcn 컴포넌트는 `components/ui`, HTTP/WS 클라이언트는 `services/` 에 분리.
 
 ## 4. 컴포넌트 설계
 
@@ -206,7 +202,7 @@ msv ui                     # 브라우저로 WebUI 열기
 
 **책임:**
 - 코어 임베드 + 내장 axum HTTP/WS 서버 기동 (`127.0.0.1:<port>`)
-- WebView 에 `http://127.0.0.1:<port>` 로드 (번들된 `apps/my_supervisor/desktop` 를 서빙)
+- WebView 에 `http://127.0.0.1:<port>` 로드 (번들된 `apps/my_supervisor/crates/desktop/ui` 를 서빙)
 - 트레이 아이콘 + 메뉴 (창을 닫아도 tray 로 상주 → supervision 유지)
 - **macOS 자동화 권한(Accessibility / Input Monitoring) 보유 주체** — 윈도우·핫키 Rule 실행 (DD-027 · DD-029). 헤드리스 `daemon` 은 이 경로가 비활성
 - 네이티브 알림 (crash loop 진입 등)
@@ -218,7 +214,7 @@ msv ui                     # 브라우저로 WebUI 열기
 - `tauri-plugin-notification` — 네이티브 알림
 - `tauri-plugin-shell` — 브라우저 열기 등
 
-**프론트엔드:** `apps/my_supervisor/desktop` 빌드 산출물을 Tauri WebView 와 외부 브라우저가 **동일하게** 로드. Tauri 의 `invoke` IPC 에 의존하지 않고 순수 HTTP/WebSocket 만 사용 → 같은 UI 가 Server 배포의 브라우저 접속에도 그대로 작동. 근거는 DD-016.
+**프론트엔드:** `apps/my_supervisor/crates/desktop/ui` 빌드 산출물을 Tauri WebView 와 외부 브라우저가 **동일하게** 로드. Tauri 의 `invoke` IPC 에 의존하지 않고 순수 HTTP/WebSocket 만 사용 → 같은 UI 가 Server 배포의 브라우저 접속에도 그대로 작동. 근거는 DD-016.
 
 ### 4.2 Application — Use Case 레이어
 
@@ -436,12 +432,12 @@ let lifecycle: Arc<dyn LifecycleController> =
 
 이후 `application` 레이어는 `Arc<dyn LifecycleController>` 만 보고 동작 → OS 분기가 application 코드에는 전혀 등장하지 않는다.
 
-### 4.8 Frontend (`apps/my_supervisor/desktop`)
+### 4.8 Frontend (`apps/my_supervisor/crates/desktop/ui`)
 
 React + Vite 기반 단일 번들. feature 단위로 모듈화한다 (DD-020).
 
 ```
-apps/my_supervisor/desktop/src/
+apps/my_supervisor/crates/desktop/ui/src/
 ├── features/
 │   ├── processes/    # [운영] 목록 / 상세 / 시작·중지·재시작 / 설정 폼
 │   ├── jobs/         # [운영] Jobs 목록 / 상세(Overview·Runs·Config·Dependencies) / Run 상세 / 수동 트리거

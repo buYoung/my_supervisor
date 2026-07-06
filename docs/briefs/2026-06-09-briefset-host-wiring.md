@@ -34,9 +34,9 @@
 ## Conflict Hotspots
 - `Cargo.toml` (root `[workspace] members`) — created by child 01; children 02, 03, 05, 06 each add a crate entry. Serialize edits.
 - Child 01's composition/assembly + Router contract — the coupling surface for 02/03/04/05/06; freeze it at the end of Wave 1.
-- `apps/my_supervisor/desktop/src/shared/types.ts` ↔ `apps/my_supervisor/crates/shared` wire DTOs — the parity surface (children 01, 04, 06).
-- `apps/my_supervisor/desktop/src/features/processes/ProcessesView.tsx` — operations-data wiring (child 04) and the SystemRegistered convert flow (child 06) both edit it. Serialize.
-- `apps/my_supervisor/desktop/dist` build output — produced by child 04, embedded by child 03.
+- `apps/my_supervisor/crates/desktop/ui/src/shared/types.ts` ↔ `apps/my_supervisor/crates/shared` wire DTOs — the parity surface (children 01, 04, 06).
+- `apps/my_supervisor/crates/desktop/ui/src/features/processes/ProcessesView.tsx` — operations-data wiring (child 04) and the SystemRegistered convert flow (child 06) both edit it. Serialize.
+- `apps/my_supervisor/crates/desktop/ui/dist` build output — produced by child 04, embedded by child 03.
 
 ## Shared Constraints
 - Parity invariant: across all hosts, `tauri invoke` handlers and HTTP/WS routes are thin adapters over the **same** `application` facade — neither re-implements domain logic.

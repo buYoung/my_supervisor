@@ -5,9 +5,6 @@
 # tools
 .serena/
 
-# turborepo
-.turbo
-
 # node
 node_modules
 dist

@@ -1,13 +1,12 @@
 {
-  "name": "@my-supervisor/desktop",
+  "name": "my-supervisor-desktop-ui",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "desktop:dev": "cargo tauri dev",
-    "desktop:build": "cargo tauri build",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false"
   },

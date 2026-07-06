@@ -362,7 +362,7 @@ desktop ┘              │              │            ▲
 
 ## DD-020: 프론트엔드 feature-based 모듈 구조
 
-**결정:** `apps/my_supervisor/desktop/src/` 를 `features/*` + `components/ui` + `services/` + `shared/` 로 구성한다. 각 feature (processes, logs, daemon, settings) 는 자기 UI · 자기 service 호출 · 자기 훅을 자체 디렉터리에 둔다.
+**결정:** `apps/my_supervisor/crates/desktop/ui/src/` 를 `features/*` + `components/ui` + `services/` + `shared/` 로 구성한다. 각 feature (processes, logs, daemon, settings) 는 자기 UI · 자기 service 호출 · 자기 훅을 자체 디렉터리에 둔다.
 
 **맥락:** DD-016 에서 React + Vite 스택 확정. 이번 DD 는 그 스택 위의 **디렉터리 규약**.
 
@@ -390,7 +390,7 @@ desktop ┘              │              │            ▲
 - **Tauri WebView·브라우저 양립과 무관**: 테마는 번들 내 CSS 변수 토글이므로 두 실행 환경 모두 동일.
 
 **운영 규약:**
-- 토큰 단일 출처: `apps/my_supervisor/desktop/src/shared/theme.css` 의 `:root` / `[data-theme="dark"]`
+- 토큰 단일 출처: `apps/my_supervisor/crates/desktop/ui/src/shared/theme.css` 의 `:root` / `[data-theme="dark"]`
 - 허용 색 사용법: 오직 CSS 변수를 통해서만. 하드코드 `#rrggbb` 는 lint 금지
 - 시안 승인 절차: Figma 또는 Claude Design 초안이 들어오면 **두 모드 동시 스크린샷 필수**. 한쪽만 검토하고 다른 쪽은 나중에 맞추는 순서는 금지 (하드코드 유입 방지)
 - 접근성: 두 모드 모두 WCAG AA 기준 대비 확인

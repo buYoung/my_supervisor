@@ -11,8 +11,7 @@
 | 도구 | 역할 | 설치 |
 |---|---|---|
 | [proto](https://moonrepo.dev/proto) | 언어·런타임 버전 관리. `.prototools`로 Node / Rust / pnpm 버전 고정 | 공식 설치 스크립트 참조 |
-| [pnpm](https://pnpm.io/) | Node 패키지 관리자. `pnpm-workspace.yaml`로 Node 워크스페이스 경계 정의 | `./scripts/setup-proto.sh` |
-| [Turborepo](https://turbo.build/repo) | Node 패키지 태스크 러너. `turbo.json`으로 빌드·개발 태스크 정의 | `pnpm install` |
+| [pnpm](https://pnpm.io/) | 데스크톱 UI 의존성 관리 (`apps/my_supervisor/crates/desktop/ui`) | `./scripts/setup-proto.sh` |
 
 현재 `.prototools`가 고정하는 버전:
 
@@ -34,39 +33,25 @@ pnpm = "10.11.0"
 # 1) proto 설치 + .prototools에 고정된 Node/Rust/pnpm 설치
 ./scripts/setup-proto.sh
 
-# 2) pnpm workspace + Turborepo 설정 파일 생성
-./scripts/setup-turbo.sh
-
-# 3) Node 의존성 설치
-pnpm install
+# 2) 데스크톱 UI 의존성 설치
+pnpm --dir apps/my_supervisor/crates/desktop/ui install
 ```
 
 각 스크립트의 동작:
 
 - `scripts/setup-proto.sh` — `proto` 명령 존재 여부 확인 → `.prototools`가 없으면 기본값으로 생성 → `proto install --yes`로 지정 버전 설치. 셸 프로필은 수정하지 않으므로 필요 시 `proto setup`을 별도 실행.
-- `scripts/setup-turbo.sh` — `pnpm` 명령 존재 여부 확인 → `apps/my_supervisor/`, `apps/my_supervisor/desktop/` 디렉터리 보장 → `package.json`, `pnpm-workspace.yaml`, `turbo.json`을 없으면 기본값으로 생성.
-
-> 두 스크립트 모두 **이미 존재하는 설정 파일을 덮어쓰지 않고 재사용**합니다.
 
 ---
 
 ## 3. 워크스페이스 구조
 
-`pnpm-workspace.yaml` 기준의 Node 프로젝트 경계:
-
-```
-apps/*        # 최상위 애플리케이션 — apps/my_supervisor (Rust), 향후 추가 앱
-apps/*/desktop # Tauri 데스크톱 앱 - apps/my_supervisor/desktop (React/Vite)
-```
-
-Rust 크레이트 의존성은 `apps/my_supervisor/Cargo.toml`의 workspace members로 관리합니다. Turborepo는 `apps/my_supervisor/package.json`을 통해 `cargo build --workspace`, `cargo check --workspace` 같은 Cargo 명령을 상위 태스크 그래프에 포함할 뿐, Rust 패키지 해석을 대체하지 않습니다.
+Rust 크레이트 의존성은 `apps/my_supervisor/Cargo.toml`의 workspace members로 관리합니다. 데스크톱 UI는 `crates/desktop/ui` 하위의 독립 pnpm 프로젝트이며, Tauri 설정의 `beforeDevCommand` / `beforeBuildCommand`가 필요한 UI 명령을 실행합니다.
 
 `apps/my_supervisor/` 내부는 Hexagonal 레이어대로 중첩 폴더 구조:
 
 ```
 apps/my_supervisor/
 ├── Cargo.toml            # Rust workspace 루트
-├── package.json          # Cargo workspace 대표 Turborepo 패키지
 ├── crates/
 │   ├── core/             # 도메인 + port trait
 │   ├── application/      # use case (ports 에만 의존)
@@ -80,14 +65,15 @@ apps/my_supervisor/
 │   ├── platform/
 │   │   └── macos/        # launchd, kqueue, macOS 프로세스 제어
 │   ├── daemon/           # 공통 데몬 런타임 lib + thin bin `msv-daemon`
-│   └── cli/              # bin `msv` — 데몬 런타임의 기본 접속값 재사용
-└── desktop/              # Tauri 앱 루트
-    ├── package.json      # React/Vite Turborepo 패키지
-    ├── src/              # React UI
-    └── src-tauri/        # Tauri Rust crate
+│   ├── cli/              # bin `msv` — 데몬 런타임의 기본 접속값 재사용
+│   └── desktop/          # Tauri Rust crate
+│       ├── Cargo.toml
+│       ├── tauri.conf.json
+│       ├── src/          # Rust Tauri entry
+│       └── ui/           # React/Vite UI
 ```
 
-`apps/my_supervisor/desktop/src/` 는 feature 단위:
+`apps/my_supervisor/crates/desktop/ui/src/` 는 feature 단위:
 
 ```
 features/{processes,jobs,logs,daemon,settings}/
@@ -111,32 +97,17 @@ members = [
     "crates/platform/*",
     "crates/daemon",
     "crates/cli",
-    "desktop/src-tauri",
+    "crates/desktop",
 ]
 ```
 
 Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-supervisor-platform-linux`, `my-supervisor-app-daemon`).
 
-Turborepo 태스크는 `turbo.json`에서 `build`, `typecheck`, `dev`를 정의합니다. Rust 쪽 `build`, `typecheck`는 `apps/my_supervisor/package.json`에서 Cargo workspace 명령으로 연결하고, 데스크톱 UI와 Tauri 명령은 `apps/my_supervisor/desktop/package.json`에서 관리합니다.
-
 ---
 
 ## 4. 빌드 / 테스트 / 실행
 
-루트 명령은 Rust workspace와 Node workspace를 함께 다루고, 세부 영역별 명령은 필요할 때 직접 실행합니다.
-
-### 루트 통합 명령
-
-```bash
-# Rust workspace + UI 프로덕션 빌드
-pnpm build
-
-# UI 개발 서버
-pnpm dev
-
-# Rust cargo check + UI 타입 체크
-pnpm typecheck
-```
+기본 단위는 Cargo workspace입니다. UI 명령은 `apps/my_supervisor/crates/desktop/ui`에서 직접 실행하거나, `cargo tauri dev/build`가 Tauri 설정을 통해 실행합니다.
 
 ### Rust 크레이트
 
@@ -174,38 +145,27 @@ cargo fmt --all
 
 ### 프론트엔드 (React + Vite)
 
-위치: `apps/my_supervisor/desktop/` (`ARCHITECTURE.md` §3 · §4.8 참조).
+위치: `apps/my_supervisor/crates/desktop/ui/` (`ARCHITECTURE.md` §3 · §4.8 참조).
 
 ```bash
 # 개발 서버
-pnpm dev
+pnpm --dir apps/my_supervisor/crates/desktop/ui dev
 
 # UI 프로덕션 빌드
-pnpm build:desktop
+pnpm --dir apps/my_supervisor/crates/desktop/ui build
 
 # 타입 체크
-pnpm typecheck:desktop
+pnpm --dir apps/my_supervisor/crates/desktop/ui typecheck
 ```
 
 ### Tauri 앱
 
 ```bash
 # Tauri 개발 모드 (프론트엔드 dev 서버 + Rust 쉘)
-cargo tauri dev
+cargo tauri dev --manifest-path apps/my_supervisor/crates/desktop/Cargo.toml
 
 # 배포용 패키징
-cargo tauri build
-```
-
-### Turborepo 태스크
-
-상위 태스크는 `turbo.json`으로 집약합니다. `@my-supervisor/my-supervisor`는 Cargo workspace 전체를 대표하고, `@my-supervisor/desktop`는 React/Vite 프론트엔드를 대표합니다.
-
-```bash
-pnpm build:rust
-pnpm build:desktop
-pnpm typecheck:rust
-pnpm typecheck:desktop
+cargo tauri build --manifest-path apps/my_supervisor/crates/desktop/Cargo.toml
 ```
 
 ---

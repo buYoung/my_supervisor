@@ -87,7 +87,7 @@
 - **언어**: Rust (전 컴포넌트)
 - **UI 셸**: Tauri v2
 - **데몬**: tokio + axum
-- **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`apps/my_supervisor/desktop`, feature 단위 모듈 — DD-020). 다크/라이트 양립.
+- **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`apps/my_supervisor/crates/desktop/ui`, feature 단위 모듈 — DD-020). 다크/라이트 양립.
 - **상위 IA (동등 이원)**:
   - **운영**: Processes · Jobs · Logs
   - **자동화**: Rules (이벤트→액션, 윈도우·핫키 포함)
@@ -95,7 +95,7 @@
 - **영속화**: TOML (설정) + SQLite (런타임 상태 · JobRun 이력 · Rule 실행 이력)
 - **배치 스케줄러**: 데몬 내장 (`infra/scheduler`, `tokio-cron-scheduler` 기반). cron 5-field + interval + one-shot + 의존성.
 - **자동화 엔진**: 데몬 내장. 이벤트 소스는 크로스 플랫폼(`notify` 파일 watch, 타이머)과 macOS 전용(Accessibility API 윈도우 제어, event tap 글로벌 핫키, NSWorkspace/IOKit 시스템 이벤트)으로 구성.
-- **모듈 구조**: Hexagonal Cargo workspace — `core` / `application` / `shared`·`config` / `infra/*` / `platform/*` / `daemon`·`cli`·`desktop`. `apps/my_supervisor/package.json`으로 Turborepo 태스크 그래프에 편입. Cargo 패키지 prefix `my-supervisor-`, 바이너리는 `msv` · `msv-daemon`.
+- **모듈 구조**: Hexagonal Cargo workspace — `core` / `application` / `shared`·`config` / `infra/*` / `platform/*` / `daemon`·`cli`·`desktop`. 데스크톱 UI는 `desktop/ui`에 포함한다. Cargo 패키지 prefix `my-supervisor-`, 바이너리는 `msv` · `msv-daemon`.
 
 ## 문서
 

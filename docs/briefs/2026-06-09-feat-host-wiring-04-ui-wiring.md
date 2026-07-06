@@ -4,14 +4,14 @@
 feat
 
 ## Current State (As-Is)
-- Every view imports static mock arrays directly: `apps/my_supervisor/desktop/src/features/processes/ProcessesView.tsx`, `apps/my_supervisor/desktop/src/features/jobs/JobsView.tsx`, and `apps/my_supervisor/desktop/src/features/logs/LogsView.tsx` all read from `apps/my_supervisor/desktop/src/shared/mock-data.ts`. There is no `services/` layer, transport client, or state library.
-- `apps/my_supervisor/desktop/src/App.tsx` hardcodes the daemon-connected indicator (`127.0.0.1:9876`, "데몬 연결됨") and renders 5 tabs (`processes/jobs/logs/daemon/settings`) from `NavigationKey`.
-- `apps/my_supervisor/desktop/src/shared/types.ts` defines camelCase shapes (`ProcessStatus`, `JobStatus`, `JobRun`, `LogLine`, `DaemonStatus`), but the backend wire (`docs/API.md` §4) is snake_case (`restart_count`, `started_at`, `triggered_by`, …) and `types.ts` carries derived/divergent fields (`ProcessStatus.uptime`; `JobRun.triggeredBy` flat vs the API's tagged `triggered_by`; the wire log line is `{timestamp, stream, line}` only, but `LogLine` adds `id`/`source`) — so the client must map between them.
+- Every view imports static mock arrays directly: `apps/my_supervisor/crates/desktop/ui/src/features/processes/ProcessesView.tsx`, `apps/my_supervisor/crates/desktop/ui/src/features/jobs/JobsView.tsx`, and `apps/my_supervisor/crates/desktop/ui/src/features/logs/LogsView.tsx` all read from `apps/my_supervisor/crates/desktop/ui/src/shared/mock-data.ts`. There is no `services/` layer, transport client, or state library.
+- `apps/my_supervisor/crates/desktop/ui/src/App.tsx` hardcodes the daemon-connected indicator (`127.0.0.1:9876`, "데몬 연결됨") and renders 5 tabs (`processes/jobs/logs/daemon/settings`) from `NavigationKey`.
+- `apps/my_supervisor/crates/desktop/ui/src/shared/types.ts` defines camelCase shapes (`ProcessStatus`, `JobStatus`, `JobRun`, `LogLine`, `DaemonStatus`), but the backend wire (`docs/API.md` §4) is snake_case (`restart_count`, `started_at`, `triggered_by`, …) and `types.ts` carries derived/divergent fields (`ProcessStatus.uptime`; `JobRun.triggeredBy` flat vs the API's tagged `triggered_by`; the wire log line is `{timestamp, stream, line}` only, but `LogLine` adds `id`/`source`) — so the client must map between them.
 - The app dependencies are minimal (React 19 + lucide-react only); there is no data-fetching or state-management library.
 - Decided transport (2026-06-09): the production Tauri UI calls `tauri invoke`; the standalone/browser UI talks HTTP/WS to the daemon. The devBridge (child 03) is a test-only HTTP mirror, not the UI's transport.
 
 ## Desired Outcome (To-Be)
-- A `services/` layer under `apps/my_supervisor/desktop/src` exposes a **transport-agnostic** operations client with two adapters behind one interface: `invoke` (used when running inside Tauri — the production path) and HTTP + WS (used standalone against the daemon). The three views consume the interface, not a specific transport.
+- A `services/` layer under `apps/my_supervisor/crates/desktop/ui/src` exposes a **transport-agnostic** operations client with two adapters behind one interface: `invoke` (used when running inside Tauri — the production path) and HTTP + WS (used standalone against the daemon). The three views consume the interface, not a specific transport.
 - Both adapters map the snake_case wire shapes to the camelCase `types.ts` shapes and reconcile the divergent fields: `ProcessStatus.uptime` (derived from `started_at`), `JobRun.triggeredBy`, and the log lines — the wire log line is `{timestamp, stream, line}` only, so the client synthesizes `LogLine.id` (a stable list key) and fills `LogLine.source` from the selected process name. `types.ts` stays the FE source of truth; nothing is forked onto the wire.
 - The Processes, Jobs, and Logs views render live backend data instead of mock arrays, with loading and error states; the Logs view follows a single selected process's logs (per-process: `/api/v1/processes/{name}/logs` over WS, or the matching `invoke` follow command).
 - The header daemon-connection indicator reflects real reachability — `GET /api/v1/daemon/status` (or its `invoke` equivalent) returning OK — rather than a hardcoded string.
@@ -26,7 +26,7 @@ feat
 - Wire the header connection indicator to daemon status reachability.
 
 ### Out of Scope
-- [hard] Do not change the visual design system or the `apps/my_supervisor/desktop/src/components/ui/primitives.tsx` API — wire data through existing components.
+- [hard] Do not change the visual design system or the `apps/my_supervisor/crates/desktop/ui/src/components/ui/primitives.tsx` API — wire data through existing components.
 - [deferred] Full wiring of the Daemon tab and Settings tab — they remain mock/static this slice (only the header indicator is wired).
 - [deferred] The Rules tab and the 동등 이원 IA re-organization (Phase 2).
 - [deferred] Wire-type codegen; adoption of a client-side state-management library.
@@ -34,15 +34,15 @@ feat
 ## Constraints
 - The services layer is transport-agnostic: in Tauri the UI uses `invoke`; standalone it uses HTTP/WS — selected behind one interface, with no domain logic in either adapter (parity, mirroring child 03's invoke/HTTP split).
 - No auth token is sent — the daemon and the test-only devBridge are both loopback no-auth (DD-011). The standalone HTTP adapter uses a configurable base URL.
-- Keep `apps/my_supervisor/desktop/src/shared/types.ts` as the single source of FE types; both adapters map the snake_case wire onto these camelCase shapes — do not fork shapes or push camelCase onto the wire.
+- Keep `apps/my_supervisor/crates/desktop/ui/src/shared/types.ts` as the single source of FE types; both adapters map the snake_case wire onto these camelCase shapes — do not fork shapes or push camelCase onto the wire.
 
 ## Related Files / Entry Points
-- `apps/my_supervisor/desktop/src/shared/mock-data.ts` — the current data source to replace with the live client.
-- `apps/my_supervisor/desktop/src/shared/types.ts` — wire types to keep aligned with the backend `shared` crate.
-- `apps/my_supervisor/desktop/src/features/processes/ProcessesView.tsx` — Processes view to wire.
-- `apps/my_supervisor/desktop/src/features/jobs/JobsView.tsx` — Jobs view to wire.
-- `apps/my_supervisor/desktop/src/features/logs/LogsView.tsx` — Logs view to wire to per-process log-follow.
-- `apps/my_supervisor/desktop/src/App.tsx` — header indicator to wire; nav stays at 5 tabs this slice.
+- `apps/my_supervisor/crates/desktop/ui/src/shared/mock-data.ts` — the current data source to replace with the live client.
+- `apps/my_supervisor/crates/desktop/ui/src/shared/types.ts` — wire types to keep aligned with the backend `shared` crate.
+- `apps/my_supervisor/crates/desktop/ui/src/features/processes/ProcessesView.tsx` — Processes view to wire.
+- `apps/my_supervisor/crates/desktop/ui/src/features/jobs/JobsView.tsx` — Jobs view to wire.
+- `apps/my_supervisor/crates/desktop/ui/src/features/logs/LogsView.tsx` — Logs view to wire to per-process log-follow.
+- `apps/my_supervisor/crates/desktop/ui/src/App.tsx` — header indicator to wire; nav stays at 5 tabs this slice.
 - `docs/API.md` — §2/§4/§5: the endpoints, types, and error envelope the HTTP adapter targets (the invoke adapter mirrors the same operations).
 - `docs/briefs/2026-06-09-feat-host-wiring-01-foundation.md` — the Router contract + facade both transports consume.
 - `docs/briefs/2026-06-09-feat-host-wiring-03-tauri-bridge.md` — defines the Tauri invoke handlers the invoke adapter calls.
@@ -51,7 +51,7 @@ feat
 - [ ] The Daemon and Settings tabs still render (on mock data) without runtime errors after the services layer lands.
 - [ ] The same view code works through either adapter (invoke in Tauri, HTTP standalone) — no transport-specific branching leaks into the views.
 - [ ] snake_case wire fields decode into the camelCase `types.ts` shapes (e.g., `restart_count`→`restartCount`, `started_at`→`startedAt`) with no `undefined` from casing mismatch, on both adapters.
-- [ ] Any `apps/my_supervisor/desktop/src/shared/types.ts` field change stays consistent with the snake_case wire of the Rust `shared` crate.
+- [ ] Any `apps/my_supervisor/crates/desktop/ui/src/shared/types.ts` field change stays consistent with the snake_case wire of the Rust `shared` crate.
 
 ## Acceptance Criteria
 - [ ] In the Tauri app, the Processes/Jobs/Logs tabs show live backend data via `invoke` (no mock arrays).
