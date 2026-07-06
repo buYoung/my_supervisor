@@ -2,29 +2,35 @@
 
 ## 1. Overview
 
-`my-supervisor-infra-sqlite` persists process specs, restart counters, job definitions, and job run history in SQLite. One `SqliteStore` implements both repository ports.
+`my-supervisor-infra-sqlite` implements process registry and job/run persistence over SQLite. A single `SqliteStore` backs both repository ports injected into the application layer.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: SQLite connection setup, schema migration, row/domain conversion, and `StateRepository`/`JobRepository` implementations.
-- `src/repr.rs`: JSON text representations for complex domain enum values stored in SQLite columns.
+### Stable Ownership Boundaries
+
+- **Schema boundary**: Start in `SqliteStore::migrate` when changing durable process, job, or run storage. It owns table names, columns, indexes, and WAL-backed connection setup; preserve compatibility with existing rows or add explicit migration logic.
+- **Process repository boundary**: Start in the `StateRepository for SqliteStore` implementation when changing stored `ProcessSpec` or restart counter behavior. It owns ordering, upsert semantics, and Direct/SystemRegistered persistence fields consumed by `OperationsFacade`.
+- **Job repository boundary**: Start in the `JobRepository for SqliteStore` implementation when changing job definitions or run history. It owns job/run upserts, run ordering, and run lookup by `(job_name, run_id)`.
+- **Persistence representation boundary**: Start in `src/repr.rs` when changing JSON text representations for trigger and trigger-origin fields. These are local storage formats, not API DTOs; preserve round trips to `core` domain enums.
+
+### Active Change Routes
+
+- **SystemRegistered persistence route**: Within **Process repository boundary**, start in `spec_from_row` and `save_spec` when changing service registration fields. Keep `mode`, `unit_name`, and lifecycle string values aligned with domain mapping.
 
 ## 3. Core Behaviors & Patterns
 
-- **Single store, two ports**: host composition injects the same `Arc<SqliteStore>` into `state_repo` and `job_repo`; keep process and job persistence cohesive unless port boundaries change.
-- **Startup migration**: `connect()` and `connect_in_memory()` both call `migrate()` before returning, so callers never manage schema setup.
-- **WAL persistence**: file-backed stores use SQLite WAL mode with a small connection pool; in-memory stores use one connection for ephemeral hosts or tests.
-- **Loss-tolerant legacy parsing**: JSON vectors/maps default to empty on malformed data, unknown process modes fall back to Direct, unknown lifecycle falls back to Tied, and unknown run states fall back to Pending.
-- **Stable ordering**: process and job list queries sort by `name`; run history sorts by `scheduled_at DESC` with a caller-provided limit.
-- **Upsert semantics**: process and job saves use `ON CONFLICT` updates. Process saves preserve existing `restart_count`; run saves update final fields for an existing `run_id`.
+- **One store, two ports**: `SqliteStore` implements both `StateRepository` and `JobRepository`; runtime assembly injects the same store into both `AppDeps` slots.
+- **Local serialization**: args, env, triggers, and `TriggeredBy` are stored as JSON text columns using local `repr` types. API DTO serialization is not reused here.
+- **Self-contained schema creation**: `connect()` and `connect_in_memory()` always call `migrate()` before returning a store.
+- **Defensive decoding**: missing or malformed optional values generally fall back to domain defaults, while timestamp and trigger parse failures become `RepoError::Backend`.
+- **Stable ordering**: list queries order processes and jobs by name; run history is ordered by scheduled time descending.
 
 ## 4. Conventions
 
-- **Backend error wrapper**: convert SQLx, parse, and serialization errors through the local `backend()` helper into `RepoError::Backend`.
-- **String conversion helpers**: keep timestamp, state, and JSON conversion helpers near row mapping code.
-- **Persistence-only reprs**: `TriggerRepr` and `TriggeredByRepr` are local storage formats, not API DTOs. Do not reuse them across HTTP or config boundaries.
-- **SQL shape**: schema DDL stays in `migrate()` and each repository method owns its explicit query; avoid hiding table access behind broad generic helpers.
-- **Domain defaults on read**: fields not currently persisted, such as restart and shutdown policy details, are restored with domain defaults.
+- **Adapter errors**: helper `backend()` converts SQLx, parse, and serialization failures into `RepoError::Backend`.
+- **String enums**: persisted simple enum values use lower snake_case strings such as `system_registered`, `detached`, and `run_anyway`.
+- **Upserts**: save methods use `ON CONFLICT` to update mutable fields while preserving identities or counters where intended.
+- **Mapping locality**: row-to-domain helpers live beside the repository implementation; complex JSON representations stay in `repr.rs`.
 
 ## 5. Working Agreements
 

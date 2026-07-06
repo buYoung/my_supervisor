@@ -2,33 +2,37 @@
 
 ## 1. Overview
 
-`my-supervisor-platform-macos` implements macOS process-control adapters for Direct mode, graceful Unix shutdown, and SystemRegistered launchd management. Platform-specific and unsafe behavior is contained inside this crate.
+`my-supervisor-platform-macos` implements macOS process lifecycle, shutdown, and launchd registration adapters. It is the platform-specific boundary behind `core` ports for Direct and SystemRegistered process control.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: module declarations and public adapter exports.
-- `src/lifecycle.rs`: `MacLifecycle`, Direct-mode child tracking, aliveness probing, shutdown reaping, and transient job execution.
-- `src/spawn.rs`: command construction, `setsid` process-group setup, stdout/stderr pumps, and child spawn plumbing.
-- `src/shutdown.rs`: `UnixShutdown` graceful signal, grace-period polling, and force kill.
-- `src/signals.rs`: thin libc signal helpers and signal constants.
-- `src/launchd.rs`: `LaunchdAgentProcess`, LaunchAgent plist generation, launchctl lifecycle calls, status query, and log tailing.
+### Stable Ownership Boundaries
+
+- **Direct lifecycle boundary**: Start in `src/lifecycle.rs` when changing spawn, probe, reap, or transient job execution. It owns `LifecycleController` behavior and must keep process/run log pumping wired through `LogSink`.
+- **Spawn plumbing boundary**: Start in `src/spawn.rs` when changing command construction, session/process-group behavior, stdout/stderr capture, or log routing. Preserve `setsid` group ownership so shutdown can signal the full tree.
+- **Shutdown boundary**: Start in `src/shutdown.rs` and `src/signals.rs` when changing graceful or forced stop behavior. It owns signal selection, grace-period polling, and group kill semantics for Direct-mode children.
+- **Launchd registration boundary**: Start in `src/launchd.rs` when changing SystemRegistered behavior. It owns user-domain LaunchAgent plist generation, bootstrap/bootout/kickstart calls, status query, and launchd log tailing.
+
+### Active Change Routes
+
+- **Convert support route**: Across **Launchd registration boundary** and the application conversion flow, start in `LaunchdAgentProcess::register` when changing SystemRegistered setup. Keep conflict detection, plist cleanup on bootstrap failure, and user-domain targeting intact.
+- **Job run capture route**: Within **Direct lifecycle boundary**, start in `run_transient` and `attach_pumps` when changing job execution output. Preserve routing to `LogTarget::Run(run_id)` instead of process-name logs.
 
 ## 3. Core Behaviors & Patterns
 
-- **Process-group control**: Direct children are spawned in their own session via `setsid`, making `pid == pgid`; shutdown helpers signal the whole tree using negative pid values.
-- **Log pumping at spawn boundary**: `spawn_child()` detaches stdout/stderr, and `attach_pumps()` routes lines either to a process source or a job run target.
-- **Tracked Direct lifecycle**: `MacLifecycle` stores a UUID-to-alive flag map, waits on child exit in a background task, appends a system log line, and removes the child from tracking.
-- **Graceful escalation**: `UnixShutdown` sends the configured signal, polls until the grace period expires, then sends `SIGKILL` to the process group if still alive.
-- **LaunchAgent registration**: `LaunchdAgentProcess` writes per-process plist files under the user `~/Library/LaunchAgents`, bootstraps the GUI domain, and never writes the system domain.
-- **Registration rollback**: failed launchctl bootstrap removes the newly written plist; application-level conversion also rolls back registrations if persistence fails.
+- **Own process group**: `spawn_child` creates a session with `setsid`, making `pid` usable as the process-group target for graceful and forced shutdown.
+- **Line pump fan-out**: stdout/stderr are read asynchronously and appended to either process or run log channels based on `LogTarget`.
+- **Tracked liveness**: `MacLifecycle` keeps an in-memory child map with an atomic alive flag and also probes the OS process.
+- **Launchd user scope**: `LaunchdAgentProcess` writes only under `~/Library/LaunchAgents` and targets `gui/<uid>`, never the system domain.
+- **Registration replacement**: register writes a plist, boots out a prior target best-effort, then bootstraps the fresh plist; failure removes the generated plist.
 
 ## 4. Conventions
 
-- **Unsafe containment**: libc calls and `pre_exec` usage stay in `signals.rs` and `spawn.rs`, with brief safety comments explaining the boundary.
-- **Adapter exports**: expose concrete adapters from `lib.rs` only (`MacLifecycle`, `UnixShutdown`, `LaunchdAgentProcess`); keep helper modules private.
+- **Unsafe containment**: keep `libc` and `pre_exec` usage inside this platform crate with comments explaining the safety boundary.
+- **Signal helpers**: raw signal numbers and `kill`/probe wrappers belong in `signals.rs`; higher-level shutdown and lifecycle code should call helpers.
 - **XML escaping**: plist string values must pass through the local `xml()` helper.
-- **User domain only**: launchd targets use `gui/<uid>` and paths under the current user's home/log directories.
-- **Best-effort platform cleanup**: `bootout`, log-dir creation, and plist removal may be best-effort where failures should not block a higher-level rollback.
+- **Adapter exports**: expose concrete adapter types from `lib.rs`; do not export internal spawn or signal helpers.
+- **Error translation**: map OS command and filesystem failures into the relevant `core::ports` error type at the adapter boundary.
 
 ## 5. Working Agreements
 

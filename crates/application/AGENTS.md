@@ -2,37 +2,37 @@
 
 ## 1. Overview
 
-`my-supervisor-application` owns the transport-agnostic use cases for processes, jobs, logs, daemon status, config reload, scheduling, and shutdown. Every host adapter calls `OperationsFacade` instead of duplicating business rules.
+`my-supervisor-application` owns transport-agnostic use cases for processes, jobs, logs, daemon status, config reload, scheduling, and shutdown. Host adapters call `OperationsFacade` rather than duplicating business rules.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: public exports for host and adapter crates.
-- `src/deps.rs`: `AppDeps` trait-object bundle and `DaemonMeta` runtime metadata.
-- `src/facade.rs`: main use-case entry point, in-memory runtime registry, job orchestration, scheduler loop, bootstrap, and shutdown behavior.
-- `src/runner.rs`: `ProcessJobRunner`, which turns a `Job` into a transient Direct-mode `ProcessSpec`.
-- `src/error.rs`: application error taxonomy, stable error codes, HTTP status hints, and port-error conversions.
-- `src/events.rs`: domain events broadcast by facade operations and mapped by HTTP/Tauri adapters.
-- `src/views.rs`: application view structs returned before DTO conversion.
-- `src/registrar_null.rs`: no-op service registrar for hosts without SystemRegistered support.
+### Stable Ownership Boundaries
+
+- **Facade behavior boundary**: Start in `src/facade.rs` when changing process commands, job commands, bootstrap, scheduler loop, daemon status, reload, or shutdown behavior. It owns in-memory runtime state and coordinates repository, lifecycle, scheduler, registrar, log, and config ports; preserve transport-agnostic signatures.
+- **Dependency injection boundary**: Start in `src/deps.rs` when changing required external capabilities or daemon metadata. It owns the `AppDeps` trait-object bundle assembled by hosts; verify every host builder provides the new dependency.
+- **Application error boundary**: Start in `src/error.rs` when changing user-visible failure semantics. `AppError::code()` and `http_status()` are consumed by HTTP and Tauri adapters; preserve stable codes unless all documented clients are updated.
+- **Job runner boundary**: Start in `src/runner.rs` when changing how jobs become transient process executions. It owns `JobRunner` implementation, in-flight/final run persistence, and run events; preserve `Job` to detached Direct `ProcessSpec` conversion.
+
+### Active Change Routes
+
+- **SystemRegistered conversion route**: Within **Facade behavior boundary**, start in `OperationsFacade::convert_process` for Direct/SystemRegistered changes. Keep stop, unregister, register-before-save, rollback, and optional `auto_start` semantics aligned with macOS launchd registration.
+- **Scheduler orchestration route**: Within **Facade behavior boundary**, start in `run_scheduler_loop`, `on_schedule_tick`, and `spawn_run` when changing scheduled job behavior. Preserve overlap guards and skipped-run persistence.
 
 ## 3. Core Behaviors & Patterns
 
-- **Single use-case entry point**: HTTP routes, Tauri commands, and future transports should call `OperationsFacade`. Do not place process, job, or daemon behavior in transport adapters.
-- **Injected adapter bundle**: `AppDeps` contains all external capabilities as `Arc<dyn Trait>` values. Host crates select concrete adapters; this crate stays `#[cfg]`-free and only talks to ports.
-- **Direct vs SystemRegistered process flow**: Direct processes are tracked in the `runtime` map after `spawn_tied` or `spawn_detached`; SystemRegistered processes call the registrar and derive status from `query_status`. Restart returns a no-op result for SystemRegistered processes because the OS owns restart behavior.
-- **Transactional conversion**: `convert_process` stops the current mode best-effort, unregisters prior SystemRegistered traces, registers the new mode before persistence, and rolls back a new registration if saving fails.
-- **Job lifecycle**: jobs are validated, cycle-checked, persisted, then registered with the scheduler. Manual and scheduled runs go through `spawn_run`, which marks the job as running, emits events, calls `JobRunner`, and removes the overlap guard when finished.
-- **Failure mapping**: port errors convert into `AppError`; `AppError::code()` and `http_status()` are the canonical boundary data used by HTTP and Tauri adapters.
-- **Bootstrap flow**: hosts call `bootstrap()` after assembly to load config into repositories, arm scheduled jobs, and autostart flagged processes. Scheduler driving is a separate host-spawned loop via `run_scheduler_loop()`.
+- **Single use-case entry point**: HTTP routes, Tauri commands, and future transports call `OperationsFacade`; process, job, and daemon behavior belongs here, not in adapters.
+- **Cfg-free adapter bundle**: `AppDeps` stores capabilities as `Arc<dyn Trait>`. Host crates select concrete adapters, while this crate stays free of platform or transport conditionals.
+- **Direct versus SystemRegistered flow**: Direct processes update the `runtime` map after `spawn_tied` or `spawn_detached`; SystemRegistered processes call the registrar and query status from the OS boundary. Restart is a no-op result for SystemRegistered because the OS owns restart.
+- **Job lifecycle**: jobs are validated, cycle-checked, persisted, then registered with the scheduler. Manual and scheduled runs go through `spawn_run`, emit domain events, call `JobRunner`, and clear the overlap guard when complete.
+- **Bootstrap sequence**: hosts call `bootstrap()` after assembly to load config, arm scheduled jobs, and autostart flagged processes; hosts spawn `run_scheduler_loop()` separately.
 
 ## 4. Conventions
 
-- **No transport types**: public facade methods return domain or application view types and must not expose axum, Tauri, reqwest, or DTO types.
-- **Guards before mutation**: validate empty commands, duplicate names, dependency cycles, and running-state conflicts before persisting or spawning.
-- **Sorting at query boundaries**: list methods sort by stable user-visible keys (`name`) before returning results.
-- **Best-effort side effects**: cleanup, unregister, shutdown, and event broadcast failures are intentionally ignored or logged when they must not mask the authoritative operation result.
-- **Event names stay domain-level**: `DomainEvent` variants describe process/job changes; wire event string names belong in adapters.
-- **Constants name capacity/window semantics**: values such as `EVENT_CHANNEL_CAPACITY` and `RECENT_RUNS_WINDOW` should remain near the owning facade behavior.
+- **No transport types**: public facade methods return domain or application view types, never axum, Tauri, reqwest, or shared DTO types.
+- **Guard before mutation**: validate empty commands, duplicate names, dependency cycles, and running-state conflicts before persisting, registering, or spawning.
+- **Sorting**: list methods sort by user-visible stable keys such as `name` before returning.
+- **Best-effort side effects**: cleanup, unregister, shutdown, event send, and autostart failures are ignored or logged only when they must not mask the authoritative operation result.
+- **Event level**: `DomainEvent` variants describe domain changes; wire event strings belong in transport adapters.
 
 ## 5. Working Agreements
 

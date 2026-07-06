@@ -2,26 +2,32 @@
 
 ## 1. Overview
 
-`my-supervisor-config` implements the TOML `ConfigSource` adapter and maps file DTOs into core domain models. It is the file-config counterpart to the HTTP request mapping layer.
+`my-supervisor-config` implements the TOML `ConfigSource` adapter. It parses file DTOs from `shared::config` and maps them into `core` domain config for application reload and bootstrap flows.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: `TomlConfigSource`, file reading, TOML parsing, and `ConfigSource` implementation.
-- `src/convert.rs`: explicit mapping from `shared` config/API DTOs to `core` `ProcessSpec` and `Job` values.
+### Stable Ownership Boundaries
+
+- **Config load boundary**: Start in `src/lib.rs` when changing file reading, missing-file behavior, or `ConfigSource` implementation. It owns TOML parsing and empty-config fallback; preserve `ConfigError` behavior consumed by `OperationsFacade::reload`.
+- **Config mapping boundary**: Start in `src/convert.rs` when changing how `ProcessConfigDto` or `JobConfigDto` becomes domain state. It must stay aligned with HTTP request mapping because both compile against the same shared DTOs.
+
+### Active Change Routes
+
+- **Process mode config route**: Within **Config mapping boundary**, start in `management_mode`, `lifecycle_mode`, and `process_spec` when config fields for Direct/SystemRegistered or tied/detached lifecycle change. Keep defaults consistent with `core` domain defaults.
 
 ## 3. Core Behaviors & Patterns
 
-- **Absent config is empty config**: `load()` treats `NotFound` as `LoadedConfig::default()` so first-run hosts can bootstrap without a file.
-- **DTO-to-domain mapping**: config parsing first deserializes `shared::config::FileConfig`, then converts into `core` models with domain defaults for restart, shutdown, lifecycle, overlap, dependency, and retention fields.
-- **Mirrored adapter mapping**: `convert.rs` intentionally mirrors HTTP DTO-to-domain conversion instead of sharing a module that would create a dependency cycle. Both mappings compile against `shared` DTOs.
-- **Error boundary**: TOML syntax and validation failures become `ConfigError::Invalid`; file-system failures other than absence become `ConfigError::Io`.
+- **Adapter-only parsing**: TOML parsing stops at shared config DTOs, then converts into `LoadedConfig`; application code never sees raw TOML structures.
+- **Missing file is valid**: `load()` returns `LoadedConfig::default()` for `NotFound`, allowing first-run bootstrap without a config file.
+- **Mirrored DTO conversion**: this crate and `infra/http::mapping` both implement DTO to domain conversion to avoid a dependency cycle while sharing the same DTO definitions.
+- **Domain defaults at boundary**: missing optional config fields become domain defaults for management mode, lifecycle, restart, shutdown, overlap policy, dependency failure policy, and log retention.
 
 ## 4. Conventions
 
-- **Small converter functions**: map enum fragments in focused helpers (`management_mode`, `lifecycle_mode`, `job_trigger`) before composing full entities.
-- **Default handling**: use DTO optional fields to select domain defaults; do not encode alternate defaults in the loader.
-- **No persistence or runtime effects**: this crate only loads and converts configuration. Repository writes and scheduler registration belong to `application::OperationsFacade::reload`.
-- **Path ownership**: `TomlConfigSource` stores a `PathBuf` and returns clones from `path()`; callers own placement.
+- **Small conversion helpers**: keep enum/default mapping in focused functions such as `management_mode`, `lifecycle_mode`, and `job_trigger`.
+- **No persistence or host logic**: this crate only loads and converts config; repository saves and scheduler registration stay in `application`.
+- **Path handling**: convert wire string paths into `PathBuf` at this boundary and pass domain paths outward.
+- **Error shape**: TOML parse failures become `ConfigError::Invalid`; filesystem failures other than missing files become `ConfigError::Io`.
 
 ## 5. Working Agreements
 

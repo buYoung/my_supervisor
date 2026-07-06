@@ -2,26 +2,33 @@
 
 ## 1. Overview
 
-`my-supervisor-infra-scheduler` implements the scheduler port with Tokio timers and broadcasts scheduled job fire events. It handles timed triggers; dependency-trigger propagation belongs to application-level observers.
+`my-supervisor-infra-scheduler` implements the timed `Scheduler` adapter. It evaluates cron, interval, and one-shot triggers with Tokio timers and broadcasts schedule events to the application layer.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: `TokioScheduler`, trigger parsing, next-run calculation, timer registration, timer abort, and schedule-event subscription.
+### Stable Ownership Boundaries
+
+- **Trigger timing boundary**: Start in `next_for`, `parse_cron`, and `next_cron` when changing how triggers compute their next fire time. It owns cron validation, interval arithmetic, one-shot expiration, and `DependsOn` non-timed behavior.
+- **Timer lifecycle boundary**: Start in `TokioScheduler::register`, `abort`, and `unregister` when changing timer arming. It owns replacing prior timers and aborting handles for deleted or updated jobs.
+- **Schedule event boundary**: Start in `Scheduler::subscribe` and the broadcast sender when changing how fired jobs reach `OperationsFacade::run_scheduler_loop`.
+
+### Active Change Routes
+
+- **Responsive sleep route**: Within **Timer lifecycle boundary**, start in `sleep_until` when changing long future waits. Preserve the capped sleep loop so far-future one-shots remain abort-responsive.
 
 ## 3. Core Behaviors & Patterns
 
-- **One timer per job**: `register()` aborts any existing timer for the job before creating a new one, so updates replace prior schedules cleanly.
-- **Cron validation up front**: cron triggers are parsed during registration and fail fast with `SchedulerError::InvalidCron`.
-- **DependsOn is not timed**: dependency triggers register successfully without spawning a timer; application code reacts to completed upstream runs.
-- **Interruptible far-future sleeps**: `sleep_until()` caps each sleep by `MAX_SLEEP` so timer tasks can react to aborts instead of sleeping indefinitely.
-- **Pure next-run calculation**: `next_for()` handles cron, interval, one-shot, and dependency triggers and is reused by both timer tasks and facade status views.
+- **Re-register replaces**: registering a job first aborts any existing timer for that name, then arms the new trigger.
+- **Cron validates early**: cron expressions are parsed during registration so invalid schedules fail before persistence-dependent orchestration continues.
+- **Dependency triggers are external**: `JobTrigger::DependsOn` returns no timer and emits no direct schedule event; dependency propagation belongs to run-completion observers.
+- **Broadcast-driven loop**: timers send `ScheduleEvent`; the application layer decides overlap behavior and spawns runs.
 
 ## 4. Conventions
 
-- **Timer ownership**: store spawned timer `JoinHandle`s in the `timers` map and cancel through `abort()`.
-- **Broadcast events**: scheduled fires publish `ScheduleEvent { job_name, scheduled_at }` over the scheduler sender; job execution is not started in this crate.
-- **Time source boundary**: scheduler internals use `Utc::now()` for timer driving; application view code passes `SystemClock` time into `next_run()`.
-- **No persistence**: scheduler state is volatile and rebuilt by `OperationsFacade::bootstrap()` from repositories.
+- **Pure next-run helper**: keep next-run computation in `next_for` so `next_run()` and timer loops share the same behavior.
+- **Mutex-protected handles**: timer handles live in a `HashMap<String, JoinHandle<()>>` behind a mutex; abort before replacement.
+- **Capacity naming**: event channel capacity constants should describe the resource they bound.
+- **Error mapping**: scheduler-specific validation failures become `SchedulerError::InvalidCron`; backend failures use `SchedulerError::Backend`.
 
 ## 5. Working Agreements
 

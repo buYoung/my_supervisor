@@ -2,30 +2,33 @@
 
 ## 1. Overview
 
-`my-supervisor-shared` defines the serialized contracts shared by REST, WebSocket, CLI, config, desktop, and UI code. It is the single Rust source for API and config wire shapes.
+`my-supervisor-shared` owns serialized DTOs for REST, WebSocket, errors, and TOML config. It is the contract crate shared by HTTP, CLI, desktop, config loading, and UI boundary code.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: exports shared API, config, error, and event modules.
-- `src/api.rs`: REST DTOs for processes, jobs, logs, daemon status, restart no-op, and conversion.
-- `src/config.rs`: TOML-facing config DTOs reused by config loading and CLI registration.
-- `src/events.rs`: WebSocket event envelope DTOs.
-- `src/error.rs`: uniform error envelope returned by HTTP and interpreted by clients.
+### Stable Ownership Boundaries
+
+- **API DTO boundary**: Start in `src/api.rs` when changing process, job, daemon, log, or conversion wire shape. These DTOs are consumed by HTTP handlers, CLI client, Tauri invoke mappings, config conversion, and frontend wire types; preserve `docs/API.md` compatibility.
+- **Config schema boundary**: Start in `src/config.rs` when changing TOML file shape. Config loading maps these DTOs into `core` domain models; keep defaults and optional fields aligned with `config::convert`.
+- **Error envelope boundary**: Start in `src/error.rs` when changing external error body format. HTTP and UI/CLI clients depend on the `{ error: { code, message } }` contract.
+
+### Active Change Routes
+
+- **SystemRegistered DTO route**: Within **API DTO boundary**, start with `ManagementModeDto`, `ConvertTargetDto`, and `ConvertRequestDto` when changing service-registration flows. Keep Rust DTOs, frontend `wire-types.ts`, and process mapping synchronized.
 
 ## 3. Core Behaviors & Patterns
 
-- **Wire contracts only**: DTOs represent external JSON/TOML shape, not application behavior. Domain defaults and lifecycle rules stay in `core` and `application`.
-- **Snake_case wire format**: tagged enums and field names serialize to the documented API shape; frontend camelCase reconciliation happens in `crates/desktop/ui/src/services/wire-mapping.ts`.
-- **Shared error envelope**: `ErrorBody` carries stable machine-readable codes and messages used by HTTP, CLI, and UI error handling.
-- **Boundary reuse**: CLI, config, HTTP, desktop commands, and UI wire types depend on these DTOs so contract drift is caught by compilation or explicit mapping updates.
+- **Serde-owned wire shape**: DTO enums use `serde` attributes such as `rename_all = "snake_case"` and tagged enum representations to define the external JSON contract.
+- **Wire/domain separation**: this crate does not depend on `core`; adapters translate shared DTOs to domain types in their own mapping modules.
+- **Optional compatibility fields**: request DTOs use `#[serde(default)]` and `skip_serializing_if` for fields that may be omitted by config files or clients.
+- **Single contract source**: CLI, HTTP, desktop invoke, and frontend wire declarations track these Rust DTOs rather than inventing parallel server-side shapes.
 
 ## 4. Conventions
 
-- **DTO suffix**: serialized API types use `Dto` suffix (`ProcessStatusDto`, `JobConfigDto`, `RestartNoopDto`).
-- **Serde tagging**: sum types that cross the wire use `#[serde(tag = "type", rename_all = "snake_case")]`; simple string enums use `#[serde(rename_all = "snake_case")]`.
-- **Optional fields**: optional outbound fields use `skip_serializing_if = "Option::is_none"` where omission is part of the contract.
-- **Collections**: environment maps use `BTreeMap<String, String>` for deterministic serialization.
-- **No adapter imports**: keep this crate independent of `core`, `application`, `infra`, and host crates.
+- **DTO suffix**: serialized types use the `Dto` suffix; list wrappers use `*ListDto`; request bodies keep resource-specific names such as `ProcessConfigDto`.
+- **JSON naming**: serialized fields are snake_case; frontend camelCase conversion happens only in UI mapping code.
+- **Tagged enums**: multi-shape wire enums use `#[serde(tag = "type", rename_all = "snake_case")]`.
+- **No domain logic**: do not add validation, scheduling, process lifecycle, or persistence decisions to DTO definitions.
 
 ## 5. Working Agreements
 

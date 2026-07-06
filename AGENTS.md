@@ -4,25 +4,21 @@
 
 This monorepo implements a local process and job supervisor with shared domain logic, host runtimes, platform adapters, a CLI, and a Tauri desktop UI.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `Cargo.toml`: Cargo workspace root; declares all Rust crates and shared dependency versions.
-- `package.json`: root release and CI script manifest for repository-level automation.
-- `crates/core`: domain entities and port traits; keep it free of workspace crate dependencies and adapter concerns.
-- `crates/application`: transport-agnostic use cases centered on `OperationsFacade`; depends on `core` ports, not concrete adapters.
-- `crates/shared`: serialized REST, WebSocket, error, and config DTOs shared by CLI, HTTP, desktop, config, and UI boundary code.
-- `crates/config`: TOML config source adapter; maps `shared::config` DTOs into `core` domain models.
-- `crates/infra`: infrastructure adapters behind `core` ports.
-    - `http`: axum REST/WebSocket adapter and domain/wire mapping.
-    - `sqlite`: `StateRepository` and `JobRepository` over SQLite.
-    - `logging`: in-memory log sink with bounded tails and live broadcasts.
-    - `scheduler`: Tokio scheduler for cron, interval, and one-shot job triggers.
-- `crates/platform`: OS-specific adapter crates.
-    - `macos`: Direct process lifecycle, Unix shutdown, and launchd registration.
-- `crates/daemon`: shared runtime composition plus the thin `msv-daemon` launcher.
-- `crates/cli`: `msv` command-line client over the operations API.
-- `crates/desktop`: Tauri desktop host; embeds the shared runtime and contains the React/Vite UI under `ui`.
-- `docs`: architecture, API, design decisions, roadmap, and task briefs; align behavior changes with these documents when relevant.
+### Stable Ownership Boundaries
+
+- **Domain and port boundary**: Start in `crates/core` when changing process, job, log, config, or external capability contracts. It owns domain entities and port traits consumed by every higher layer; verify through the downstream workspace type-check surface because `application`, `infra/*`, `platform/*`, `daemon`, `cli`, and `desktop` compile against these contracts.
+- **Use-case boundary**: Start in `crates/application` when changing process/job behavior, daemon lifecycle, scheduling orchestration, config reload, or error semantics. It owns `OperationsFacade`, application views, domain events, and `AppError`; preserve transport independence and verify through HTTP, Tauri, and CLI consumers.
+- **Wire contract boundary**: Start in `crates/shared` and `crates/infra/http` when changing REST, WebSocket, error, or config DTO shape. `shared` owns serialized types, while `infra/http` owns route registration and domain/wire mapping; preserve `docs/API.md` compatibility and update UI/CLI mapping consumers together.
+- **Runtime composition boundary**: Start in `crates/daemon` when changing adapter wiring, default bind values, data paths, bootstrap, or host shutdown behavior. It owns the shared runtime used by both `msv-daemon` and `desktop`; preserve platform selection through `core` ports.
+- **Host client boundary**: Start in `crates/desktop` for Tauri invoke/devBridge/UI behavior and in `crates/cli` for command-line output and exit-code behavior. Both consume the same operations API and `shared` DTOs; keep host behavior thin over the facade contract.
+
+### Active Change Routes
+
+- **Host wiring route**: Across **Runtime composition boundary** and **Host client boundary**, start in `crates/daemon/src/lib.rs` and `crates/desktop/src/main.rs` when changing embedded-runtime behavior. The current code intentionally shares one `OperationsFacade` between Tauri invoke and devBridge; verify both transports still map through `infra_http::mapping`.
+- **SystemRegistered process route**: Within **Use-case boundary**, start in `OperationsFacade::convert_process` and the `ProcessServiceRegistrar` port when changing Direct/SystemRegistered conversion. Keep registration-before-persistence and rollback behavior aligned with `crates/platform/macos/src/launchd.rs`.
+- **Documentation contract route**: Across **Wire contract boundary**, start in `docs/API.md`, `crates/shared/src/api.rs`, and `crates/infra/http/src/lib.rs` when changing endpoint or DTO semantics. Keep the route manifest, DTOs, CLI client, and desktop service mappings synchronized.
 
 ## 3. Working Agreements
 
@@ -33,10 +29,11 @@ This monorepo implements a local process and job supervisor with shared domain l
 - Check side effects across callers, shared abstractions, and behavior/API boundaries; report relevant impact and compatibility risks
 - Ask actively when user decisions are needed for scope, behavior, or tradeoffs
 - Run type-check after Rust code changes with `cargo check --workspace`; use package-level `AGENTS.md` files for package-only verification guidance
-- In monorepos, put package-only tests/type-check/verification guidance in the package-level AGENTS.md, not the root document
+- Put package-only tests/type-check/verification guidance in the package-level AGENTS.md, not the root document
 - New functions: single-purpose, colocated with related code
 - External dependencies: only when necessary, explain why
 
 ## 4. Custom Instructions
 
-- For any work on `fable5.md`, read that document first and treat its existing content as the source of truth.
+- Absolute rule for `fable5.md`: for any work involving `fable5.md`, read `fable5.md` first and treat its current contents as the source of truth. Do not skip this rule for convenience.
+- Absolute rule for `codemap-search`: actively use `codemap-search` for code exploration and repository navigation. Prefer it over generic Read, Grep, Find, shell search, or broad file-reading workflows whenever it is available and suitable; do not skip this rule for convenience.

@@ -2,27 +2,34 @@
 
 ## 1. Overview
 
-`my-supervisor-app-daemon` is the shared backend composition crate and the thin `msv-daemon` launcher. Desktop and headless hosts reuse this runtime wiring.
+`my-supervisor-app-daemon` owns shared backend runtime assembly and the thin `msv-daemon` launcher. The desktop host reuses the same runtime composition in-process.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: runtime constants, data/config path helpers, adapter construction, platform selection, and `build_runtime()`/`build_deps()`.
-- `src/main.rs`: launcher entry point, tracing setup, bootstrap, scheduler loop, HTTP bind, graceful shutdown, and child reaping.
+### Stable Ownership Boundaries
+
+- **Runtime assembly boundary**: Start in `src/lib.rs` when changing adapter wiring, data/config/log paths, default bind constants, or `AppDeps` construction. It owns the concrete adapter graph used by daemon and desktop hosts; preserve dependency injection through `core` ports.
+- **Platform selection boundary**: Start in `platform_adapters` and `process_service_registrar` when changing OS-specific support. It owns `#[cfg(target_os)]` adapter selection and the non-macOS fallback registrar.
+- **Launcher lifecycle boundary**: Start in `src/main.rs` when changing `msv-daemon` startup, bootstrap, scheduler loop spawning, HTTP serving, signal handling, or child reaping.
+
+### Active Change Routes
+
+- **Embedded host route**: Within **Runtime assembly boundary**, start in `build_runtime` and `build_deps` when changing behavior shared with desktop. Desktop calls this crate directly, so avoid assumptions that only the headless binary uses the runtime.
 
 ## 3. Core Behaviors & Patterns
 
-- **Composition root**: this crate wires config, SQLite, HTTP, logging, scheduler, clock, lifecycle, shutdown, and registrar adapters into `AppDeps`.
-- **Shared host runtime**: both `msv-daemon` and the Tauri desktop host call `build_runtime()`, keeping API behavior and facade wiring identical.
-- **Path ownership**: data, logs, SQLite state, and config paths are resolved here before injection. Application code receives only `DaemonMeta` and port trait objects.
-- **Platform cfg boundary**: macOS adapter selection happens in `platform_adapters()` and `process_service_registrar()`; non-macOS Direct runtime support is explicitly deferred.
-- **Launcher lifecycle**: `main.rs` bootstraps config/scheduler/autostart, spawns the scheduler loop, serves axum on the default loopback bind address, waits for signal or API shutdown, then reaps tied children.
+- **Composition root**: this crate creates concrete config, SQLite, scheduler, logging, lifecycle, shutdown, registrar, and clock adapters, then calls `infra_http::assemble`.
+- **Shared defaults**: `DEFAULT_BIND_ADDR`, `DEFAULT_BIND_PORT`, and `DEFAULT_BASE_URL` are consumed by hosts and CLI defaults.
+- **Runtime paths**: state database and logs live under `data_dir()/my-supervisor`; config defaults to the platform config directory with a data-dir fallback.
+- **Bootstrap before serving**: the launcher loads config, arms scheduler jobs, autostarts processes, then serves the operations router.
+- **Graceful shutdown**: signal or API shutdown resolves the notify handle, stops the HTTP server, and reaps tied Direct children.
 
 ## 4. Conventions
 
-- **Constants**: keep `DEFAULT_BIND_ADDR`, `DEFAULT_BIND_PORT`, and `DEFAULT_BASE_URL` in this crate for CLI and host reuse.
-- **Thin binary**: `src/main.rs` should remain startup and shutdown orchestration only; use-case behavior belongs in `application`.
-- **Adapter construction**: create concrete adapters in `build_deps()` and immediately erase them behind `Arc<dyn Trait>` where `AppDeps` requires it.
-- **Error context**: use `anyhow::Context` around external startup failures such as opening SQLite, binding TCP, or serving HTTP.
+- **Keep domain logic out**: runtime assembly may choose adapters and paths, but process/job behavior belongs in `application`.
+- **Trait-object wiring**: new adapters should be injected through existing or new `core` ports, not exposed directly to hosts.
+- **Platform cfg locality**: keep target-specific adapter selection in this crate or the platform crate; do not leak platform conditionals into `application`.
+- **Contextful errors**: use `anyhow::Context` at host boundaries where path, bind, or server failures need operational detail.
 
 ## 5. Working Agreements
 

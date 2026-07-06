@@ -2,29 +2,35 @@
 
 ## 1. Overview
 
-`my-supervisor-app-cli` implements the `msv` operations client. It talks to the daemon API over HTTP/WebSocket and reuses shared DTOs; it does not embed core behavior.
+`my-supervisor-app-cli` implements the `msv` command-line client over the operations API. It reuses shared DTOs and daemon defaults instead of embedding domain logic.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/main.rs`: clap command model, dispatch, table/JSON output, config import, log follow, and process exit handling.
-- `src/client.rs`: HTTP request wrapper, API methods, error-envelope mapping, daemon-down detection, and WebSocket base derivation.
+### Stable Ownership Boundaries
+
+- **Command dispatch boundary**: Start in `src/main.rs` when changing command names, arguments, output modes, table rendering, or follow-log behavior. It owns CLI user interaction and delegates API calls to `Client`.
+- **HTTP client boundary**: Start in `src/client.rs` when changing request paths, JSON decoding, error envelope handling, WebSocket base derivation, or exit-code mapping. It owns the transport behavior for CLI commands.
+- **Config add boundary**: Start in `add_from_config` in `src/main.rs` when changing how a TOML file registers processes and jobs through the API. It must preserve shared config DTO reuse.
+
+### Active Change Routes
+
+- **Job command route**: Within **Command dispatch boundary**, start in `JobCmd` and matching `Client` methods when changing job listing, triggering, or run history. Keep table and JSON outputs backed by the same `shared` DTO responses.
+- **Error exit route**: Within **HTTP client boundary**, start in `CliError` and `Client::send` when changing CLI failure behavior. Preserve `process_not_found` exit 2 and daemon connection failure exit 3 unless the documented convention changes.
 
 ## 3. Core Behaviors & Patterns
 
-- **Thin client boundary**: CLI commands call `Client` methods over `/api/v1`; process/job semantics remain in the daemon facade.
-- **Shared DTO reuse**: API bodies and responses use `my_supervisor_shared` DTOs so contract changes break compilation.
-- **Exit-code mapping**: `CliError` maps `process_not_found` to exit 2, connection failures to exit 3, and other failures to exit 1.
-- **Output mode split**: commands use table output by default and pretty JSON when `-o json` is selected.
-- **Config import**: `Add -c` reads `FileConfig` and posts each process/job DTO through the same API used by other clients.
-- **Log follow**: `logs -f` prints the REST tail first, then follows the WebSocket stream derived from the configured base URL.
+- **Thin API client**: commands call HTTP/WS endpoints exposed by daemon or desktop devBridge; no `core` or `application` types are used.
+- **Shared DTO decoding**: request and response bodies use `my_supervisor_shared` types, so API contract drift is compile-visible.
+- **Output split**: each command supports JSON output through the raw DTO and table/text output through local presentation helpers.
+- **Log follow**: `logs -f` seeds from REST tail, then follows the process log WebSocket derived from the configured base URL.
+- **Exit-code mapping**: normalized API errors and transport failures become `CliError` variants carrying process exit codes.
 
 ## 4. Conventions
 
-- **Command naming**: top-level subcommands are concise operational verbs or nouns (`ps`, `start`, `stop`, `restart`, `logs`, `reload`, `daemon`, `job`).
-- **Client wrapper**: add new API calls to `client.rs` as typed methods and keep raw request construction behind `send()`/`get_json()`.
-- **Error messages**: user-facing CLI failures come from `CliError::message()` and preserve daemon envelope messages when available.
-- **URL handling**: normalize base URLs by trimming trailing slashes and derive `ws://` or `wss://` with `ws_base()`.
-- **No domain imports**: keep CLI code on shared DTOs and daemon defaults, not `core` domain types.
+- **Clap shape**: command enums stay close to the external command tree; subcommands own their specific arguments.
+- **Presentation helpers**: keep label formatting helpers such as `process_state_label` and `run_state_label` in CLI code, not shared DTOs.
+- **Client paths**: construct API paths in `Client` methods so dispatch code does not duplicate URLs.
+- **JSON first**: when adding a command, make JSON output use the DTO directly and table output derive from that same value.
 
 ## 5. Working Agreements
 

@@ -2,26 +2,29 @@
 
 ## 1. Overview
 
-`my-supervisor-infra-logging` provides the current in-memory `LogSink` implementation for process and job-run output. It keeps bounded history and live broadcast channels per source.
+`my-supervisor-infra-logging` implements the in-memory `LogSink` adapter. It keeps bounded process and job-run log buffers and broadcasts newly captured lines to live subscribers.
 
-## 2. Folder Structure
+## 2. Ownership Map
 
-- `src/lib.rs`: `InMemoryLogSink`, per-source channel state, snapshot logic, process log methods, and run log methods.
+### Stable Ownership Boundaries
+
+- **Log channel boundary**: Start in `Channel` and `snapshot` when changing buffering, truncation, or broadcast behavior. It owns ring capacity, live fan-out, and tail semantics consumed by HTTP, Tauri, CLI, and UI log views.
+- **Process log boundary**: Start in the `LogSink` process methods when changing per-process append, tail, or subscribe behavior. Process logs are keyed by process name and feed `/processes/{name}/logs`.
+- **Run log boundary**: Start in the `LogSink` run methods when changing per-job-run log behavior. Run logs are keyed by `JobRunId` and feed job run WebSocket subscriptions.
 
 ## 3. Core Behaviors & Patterns
 
-- **Separate process and run channels**: process logs are keyed by process name, while job run logs are keyed by `JobRunId`.
-- **Bounded ring buffers**: every channel uses a `VecDeque` capped by `RING_CAPACITY`; new lines evict the oldest line before broadcasting.
-- **Live broadcast plus snapshot**: append methods push into the buffer and broadcast over a per-channel `broadcast::Sender`; tail methods return filtered snapshots from the buffer.
-- **Lazy channel creation**: append and subscribe paths create channels on first use, allowing consumers to subscribe before any log line exists.
-- **Since filtering**: process tails can filter by timestamp before applying the tail limit.
+- **Bounded ring buffer**: each source uses a `VecDeque` capped at `RING_CAPACITY`; pushing a new line drops the oldest line when full.
+- **Live broadcast per source**: each channel has its own `broadcast::Sender`, so subscribers receive only new lines for the selected process or run.
+- **Snapshot filtering**: tail reads filter by `since`, then apply the requested limit and report whether older matching lines were truncated.
+- **Lazy channel creation**: appending or subscribing creates a channel on demand, allowing follow-before-output flows.
 
 ## 4. Conventions
 
-- **Capacity constants**: keep `RING_CAPACITY` and `BROADCAST_CAPACITY` explicit near the implementation.
-- **Mutex boundaries**: lock only the relevant map while locating or mutating a channel; avoid holding locks across awaited calls.
-- **Default empty reads**: missing channels return empty/default tails rather than errors.
-- **Run API symmetry**: keep `append_run`, `tail_run`, and `subscribe_run` behavior aligned with process log methods where the port allows it.
+- **Separate maps**: keep process logs and run logs in separate mutex-protected maps because they use different keys and API routes.
+- **No disk retention here**: on-disk rotation, archives, and durable log retention are outside this adapter's current responsibility.
+- **Silent send failure**: ignore broadcast send errors because they only mean there are no live subscribers.
+- **Capacity constants**: keep `RING_CAPACITY` and `BROADCAST_CAPACITY` near the adapter implementation that owns their semantics.
 
 ## 5. Working Agreements
 
