@@ -19,7 +19,7 @@
 본 로드맵의 단계들은 아래 전략 위에서 읽는다 (DD-026 동등 이원, DD-002 호스트 이원).
 
 - **동등 이원 범위**: **운영**(`Process` + `Job`)과 **자동화**(`Rule`)를 동등한 두 기둥으로 만든다. 자동화는 부가 기능이 아니다.
-- **macOS 우선, 구조는 크로스플랫폼**: 구현은 macOS 호스트(`app/desktop`)를 먼저 완성한다. 단 `core`/`application` 과 port 구조는 크로스플랫폼을 유지하고 Linux/Windows 운영 어댑터는 자리만 확보(stub)한다. 윈도우·핫키 자동화는 macOS **단일 구현 seam** (DD-027).
+- **macOS 우선, 구조는 크로스플랫폼**: 구현은 macOS 호스트(`desktop`)를 먼저 완성한다. 단 `core`/`application` 과 port 구조는 크로스플랫폼을 유지하고 Linux/Windows 운영 어댑터는 자리만 확보(stub)한다. 윈도우·핫키 자동화는 macOS **단일 구현 seam** (DD-027).
 - **버리는 PoC 없음 — walking skeleton 부터**: 던져버릴 프로토타입을 만들지 않는다. 실제 crate 구조 위에서 얇은 수직 슬라이스를 production 품질로 만들고 그대로 확장한다. (아래 "PoC" 단계는 이 의미의 walking skeleton 으로 읽는다.)
 - **품질 기준 — 일상 개인 사용에 견고**: 공개 1.0 의 풀 스펙(로그 gzip·메트릭 차트·3-OS 인스톨러 등)은 후순위. **단 자동화(윈도우·핫키)는 "견고하거나 없거나"** — 오작동하는 핫키·윈도우 매니저는 일상 사용에 파괴적이므로 얕게 내지 않는다.
 - **슬라이스 순서**:
@@ -35,15 +35,15 @@
 
 ### 진입 조건
 - 아키텍처 문서 확정
-- 모노레포 스켈레톤 생성 — `crates/{core, application, shared, config, infra/{sqlite,http,logging}, platform/{linux,macos,windows}, app/{daemon,cli,desktop}}` 빈 crate 가 workspace 에 등록되어 `cargo check --workspace` 통과
+- 모노레포 스켈레톤 생성 — `apps/my_supervisor/{core, application, shared, config, infra/{sqlite,http,logging}, platform/{linux,macos,windows}, daemon, cli, desktop}` 빈 crate 가 workspace 에 등록되어 `cargo check --workspace` 통과
 
 ### 범위 (검증 대상)
 
 #### 1. 호스트 이원 구조 (코어 임베드 / 헤드리스 데몬)
-- `app/desktop` (Tauri) 가 `core`/`application` 을 **인프로세스 임베드** + 내장 axum HTTP/WS 서버 기동 (별도 `msv-daemon` spawn 없음 — DD-002)
+- `desktop` (Tauri) 가 `core`/`application` 을 **인프로세스 임베드** + 내장 axum HTTP/WS 서버 기동 (별도 `msv-daemon` spawn 없음 — DD-002)
 - 창을 닫아도 tray 상주로 자식 프로세스 유지 → 다시 열면 복귀
 - `tauri-plugin-single-instance` 로 앱 이중 실행 방지
-- `app/daemon` (헤드리스) 이 같은 코어를 임베드해 GUI 없이 동일 API 제공 — **두 호스트가 서로 의존하지 않음** 을 확인 (Tauri 는 데몬을 필요로 하지 않음)
+- `daemon` (헤드리스) 이 같은 코어를 임베드해 GUI 없이 동일 API 제공 — **두 호스트가 서로 의존하지 않음** 을 확인 (Tauri 는 데몬을 필요로 하지 않음)
 - React + Vite 번들 (`packages/ui`) 이 Tauri WebView 와 외부 브라우저에서 동일 렌더링·동작
 - 호스트 bin 이 타겟 OS 에 따라 `platform/*` 의 `LifecycleController` 구현을 `#[cfg(target_os)]` 로 DI 조립하는 경로 확인
 

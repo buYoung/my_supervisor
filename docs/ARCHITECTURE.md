@@ -4,12 +4,12 @@
 
 ## 1. 설계 원칙
 
-1. **GUI 호스트와 헤드리스 호스트 (독립)** — `core`/`application` 을 공유 라이브러리로 두고, **GUI 가 있는 my-supervisor**(`app/desktop`, Tauri)와 **GUI 가 없는 my-supervisor**(`app/daemon`, 헤드리스)가 각각 이 코어를 임베드한다. **둘은 독립이며 Tauri 는 데몬을 spawn 하지도, 필요로 하지도 않는다**(DD-002). 데스크톱에서 창을 닫아도 tray 로 상주해 관리 중인 프로세스는 유지된다.
+1. **GUI 호스트와 헤드리스 launcher** — `core`/`application` 과 adapter 조립을 `daemon` 런타임 라이브러리로 모으고, **GUI 가 있는 my-supervisor**(`desktop`, Tauri)는 이를 인프로세스로 재사용한다. **GUI 가 없는 my-supervisor**는 같은 런타임을 `msv-daemon` launcher로 실행한다. Tauri 는 별도 데몬 프로세스를 spawn 하지 않는다(DD-002). 데스크톱에서 창을 닫아도 tray 로 상주해 관리 중인 프로세스는 유지된다.
 2. **단일 통신 프로토콜** — Tauri WebView·브라우저·CLI가 모두 동일한 HTTP/WebSocket API를 사용한다(각 호스트가 내장 서버로 제공).
-3. **단일 코어, 두 호스트** — Desktop·Server 배포는 동일한 `core`/`application` 라이브러리를 공유하고, 호스트 바이너리(`app/desktop` · `app/daemon`)만 다르다.
+3. **단일 런타임, 두 실행 형태** — Desktop·Server 배포는 동일한 `daemon` 런타임 조립을 공유하고, 실행 형태(`desktop` Tauri 셸 · `msv-daemon` launcher)만 다르다.
 4. **GUI 우선, CLI 동등** — 주 사용자는 데스크톱 GUI, 그러나 CLI로도 동일 기능을 수행할 수 있어야 한다.
 5. **Opt-in 시스템 통합** — 시스템 서비스 등록은 기본이 아니며 사용자가 명시적으로 활성화한다.
-6. **Hexagonal 아키텍처 (Ports & Adapters)** — 도메인 로직은 OS·DB·네트워크 세부를 모른다. 모든 외부 의존은 `core` crate 의 port trait 로 추상화되고, `platform-*` · `infra-*` crate 가 adapter 로 구현한다. `#[cfg(target_os)]` 분기는 최상위 bin(`app/daemon` 등)에만 존재한다. 근거: DD-017 ~ DD-019.
+6. **Hexagonal 아키텍처 (Ports & Adapters)** — 도메인 로직은 OS·DB·네트워크 세부를 모른다. 모든 외부 의존은 `core` crate 의 port trait 로 추상화되고, `platform-*` · `infra-*` crate 가 adapter 로 구현한다. `#[cfg(target_os)]` 분기는 `daemon` 런타임 조립부에만 존재한다. 근거: DD-017 ~ DD-019.
 7. **Process + Job 이원 모델** — 장시간 실행 supervisor 대상인 **Process** 와 예약/주기/의존성으로 트리거되어 실행 후 종료를 기대하는 **Job** 은 별도 도메인 엔티티로 모델링한다. Job 스케줄링은 OS cron/Task Scheduler 에 위임하지 않고 데몬이 자체 수행한다. 근거: DD-022 ~ DD-024.
 8. **프로세스 관리 모드 이원화** — 각 Process 는 **Direct** (데몬이 직접 spawn·감시·재시작) 또는 **SystemRegistered** (OS 서비스 매니저 — systemd user unit / launchd agent / Windows Service — 에 등록 후 OS 가 감시, 데몬은 제어·조회·로그 집계) 중 하나를 프로세스별로 선택한다. 두 모드는 port 레벨에서 분리되며 재시작 엔진 충돌은 설계 시점에 차단한다. 근거: DD-025.
 9. **테마 동등 지원** — 다크 모드와 라이트 모드를 동등하게 지원한다. 토큰은 shadcn/ui CSS 변수를 단일 출처로 쓰고, 디자인 시안 승인 시 두 모드 스크린샷을 동시 확인한다. 근거: DD-021.
@@ -55,12 +55,10 @@ GUI 의존성 없이 데몬과 CLI만 배포:
 
 ## 3. 모노레포 구조
 
-Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. Turborepo는 `crates/package.json`을 통해 Cargo workspace 전체를 상위 태스크 그래프에 포함한다. 폴더는 카테고리 하위 중첩(`crates/platform/linux/`, `crates/infra/sqlite/`, `crates/app/daemon/`).
+Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. Turborepo는 `apps/my_supervisor/package.json`을 통해 Cargo workspace 전체를 상위 태스크 그래프에 포함한다. 폴더는 카테고리 하위 중첩(`apps/my_supervisor/platform/linux/`, `apps/my_supervisor/infra/sqlite/`, `apps/my_supervisor/daemon/`).
 
 ```
 my-supervisor/
-├── Cargo.toml                       # workspace (members 아래 참조)
-├── Cargo.lock
 ├── README.md
 ├── docs/
 ├── package.json                     # pnpm + Turborepo 루트 스크립트
@@ -80,7 +78,7 @@ my-supervisor/
 │           ├── components/ui/       # shadcn 공용 컴포넌트 (CSS 변수 기반, 다크+라이트 양립)
 │           ├── services/            # HTTP/WS 클라이언트
 │           └── shared/              # 타입·훅·유틸
-├── crates/
+├── apps/my_supervisor/
 │   ├── package.json                 # Turborepo에서 Cargo workspace를 대표하는 작업 패키지
 │   ├── core/                        # 도메인 + port trait (std/serde/uuid 수준만 의존)
 │   │   └── src/
@@ -124,10 +122,9 @@ my-supervisor/
 │   │   ├── linux/                   # prctl·PDEATHSIG·subreaper, systemd, journald
 │   │   ├── macos/                   # kqueue shutdown hook, launchd plist, unified logs
 │   │   └── windows/                 # Job Object, Service, Event Log, Task Scheduler, CTRL_BREAK
-│   └── app/
-│       ├── daemon/                  # 공통 데몬 런타임 lib + thin bin (`msv-daemon`)
-│       ├── cli/                     # bin (`msv`) — reqwest 클라이언트 (shared 타입 재사용)
-│       └── desktop/                 # bin — Tauri shell (tray, invoke, webview)
+│   ├── daemon/                      # 공통 데몬 런타임 lib + thin bin (`msv-daemon`)
+│   ├── cli/                         # bin (`msv`) — reqwest 클라이언트 (shared 타입 재사용)
+│   └── desktop/                     # bin — Tauri shell (tray, invoke, webview)
 └── scripts/
     ├── install-server.sh
     └── build-packages.sh
@@ -136,16 +133,18 @@ my-supervisor/
 **Workspace members 선언**:
 
 ```toml
-# Cargo.toml (root)
+# apps/my_supervisor/Cargo.toml
 [workspace]
 members = [
-    "crates/core",
-    "crates/application",
-    "crates/shared",
-    "crates/config",
-    "crates/infra/*",
-    "crates/platform/*",
-    "crates/app/*",
+    "core",
+    "application",
+    "shared",
+    "config",
+    "infra/*",
+    "platform/*",
+    "daemon",
+    "cli",
+    "desktop",
 ]
 ```
 
@@ -154,9 +153,9 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 ### 3.1 의존성 방향 (단방향)
 
 ```
-  app/cli ─┐
-           ├──▶ app/daemon(runtime) ──▶ application ──▶ core ◀── port trait 정의
-  app/desktop ┘              │              │                    ▲
+  cli ─┐
+           ├──▶ daemon(runtime) ──▶ application ──▶ core ◀── port trait 정의
+  desktop ┘              │              │                    ▲
                              │              └── shared ──────────┤
                              ├──▶ infra/*    ─────────────────── │
                              ├──▶ platform/* ─────────────────── │
@@ -168,27 +167,27 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 - `core` 는 다른 어떤 워크스페이스 crate 도 의존하지 않는다. 외부 crate 도 `serde`·`uuid`·`thiserror`·`tokio`(trait async) 등 의존성이 얇은 것만.
 - `application` 은 `core` 만 의존. use case 는 port trait 를 호출할 뿐 adapter 타입을 직접 참조하지 않는다.
 - `infra/*` · `platform/*` · `config` 는 `core`(+ 필요 시 `shared`) 만 의존. 서로 의존하지 않는다.
-- `app/daemon` 의 라이브러리 타깃이 공통 조립 지점이다. `core` · `application` · 필요한 `infra/*` · `platform/*` · `config` · `shared` 를 가져와 데몬 런타임을 만든다.
-- `app/desktop` 은 Tauri 셸과 invoke/devBridge만 담당하고, 데몬 런타임 조립은 `app/daemon` 라이브러리를 재사용한다. `app/cli` 는 같은 데몬 기본 접속값과 `shared` DTO를 재사용한다.
+- `daemon` 의 라이브러리 타깃이 공통 조립 지점이다. `core` · `application` · 필요한 `infra/*` · `platform/*` · `config` · `shared` 를 가져와 데몬 런타임을 만든다.
+- `desktop` 은 Tauri 셸과 invoke/devBridge만 담당하고, 데몬 런타임 조립은 `daemon` 라이브러리를 재사용한다. `cli` 는 같은 데몬 기본 접속값과 `shared` DTO를 재사용한다.
 
 ### 3.2 왜 이 구조인가
 
 - **core / application 의 플랫폼-프리**: OS·DB·HTTP 세부가 도메인으로 누출되지 않아 Linux/macOS/Windows 가 각기 다르게 동작해도 use case 코드는 한 벌이다 (§6·§7·§11 참조). 테스트 시 `InMemoryStateRepository`, `NoopAutoStart` 같은 가짜 adapter 를 주입해 빠르게 검증.
 - **OS별 adapter 의 물리적 격리**: `platform-linux` · `platform-macos` · `platform-windows` 가 각각 별도 crate 라 **빌드 타겟에 해당하는 crate 만 컴파일**된다. Linux 서버에서 `platform-macos` 소스 오류가 CI 에 새지 않고, `unsafe` · syscall 바인딩도 크레이트 경계 안에 갇힌다.
 - **Infra 카테고리 분리**: SQLite → Postgres, axum → 다른 서버 프레임워크로의 교체가 `infra-sqlite` · `infra-http` 만 손대면 된다. `infra-logging` 도 같은 이유로 분리 — Phase 3 의 JSON 로테이션·백프레셔 변경이 다른 crate 를 건드리지 않는다.
-- **Server 배포 크기 최소화**: `cargo build -p my-supervisor-app-daemon` 은 `app/desktop` (Tauri, GTK/WebView2) 을 건드리지 않는다. 플랫폼별로도 `platform/<현재_OS>` 만 링크된다.
+- **Server 배포 크기 최소화**: `cargo build -p my-supervisor-app-daemon` 은 `desktop` (Tauri, GTK/WebView2) 을 건드리지 않는다. 플랫폼별로도 `platform/<현재_OS>` 만 링크된다.
 - **`shared` 와 `core` 의 역할 분리**: `shared` 는 네트워크·파일로 나가는 **wire format** 만 (DTO, 설정 파일 스키마). `core` 는 **도메인 모델** 과 **port trait**. 둘을 섞지 않아야 API 스펙이 도메인 변경에 휘둘리지 않고, 역으로 도메인이 wire 포맷 호환성에 묶이지 않는다.
 - **Feature 단위 프론트엔드**: `packages/ui` 의 `features/*` 가 백엔드 port 분리와 대칭. 각 feature 폴더는 자기 UI + service 호출 + 훅을 자기 안에 둔다. 공용 shadcn 컴포넌트는 `components/ui`, HTTP/WS 클라이언트는 `services/` 에 분리.
 
 ## 4. 컴포넌트 설계
 
-컴포넌트는 **(a) 실행 형태** (bin/lib) 와 **(b) 레이어 위치** 를 교차해서 본다. §3 의 5-레이어(core / application / shared+config / infra / platform / app) 를 기준으로 정리한다.
+컴포넌트는 **(a) 실행 형태** (bin/lib) 와 **(b) 레이어 위치** 를 교차해서 본다. §3 의 레이어(core / application / shared+config / infra / platform / host)를 기준으로 정리한다.
 
-### 4.1 App — 바이너리 조립 지점
+### 4.1 Host — 런타임 조립과 실행 지점
 
 실제로 빌드되는 최종 산출물. Hexagonal 의 "composition root" 역할만 한다. 도메인 로직은 들어가지 않는다.
 
-#### 4.1.1 `app/daemon` (lib + bin `msv-daemon`)
+#### 4.1.1 `daemon` (lib + bin `msv-daemon`)
 
 공통 데몬 런타임. 라이브러리 타깃은 `core`/`application`/adapter 조립, 데이터 경로, 기본 loopback 주소를 제공한다. `msv-daemon` 바이너리는 이 런타임을 HTTP 서버로 띄우는 얇은 launcher 이다.
 
@@ -209,11 +208,11 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 | 시그널 | `signal-hook`, `signal-hook-tokio` |
 | DI / 에러 | `anyhow`, `thiserror` |
 
-`sqlx`, `axum`, `nix`, `windows` 등은 각 infra/platform crate 의 내부 의존이며 `app/daemon` 은 concrete adapter 를 선택해 연결만 한다.
+`sqlx`, `axum`, `nix`, `windows` 등은 각 infra/platform crate 의 내부 의존이며 `daemon` 은 concrete adapter 를 선택해 연결만 한다.
 
-#### 4.1.2 `app/cli` (bin `msv`)
+#### 4.1.2 `cli` (bin `msv`)
 
-데몬 HTTP API를 호출하는 얇은 클라이언트. `shared` crate 의 wire 타입을 재사용하므로 API 변경이 컴파일 타임에 잡힌다. 기본 접속 주소는 `app/daemon` 런타임의 상수를 사용한다.
+데몬 HTTP API를 호출하는 얇은 클라이언트. `shared` crate 의 wire 타입을 재사용하므로 API 변경이 컴파일 타임에 잡힌다. 기본 접속 주소는 `daemon` 런타임의 상수를 사용한다.
 
 **명령 체계:**
 
@@ -238,15 +237,15 @@ msv ui                     # 브라우저로 WebUI 열기
 
 **크레이트:** `clap`, `reqwest`, `comfy-table`, `indicatif`, `serde_json`, `my-supervisor-shared`
 
-#### 4.1.3 `app/desktop` (Tauri bin)
+#### 4.1.3 `desktop` (Tauri bin)
 
-**GUI 가 있는 my-supervisor.** `app/daemon` 라이브러리의 런타임 조립을 **인프로세스로 재사용** 하고, Tauri invoke와 test-only devBridge를 제공한다. **별도 `msv-daemon` 프로세스를 spawn 하지 않는다**(DD-002).
+**GUI 가 있는 my-supervisor.** `daemon` 라이브러리의 런타임 조립을 **인프로세스로 재사용** 하고, Tauri invoke와 test-only devBridge를 제공한다. **별도 `msv-daemon` 프로세스를 spawn 하지 않는다**(DD-002).
 
 **책임:**
 - 코어 임베드 + 내장 axum HTTP/WS 서버 기동 (`127.0.0.1:<port>`)
 - WebView 에 `http://127.0.0.1:<port>` 로드 (번들된 `packages/ui` 를 서빙)
 - 트레이 아이콘 + 메뉴 (창을 닫아도 tray 로 상주 → supervision 유지)
-- **macOS 자동화 권한(Accessibility / Input Monitoring) 보유 주체** — 윈도우·핫키 Rule 실행 (DD-027 · DD-029). 헤드리스 `app/daemon` 은 이 경로가 비활성
+- **macOS 자동화 권한(Accessibility / Input Monitoring) 보유 주체** — 윈도우·핫키 Rule 실행 (DD-027 · DD-029). 헤드리스 `daemon` 은 이 경로가 비활성
 - 네이티브 알림 (crash loop 진입 등)
 - OS 자동 시작 등록 (user-level) — `platform/*` 의 `AutoStartService` adapter 재사용 가능
 
@@ -260,7 +259,7 @@ msv ui                     # 브라우저로 WebUI 열기
 
 ### 4.2 Application — Use Case 레이어
 
-`crates/application`. `core::ports` 의 trait 만 소비하는 순수 로직. 각 use case 는 한 파일·한 struct.
+`apps/my_supervisor/application`. `core::ports` 의 trait 만 소비하는 순수 로직. 각 use case 는 한 파일·한 struct.
 
 **Process 영역 use case:**
 
@@ -289,12 +288,12 @@ Use case 는 OS 를 모른다 (#[cfg] 없음). 모든 플랫폼 차이는 port �
 
 ### 4.3 Core — 도메인 + Ports
 
-`crates/core`. 프로젝트의 중심. 다른 워크스페이스 crate 에 **의존하지 않는다**.
+`apps/my_supervisor/core`. 프로젝트의 중심. 다른 워크스페이스 crate 에 **의존하지 않는다**.
 
 **`core::domain`** — 값 객체와 엔티티.
 
 ```rust
-// crates/core/src/domain/process.rs 발췌
+// apps/my_supervisor/core/src/domain/process.rs 발췌
 pub struct ProcessSpec {
     pub name: String,
     pub command: String,
@@ -329,7 +328,7 @@ pub struct ChildHandle {
 Job 영역의 도메인 타입은 §12 에 상세. 요약:
 
 ```rust
-// crates/core/src/domain/job.rs 발췌
+// apps/my_supervisor/core/src/domain/job.rs 발췌
 pub struct Job {
     pub id: JobId,
     pub name: String,
@@ -357,7 +356,7 @@ pub enum JobRunState { Pending, Running, Succeeded, Failed, Cancelled, Skipped }
 Rule(자동화) 영역의 도메인 타입은 §13 에 상세. 요약:
 
 ```rust
-// crates/core/src/domain/rule.rs 발췌
+// apps/my_supervisor/core/src/domain/rule.rs 발췌
 pub struct Rule {
     pub id: RuleId,
     pub name: String,
@@ -404,14 +403,14 @@ pub enum RuleFireState { Fired, ActionsSucceeded, ActionsFailed, Skipped }
 | `HotkeyBinder` ✱ | Rule 의 글로벌 핫키 트리거 | `platform/macos` (event tap) |
 | `SystemEventWatcher` ✱ | Rule 의 macOS 시스템 이벤트 (USB·WiFi·화면잠금·앱 실행) | `platform/macos` (NSWorkspace/IOKit) |
 
-> ✱ **단일 구현 seam** — trait 는 `core::ports` 에 있으나 구현자가 `platform/macos` **하나뿐이며 Linux/Windows stub 을 만들지 않는다.** 여러 OS 가 구현하는 일반 port 와 달리, `application` 은 `Option<&dyn …>` 로 소비하고 `app/desktop`(macOS)만 `Some` 을 주입한다(비-macOS 호스트는 `None`). 근거·미러링 함정 회피: DD-027.
+> ✱ **단일 구현 seam** — trait 는 `core::ports` 에 있으나 구현자가 `platform/macos` **하나뿐이며 Linux/Windows stub 을 만들지 않는다.** 여러 OS 가 구현하는 일반 port 와 달리, `application` 은 `Option<&dyn …>` 로 소비하고 `desktop`(macOS)만 `Some` 을 주입한다(비-macOS 호스트는 `None`). 근거·미러링 함정 회피: DD-027.
 
 ### 4.4 Shared — Wire Types
 
-`crates/shared`. HTTP/WS DTO 와 TOML 설정 스키마만 담는다. `core` 와 분리된 이유: wire format 호환성 제약(`#[serde(rename_all = "snake_case")]` 같은 어노테이션)이 도메인 타입으로 누출되지 않게 하기 위함.
+`apps/my_supervisor/shared`. HTTP/WS DTO 와 TOML 설정 스키마만 담는다. `core` 와 분리된 이유: wire format 호환성 제약(`#[serde(rename_all = "snake_case")]` 같은 어노테이션)이 도메인 타입으로 누출되지 않게 하기 위함.
 
 ```rust
-// crates/shared/src/api.rs 예시
+// apps/my_supervisor/shared/src/api.rs 예시
 #[derive(Serialize, Deserialize)]
 pub struct ProcessStatusDto {
     pub name: String,
@@ -424,15 +423,15 @@ pub struct ProcessStatusDto {
 }
 ```
 
-`infra/http` 와 `app/cli` 가 같은 DTO 를 임포트하기 때문에 API 변경이 양쪽에 동시 반영된다 (DD-003 의 "단일 통신 프로토콜" 을 타입 레벨에서 강제).
+`infra/http` 와 `cli` 가 같은 DTO 를 임포트하기 때문에 API 변경이 양쪽에 동시 반영된다 (DD-003 의 "단일 통신 프로토콜" 을 타입 레벨에서 강제).
 
 ### 4.5 Config
 
-`crates/config`. `ConfigSource` port 의 참조 구현. `shared::config` 스키마를 사용하여 TOML 을 파싱하고, `notify` 크레이트로 파일 변경을 감지한다. `core` 외에는 의존하지 않기 때문에 테스트에서 `InMemoryConfigSource` 와 교체 가능.
+`apps/my_supervisor/config`. `ConfigSource` port 의 참조 구현. `shared::config` 스키마를 사용하여 TOML 을 파싱하고, `notify` 크레이트로 파일 변경을 감지한다. `core` 외에는 의존하지 않기 때문에 테스트에서 `InMemoryConfigSource` 와 교체 가능.
 
 ### 4.6 Infrastructure Adapters
 
-`crates/infra/*`. 기술 스택에 종속적인 port 구현.
+`apps/my_supervisor/infra/*`. 기술 스택에 종속적인 port 구현.
 
 | Crate | 구현 port | 주요 의존 |
 |---|---|---|
@@ -441,11 +440,11 @@ pub struct ProcessStatusDto {
 | `infra/logging` | `LogSink` + 로테이션 (run 단위 로그 아카이브 경로 포함) | `tracing`, `tracing-subscriber`, `file-rotate` |
 | `infra/scheduler` | `Scheduler` — cron 5-field / interval / one-shot / 의존성 타이머 평가 | `tokio-cron-scheduler` (또는 `cron` + 자체 `tokio::time`) |
 
-교체 가능성: SQLite → Postgres 시 `infra/postgres` 를 새로 만들고 `app/daemon` 의 DI 만 교체하면 된다. `core` · `application` 은 무변경. `infra/scheduler` 도 동일 — 다른 스케줄러 라이브러리로 교체 시 이 crate 만 재작성.
+교체 가능성: SQLite → Postgres 시 `infra/postgres` 를 새로 만들고 `daemon` 의 DI 만 교체하면 된다. `core` · `application` 은 무변경. `infra/scheduler` 도 동일 — 다른 스케줄러 라이브러리로 교체 시 이 crate 만 재작성.
 
 ### 4.7 Platform Adapters
 
-`crates/platform/*`. OS 에 종속적인 port 구현. 각 crate 는 **자기 OS 에서만 컴파일**되도록 `[target]` 블록 또는 `#[cfg]` 로 가드한다.
+`apps/my_supervisor/platform/*`. OS 에 종속적인 port 구현. 각 crate 는 **자기 OS 에서만 컴파일**되도록 `[target]` 블록 또는 `#[cfg]` 로 가드한다.
 
 | Crate | 대표 구현 | OS-native API |
 |---|---|---|
@@ -458,7 +457,7 @@ pub struct ProcessStatusDto {
 - `AutoStartService` — **데몬 자체** 를 부팅 시 기동하기 위한 단일 unit (예: `my-supervisor.service`)
 - `ProcessServiceRegistrar` — **관리 대상 프로세스마다** 하나씩의 unit (예: `my-supervisor-managed-<name>.service`). 이름 네임스페이스로 충돌 방지.
 
-세 crate 가 같은 port trait (`LifecycleController` 등) 을 구현하기 때문에 `app/daemon` 에서는:
+세 crate 가 같은 port trait (`LifecycleController` 등) 을 구현하기 때문에 `daemon` 에서는:
 
 ```rust
 #[cfg(target_os = "linux")]
@@ -595,7 +594,7 @@ WebSocket 채널은 연결 해제 시 close frame의 reason에 같은 `code`를 
 생명주기 제어는 **OS별로 사용하는 커널 기능이 완전히 다르다**. 같은 "tied 모드"여도 Linux 는 `PR_SET_PDEATHSIG`, Windows 는 Job Object 의 `KILL_ON_JOB_CLOSE`, macOS 는 shutdown hook 이라는 식. 이 차이를 `application` 레이어가 알면 코드가 3중 분기투성이가 된다. 따라서 단일 port trait 로 묶고 OS crate 가 각자 구현한다.
 
 ```rust
-// crates/core/src/ports/lifecycle.rs
+// apps/my_supervisor/core/src/ports/lifecycle.rs
 #[async_trait]
 pub trait LifecycleController: Send + Sync {
     async fn spawn_tied(&self, spec: &ProcessSpec) -> Result<ChildHandle, SpawnError>;
@@ -616,7 +615,7 @@ pub trait LifecycleController: Send + Sync {
 `application::StartProcess` 는 위 표의 어느 항목도 직접 알지 않는다. 또한 `management_mode` 에 따라 `LifecycleController` (Direct) 또는 `ProcessServiceRegistrar` (SystemRegistered) 로 분기한다 (§6.4 참조):
 
 ```rust
-// crates/application/src/start_process.rs 발췌
+// apps/my_supervisor/application/src/start_process.rs 발췌
 pub async fn start_process(
     spec: &ProcessSpec,
     lifecycle: &dyn LifecycleController,
@@ -686,7 +685,7 @@ pub async fn start_process(
 자식 프로세스로 "정지하라" 는 신호를 보내는 방식은 OS 마다 다르지만, `application` 레이어에는 "정상 요청 → grace period → 강제 종료" 라는 동일한 논리가 있다. 이를 port 로 추상화한다.
 
 ```rust
-// crates/core/src/ports/shutdown.rs
+// apps/my_supervisor/core/src/ports/shutdown.rs
 #[async_trait]
 pub trait ShutdownSignaler: Send + Sync {
     async fn request_graceful(&self, target: &ChildHandle, cfg: &ShutdownPolicy)
@@ -848,7 +847,7 @@ OS 서비스 매니저(systemd user unit / launchd agent / Windows Service) 와�
 #### Port: `AutoStartService`
 
 ```rust
-// crates/core/src/ports/autostart.rs
+// apps/my_supervisor/core/src/ports/autostart.rs
 #[async_trait]
 pub trait AutoStartService: Send + Sync {
     async fn enable(&self, scope: AutoStartScope) -> Result<(), AutoStartError>;
@@ -867,7 +866,7 @@ pub enum AutoStartScope { User, System } // user-level vs 시스템 전역
 | `platform/macos` | `LaunchdAgent` | `~/Library/LaunchAgents/com.my-supervisor.daemon.plist` | `launchctl bootstrap gui/$(id -u) ...` |
 | `platform/windows` | `TaskSchedulerEntry` 또는 `WindowsService` | Task Scheduler XML · `sc create my-supervisor` | `sc start/stop my-supervisor` |
 
-UI/CLI 는 `AutoStartService` trait 만 호출 → OS 분기는 `app/daemon` DI 지점에만 존재.
+UI/CLI 는 `AutoStartService` trait 만 호출 → OS 분기는 `daemon` DI 지점에만 존재.
 
 ### 11.2 (B) 관리 대상 프로세스 관리 모드
 
@@ -876,7 +875,7 @@ UI/CLI 는 `AutoStartService` trait 만 호출 → OS 분기는 `app/daemon` DI 
 #### Port: `ProcessServiceRegistrar`
 
 ```rust
-// crates/core/src/ports/process_service.rs
+// apps/my_supervisor/core/src/ports/process_service.rs
 #[async_trait]
 pub trait ProcessServiceRegistrar: Send + Sync {
     /// unit 파일 생성 + register (daemon-reload 등 부수 절차 포함).
@@ -998,7 +997,7 @@ pub trait ProcessServiceRegistrar: Send + Sync {
 
 ### 13.4 macOS 전용 경계와 권한
 
-- 윈도우·핫키·macOS 시스템 이벤트는 **GUI 세션 + TCC 권한** 이 필요하므로 `app/desktop`(Tauri, macOS) 호스트에서만 동작한다. 헤드리스 `app/daemon` 이나 비-macOS 호스트는 해당 seam 이 `None` 이라, 그런 트리거·액션을 포함한 Rule 은 **등록 시점에 `not supported on this platform` 으로 거부** 된다 (DD-027).
+- 윈도우·핫키·macOS 시스템 이벤트는 **GUI 세션 + TCC 권한** 이 필요하므로 `desktop`(Tauri, macOS) 호스트에서만 동작한다. 헤드리스 `daemon` 이나 비-macOS 호스트는 해당 seam 이 `None` 이라, 그런 트리거·액션을 포함한 Rule 은 **등록 시점에 `not supported on this platform` 으로 거부** 된다 (DD-027).
 - 권한 모델 (DD-029): 윈도우 제어는 **Accessibility**, 글로벌 핫키는 **Input Monitoring** 권한이 필요하다. 미부여 시 해당 Rule 을 `enabled = false (권한 필요)` 로 표기하고 UI 에서 상태 + 시스템 설정 안내를 노출한다. **조용한 실패는 금지.**
 - 파일 watch·타이머 트리거와 프로세스/Job/명령 액션은 권한과 무관하게 모든 호스트에서 동작한다.
 

@@ -5,10 +5,10 @@ set -euo pipefail
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly EXPECTED_PROTOTOOLS_CONTENT=$'node = "24.14.0"\nrust = "1.94.1"\npnpm = "10.11.0"'
-readonly EXPECTED_ROOT_PACKAGE_CONTENT=$'{\n  "name": "my-supervisor",\n  "version": "0.1.0",\n  "private": true,\n  "packageManager": "pnpm@10.11.0",\n  "scripts": {\n    "dev": "turbo run dev --filter=@my-supervisor/ui",\n    "build": "turbo run build",\n    "build:rust": "turbo run build --filter=@my-supervisor/crates",\n    "build:ui": "turbo run build --filter=@my-supervisor/ui",\n    "typecheck": "turbo run typecheck",\n    "typecheck:rust": "turbo run typecheck --filter=@my-supervisor/crates",\n    "typecheck:ui": "turbo run typecheck --filter=@my-supervisor/ui",\n    "desktop:dev": "cargo tauri dev",\n    "desktop:build": "cargo tauri build"\n  },\n  "devDependencies": {\n    "turbo": "^2.10.3"\n  }\n}'
-readonly EXPECTED_CRATES_PACKAGE_CONTENT=$'{\n  "name": "@my-supervisor/crates",\n  "version": "0.1.0",\n  "private": true,\n  "scripts": {\n    "build": "cargo build --workspace",\n    "typecheck": "cargo check --workspace"\n  }\n}'
-readonly EXPECTED_PNPM_WORKSPACE_CONTENT=$'packages:\n  - "crates"\n  - "apps/*"\n  - "packages/*"'
-readonly EXPECTED_TURBO_CONTENT=$'{\n  "$schema": "https://turborepo.com/schema.json",\n  "tasks": {\n    "build": {\n      "dependsOn": ["^build"],\n      "outputs": ["dist/**", "../target/**"]\n    },\n    "typecheck": {\n      "dependsOn": ["^typecheck"],\n      "outputs": []\n    },\n    "dev": {\n      "cache": false,\n      "persistent": true\n    }\n  }\n}'
+readonly EXPECTED_ROOT_PACKAGE_CONTENT=$'{\n  "name": "my-supervisor",\n  "version": "0.1.0",\n  "private": true,\n  "packageManager": "pnpm@10.11.0",\n  "scripts": {\n    "dev": "turbo run dev --filter=@my-supervisor/ui",\n    "build": "turbo run build",\n    "build:rust": "turbo run build --filter=@my-supervisor/my-supervisor",\n    "build:ui": "turbo run build --filter=@my-supervisor/ui",\n    "typecheck": "turbo run typecheck",\n    "typecheck:rust": "turbo run typecheck --filter=@my-supervisor/my-supervisor",\n    "typecheck:ui": "turbo run typecheck --filter=@my-supervisor/ui",\n    "desktop:dev": "pnpm --filter @my-supervisor/my-supervisor desktop:dev",\n    "desktop:build": "pnpm --filter @my-supervisor/my-supervisor desktop:build"\n  },\n  "devDependencies": {\n    "turbo": "^2.10.3"\n  }\n}'
+readonly EXPECTED_APP_PACKAGE_CONTENT=$'{\n  "name": "@my-supervisor/my-supervisor",\n  "version": "0.1.0",\n  "private": true,\n  "scripts": {\n    "build": "cargo build --workspace",\n    "typecheck": "cargo check --workspace",\n    "desktop:dev": "cargo tauri dev",\n    "desktop:build": "cargo tauri build"\n  }\n}'
+readonly EXPECTED_PNPM_WORKSPACE_CONTENT=$'packages:\n  - "apps/*"\n  - "packages/*"'
+readonly EXPECTED_TURBO_CONTENT=$'{\n  "$schema": "https://turborepo.com/schema.json",\n  "tasks": {\n    "build": {\n      "dependsOn": ["^build"],\n      "outputs": ["dist/**", "target/**"]\n    },\n    "typecheck": {\n      "dependsOn": ["^typecheck"],\n      "outputs": []\n    },\n    "dev": {\n      "cache": false,\n      "persistent": true\n    }\n  }\n}'
 
 TEMPORARY_DIRECTORY=""
 
@@ -125,10 +125,10 @@ test_setup_turbo_creates_expected_files() {
   run_in_workspace "${workspace_path}" "${workspace_path}/tool.log" false bash "${workspace_path}/scripts/setup-turbo.sh"
 
   assert_directory_exists "${workspace_path}/apps"
+  assert_directory_exists "${workspace_path}/apps/my_supervisor"
   assert_directory_exists "${workspace_path}/packages"
-  assert_directory_exists "${workspace_path}/crates"
   assert_file_content "${workspace_path}/package.json" "${EXPECTED_ROOT_PACKAGE_CONTENT}"
-  assert_file_content "${workspace_path}/crates/package.json" "${EXPECTED_CRATES_PACKAGE_CONTENT}"
+  assert_file_content "${workspace_path}/apps/my_supervisor/package.json" "${EXPECTED_APP_PACKAGE_CONTENT}"
   assert_file_content "${workspace_path}/pnpm-workspace.yaml" "${EXPECTED_PNPM_WORKSPACE_CONTENT}"
   assert_file_content "${workspace_path}/turbo.json" "${EXPECTED_TURBO_CONTENT}"
 }
@@ -145,10 +145,10 @@ test_setup_turbo_preserves_existing_configuration() {
 }
 EOF
 
-  mkdir -p "${workspace_path}/crates"
-  cat <<'EOF' > "${workspace_path}/crates/package.json"
+  mkdir -p "${workspace_path}/apps/my_supervisor"
+  cat <<'EOF' > "${workspace_path}/apps/my_supervisor/package.json"
 {
-  "name": "@custom/crates"
+  "name": "@custom/my-supervisor"
 }
 EOF
 
@@ -166,10 +166,10 @@ EOF
   run_in_workspace "${workspace_path}" "${workspace_path}/tool.log" false bash "${workspace_path}/scripts/setup-turbo.sh"
 
   assert_directory_exists "${workspace_path}/apps"
+  assert_directory_exists "${workspace_path}/apps/my_supervisor"
   assert_directory_exists "${workspace_path}/packages"
-  assert_directory_exists "${workspace_path}/crates"
   assert_file_content "${workspace_path}/package.json" $'{\n  "name": "custom"\n}'
-  assert_file_content "${workspace_path}/crates/package.json" $'{\n  "name": "@custom/crates"\n}'
+  assert_file_content "${workspace_path}/apps/my_supervisor/package.json" $'{\n  "name": "@custom/my-supervisor"\n}'
   assert_file_content "${workspace_path}/pnpm-workspace.yaml" $'packages:\n  - "custom/*"'
   assert_file_content "${workspace_path}/turbo.json" $'{\n  "tasks": {}\n}'
 }

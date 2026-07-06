@@ -12,7 +12,7 @@ importers:
         specifier: ^2.10.3
         version: 2.10.3
 
-  crates: {}
+  apps/my_supervisor: {}
 
   packages/ui:
     dependencies:

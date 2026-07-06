@@ -1,9 +1,0 @@
-{
-  "name": "@my-supervisor/crates",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "build": "cargo build --workspace",
-    "typecheck": "cargo check --workspace"
-  }
-}

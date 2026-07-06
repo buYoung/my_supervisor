@@ -6,13 +6,13 @@
   "scripts": {
     "dev": "turbo run dev --filter=@my-supervisor/ui",
     "build": "turbo run build",
-    "build:rust": "turbo run build --filter=@my-supervisor/crates",
+    "build:rust": "turbo run build --filter=@my-supervisor/my-supervisor",
     "build:ui": "turbo run build --filter=@my-supervisor/ui",
     "typecheck": "turbo run typecheck",
-    "typecheck:rust": "turbo run typecheck --filter=@my-supervisor/crates",
+    "typecheck:rust": "turbo run typecheck --filter=@my-supervisor/my-supervisor",
     "typecheck:ui": "turbo run typecheck --filter=@my-supervisor/ui",
-    "desktop:dev": "cargo tauri dev",
-    "desktop:build": "cargo tauri build"
+    "desktop:dev": "pnpm --filter @my-supervisor/my-supervisor desktop:dev",
+    "desktop:build": "pnpm --filter @my-supervisor/my-supervisor desktop:build"
   },
   "devDependencies": {
     "turbo": "^2.10.3"

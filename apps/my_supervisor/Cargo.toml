@@ -1,13 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/core",
-    "crates/application",
-    "crates/shared",
-    "crates/config",
-    "crates/infra/*",
-    "crates/platform/*",
-    "crates/app/*",
+    "core",
+    "application",
+    "shared",
+    "config",
+    "infra/*",
+    "platform/*",
+    "daemon",
+    "cli",
+    "desktop",
 ]
 
 [workspace.package]
@@ -18,16 +20,16 @@ repository = "https://github.com/buYoung/my_supervisor"
 
 [workspace.dependencies]
 # Internal crates
-my-supervisor-core = { path = "crates/core" }
-my-supervisor-application = { path = "crates/application" }
-my-supervisor-shared = { path = "crates/shared" }
-my-supervisor-config = { path = "crates/config" }
-my-supervisor-infra-sqlite = { path = "crates/infra/sqlite" }
-my-supervisor-infra-http = { path = "crates/infra/http" }
-my-supervisor-infra-logging = { path = "crates/infra/logging" }
-my-supervisor-infra-scheduler = { path = "crates/infra/scheduler" }
-my-supervisor-platform-macos = { path = "crates/platform/macos" }
-my-supervisor-app-daemon = { path = "crates/app/daemon" }
+my-supervisor-core = { path = "core" }
+my-supervisor-application = { path = "application" }
+my-supervisor-shared = { path = "shared" }
+my-supervisor-config = { path = "config" }
+my-supervisor-infra-sqlite = { path = "infra/sqlite" }
+my-supervisor-infra-http = { path = "infra/http" }
+my-supervisor-infra-logging = { path = "infra/logging" }
+my-supervisor-infra-scheduler = { path = "infra/scheduler" }
+my-supervisor-platform-macos = { path = "platform/macos" }
+my-supervisor-app-daemon = { path = "daemon" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
