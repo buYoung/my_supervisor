@@ -15,25 +15,17 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tokio::net::TcpListener;
 
-use my_supervisor_application::{
-    AppDeps, AppError, ConvertTarget, DaemonMeta, OperationsFacade, RestartOutcome,
-};
-use my_supervisor_core::ports::{
-    LifecycleController, LogSink, ProcessServiceRegistrar, RealClock, ShutdownSignaler,
-};
+use my_supervisor_app_daemon::{build_runtime, data_dir, DEFAULT_BIND_PORT};
+use my_supervisor_application::{AppError, ConvertTarget, OperationsFacade, RestartOutcome};
 use my_supervisor_infra_http::mapping::{
     daemon_info_to_dto, job_config_to_job, job_run_to_dto, job_view_to_dto, log_line_to_dto,
     log_page_to_dto, process_config_to_spec, process_status_to_dto,
 };
-use my_supervisor_infra_http::{assemble, Assembled};
+use my_supervisor_infra_http::Assembled;
 use my_supervisor_shared::api::{
     ConvertTargetDto, DaemonStatusDto, JobConfigDto, JobListDto, JobRunListDto, LogsResponseDto,
     ProcessConfigDto, ProcessListDto, ProcessStatusDto,
 };
-
-/// Default devBridge port — reuses the daemon's `9876` (only one host typically
-/// runs at once). Override with `MSV_DEVBRIDGE_PORT` to co-run with the daemon.
-const DEFAULT_DEVBRIDGE_PORT: u16 = 9876;
 
 /// Serializable command error carrying the API §5 code.
 #[derive(Debug, Serialize)]
@@ -75,7 +67,10 @@ async fn cmd_get_process(facade: Facade<'_>, name: String) -> CmdResult<ProcessS
 }
 
 #[tauri::command]
-async fn cmd_add_process(facade: Facade<'_>, config: ProcessConfigDto) -> CmdResult<ProcessStatusDto> {
+async fn cmd_add_process(
+    facade: Facade<'_>,
+    config: ProcessConfigDto,
+) -> CmdResult<ProcessStatusDto> {
     let status = facade.add_process(process_config_to_spec(config)).await?;
     Ok(process_status_to_dto(status))
 }
@@ -94,13 +89,18 @@ async fn cmd_stop_process(facade: Facade<'_>, name: String, force: bool) -> CmdR
 async fn cmd_restart_process(facade: Facade<'_>, name: String) -> CmdResult<serde_json::Value> {
     match facade.restart_process(&name).await? {
         RestartOutcome::Accepted => Ok(serde_json::json!({ "noop": false })),
-        RestartOutcome::Noop { reason } => Ok(serde_json::json!({ "noop": true, "reason": reason })),
+        RestartOutcome::Noop { reason } => {
+            Ok(serde_json::json!({ "noop": true, "reason": reason }))
+        }
     }
 }
 
 #[tauri::command]
 async fn cmd_remove_process(facade: Facade<'_>, name: String, force: bool) -> CmdResult<()> {
-    facade.remove_process(&name, force).await.map_err(Into::into)
+    facade
+        .remove_process(&name, force)
+        .await
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -122,8 +122,14 @@ async fn cmd_convert_process(
 }
 
 #[tauri::command]
-async fn cmd_process_logs(facade: Facade<'_>, name: String, tail: usize) -> CmdResult<LogsResponseDto> {
-    Ok(log_page_to_dto(facade.process_logs(&name, tail, None).await?))
+async fn cmd_process_logs(
+    facade: Facade<'_>,
+    name: String,
+    tail: usize,
+) -> CmdResult<LogsResponseDto> {
+    Ok(log_page_to_dto(
+        facade.process_logs(&name, tail, None).await?,
+    ))
 }
 
 #[tauri::command]
@@ -140,8 +146,10 @@ async fn cmd_list_jobs(facade: Facade<'_>) -> CmdResult<JobListDto> {
 #[tauri::command]
 async fn cmd_add_job(facade: Facade<'_>, config: JobConfigDto) -> CmdResult<serde_json::Value> {
     let view = facade.add_job(job_config_to_job(config)).await?;
-    serde_json::to_value(job_view_to_dto(view))
-        .map_err(|e| CmdError { code: "internal_error".into(), message: e.to_string() })
+    serde_json::to_value(job_view_to_dto(view)).map_err(|e| CmdError {
+        code: "internal_error".into(),
+        message: e.to_string(),
+    })
 }
 
 #[tauri::command]
@@ -208,7 +216,7 @@ fn main() {
             let port = std::env::var("MSV_DEVBRIDGE_PORT")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(DEFAULT_DEVBRIDGE_PORT);
+                .unwrap_or(DEFAULT_BIND_PORT);
             tauri::async_runtime::spawn(run_devbridge(assembled.router, port, data_dir));
 
             app.manage(facade);
@@ -250,8 +258,9 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
 
-    let mut builder = TrayIconBuilder::new().menu(&menu).on_menu_event(|app, event| {
-        match event.id.as_ref() {
+    let mut builder = TrayIconBuilder::new()
+        .menu(&menu)
+        .on_menu_event(|app, event| match event.id.as_ref() {
             "quit" => app.exit(0),
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
@@ -260,19 +269,12 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                 }
             }
             _ => {}
-        }
-    });
+        });
     if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
     builder.build(app)?;
     Ok(())
-}
-
-fn data_dir() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("my-supervisor")
 }
 
 /// Serve the operations Router on loopback for test automation; write the
@@ -295,65 +297,7 @@ async fn run_devbridge(router: axum::Router, port: u16, data_dir: PathBuf) {
     let _ = tokio::fs::remove_file(&discovery).await;
 }
 
-/// In-process composition (mirrors the daemon's DI; the `#[cfg(target_os)]`
-/// adapter selection lives only here, per DD-018).
+/// In-process composition shared with the daemon runtime.
 async fn build_host() -> anyhow::Result<Assembled> {
-    let base = data_dir();
-    tokio::fs::create_dir_all(&base).await.ok();
-    let log_dir = base.join("logs");
-    tokio::fs::create_dir_all(&log_dir).await.ok();
-    let db_path = base.join("state.db");
-    let config_path = dirs::config_dir()
-        .map(|p| p.join("my-supervisor").join("config.toml"))
-        .unwrap_or_else(|| base.join("config.toml"));
-
-    let log_sink: Arc<dyn LogSink> = Arc::new(my_supervisor_infra_logging::InMemoryLogSink::new());
-    let (lifecycle, shutdown) = platform_adapters(log_sink.clone());
-    let registrar = process_service_registrar(log_dir.clone());
-    let store = Arc::new(my_supervisor_infra_sqlite::SqliteStore::connect(&db_path).await?);
-
-    let deps = AppDeps {
-        lifecycle,
-        shutdown,
-        registrar,
-        state_repo: store.clone(),
-        job_repo: store.clone(),
-        scheduler: Arc::new(my_supervisor_infra_scheduler::TokioScheduler::new()),
-        log_sink,
-        clock: Arc::new(RealClock),
-        config: Arc::new(my_supervisor_config::TomlConfigSource::new(config_path.clone())),
-        meta: DaemonMeta::new(config_path, log_dir),
-    };
-    Ok(assemble(deps))
-}
-
-#[cfg(target_os = "macos")]
-fn platform_adapters(
-    log_sink: Arc<dyn LogSink>,
-) -> (Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>) {
-    use my_supervisor_platform_macos::{MacLifecycle, UnixShutdown};
-    (
-        Arc::new(MacLifecycle::new(log_sink)),
-        Arc::new(UnixShutdown::new()),
-    )
-}
-
-#[cfg(not(target_os = "macos"))]
-fn platform_adapters(
-    _log_sink: Arc<dyn LogSink>,
-) -> (Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>) {
-    compile_error!("app/desktop currently supports macOS only (Linux/Windows deferred)");
-    unreachable!()
-}
-
-#[cfg(target_os = "macos")]
-fn process_service_registrar(log_dir: PathBuf) -> Arc<dyn ProcessServiceRegistrar> {
-    Arc::new(my_supervisor_platform_macos::LaunchdAgentProcess::new(
-        log_dir,
-    ))
-}
-
-#[cfg(not(target_os = "macos"))]
-fn process_service_registrar(_log_dir: PathBuf) -> Arc<dyn ProcessServiceRegistrar> {
-    Arc::new(my_supervisor_application::NullProcessServiceRegistrar)
+    build_runtime().await
 }

@@ -12,6 +12,7 @@ use futures_util::StreamExt;
 use serde::Serialize;
 
 use client::{CliError, Client};
+use my_supervisor_app_daemon::DEFAULT_BASE_URL;
 use my_supervisor_shared::api::{JobRunStateDto, ProcessStateDto};
 use my_supervisor_shared::config::FileConfig;
 
@@ -19,8 +20,8 @@ use my_supervisor_shared::config::FileConfig;
 #[command(name = "msv", version, about = "my-supervisor operations CLI")]
 struct Cli {
     /// Operations host base URL (defaults to the local daemon).
-    #[arg(long, global = true, default_value = "http://127.0.0.1:9876")]
-    url: String,
+    #[arg(long, global = true)]
+    url: Option<String>,
     /// Output format.
     #[arg(short = 'o', long, global = true, default_value = "table")]
     output: OutputFormat,
@@ -104,7 +105,11 @@ enum JobCmd {
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
-    let client = Client::new(cli.url.clone());
+    let client = Client::new(
+        cli.url
+            .clone()
+            .unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
+    );
     match dispatch(&cli, &client).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
@@ -190,7 +195,12 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 print_json(&page);
             } else {
                 for line in &page.lines {
-                    println!("{} [{:?}] {}", line.timestamp.to_rfc3339(), line.stream, line.line);
+                    println!(
+                        "{} [{:?}] {}",
+                        line.timestamp.to_rfc3339(),
+                        line.stream,
+                        line.line
+                    );
                 }
             }
             if *follow {
@@ -267,9 +277,13 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                         table.add_row(vec![
                             r.run_id.clone(),
                             run_state_label(r.state).to_string(),
-                            r.exit_code.map(|c| c.to_string()).unwrap_or_else(|| "-".into()),
+                            r.exit_code
+                                .map(|c| c.to_string())
+                                .unwrap_or_else(|| "-".into()),
                             r.scheduled_at.to_rfc3339(),
-                            r.ended_at.map(|t| t.to_rfc3339()).unwrap_or_else(|| "-".into()),
+                            r.ended_at
+                                .map(|t| t.to_rfc3339())
+                                .unwrap_or_else(|| "-".into()),
                         ]);
                     }
                     println!("{table}");
@@ -292,7 +306,12 @@ async fn follow_logs(client: &Client, name: &str) -> Result<(), CliError> {
                 if let Ok(line) =
                     serde_json::from_str::<my_supervisor_shared::api::LogLineDto>(&text)
                 {
-                    println!("{} [{:?}] {}", line.timestamp.to_rfc3339(), line.stream, line.line);
+                    println!(
+                        "{} [{:?}] {}",
+                        line.timestamp.to_rfc3339(),
+                        line.stream,
+                        line.line
+                    );
                 }
             }
             Ok(tokio_tungstenite::tungstenite::Message::Close(_)) | Err(_) => break,

@@ -1,6 +1,6 @@
 # API Reference
 
-**호스트**(데스크톱 `app/desktop` Tauri 앱 또는 헤드리스 `app/daemon`)가 내장 HTTP / WebSocket 서버로 제공하는 API 를 정리합니다. 두 호스트는 같은 `core`/`application` 을 임베드하므로 API 는 동일합니다(DD-002). 클라이언트는 호스트의 WebView · 외부 브라우저 · `msv` CLI · 스크립트입니다. 내부적으로는 `crates/infra/http` adapter 가 `core::ports::HttpServer` 를 구현하여 이 엔드포인트를 호스팅합니다.
+**호스트**(데스크톱 `app/desktop` Tauri 앱 또는 헤드리스 `msv-daemon` launcher)가 제공하는 HTTP / WebSocket API 를 정리합니다. 두 경로 모두 `app/daemon` 런타임 조립을 공유하므로 API 는 동일합니다(DD-002). 클라이언트는 호스트의 WebView · 외부 브라우저 · `msv` CLI · 스크립트입니다. 내부적으로는 `crates/infra/http` adapter 가 `core::ports::HttpServer` 를 구현하여 이 엔드포인트를 호스팅합니다.
 
 > **현재 문서 상태**: **설계 레벨 스펙 초안**. 리포지토리는 아직 PoC 단계 이전이며, 본 문서는 `ARCHITECTURE.md` §5를 기반으로 엔드포인트·오류 포맷·타입을 선정의한 것입니다. request/response 세부 필드는 PoC·MVP 구현 시 확정되며, 구현 이후 Phase 3 §J에서 최종화합니다.
 

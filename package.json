@@ -1,0 +1,20 @@
+{
+  "name": "my-supervisor",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "dev": "turbo run dev --filter=@my-supervisor/ui",
+    "build": "turbo run build",
+    "build:rust": "turbo run build --filter=@my-supervisor/crates",
+    "build:ui": "turbo run build --filter=@my-supervisor/ui",
+    "typecheck": "turbo run typecheck",
+    "typecheck:rust": "turbo run typecheck --filter=@my-supervisor/crates",
+    "typecheck:ui": "turbo run typecheck --filter=@my-supervisor/ui",
+    "desktop:dev": "cargo tauri dev",
+    "desktop:build": "cargo tauri build"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.3"
+  }
+}

@@ -5,9 +5,8 @@
 # tools
 .serena/
 
-# moon
-.moon/cache
-.moon/docker
+# turborepo
+.turbo
 
 # node
 node_modules

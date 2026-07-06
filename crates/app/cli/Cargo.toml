@@ -9,6 +9,7 @@ name = "msv"
 path = "src/main.rs"
 
 [dependencies]
+my-supervisor-app-daemon = { workspace = true }
 my-supervisor-shared = { workspace = true }
 serde = { workspace = true }
 clap = { version = "4", features = ["derive"] }

@@ -5,8 +5,10 @@ set -euo pipefail
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly EXPECTED_PROTOTOOLS_CONTENT=$'node = "24.14.0"\nrust = "1.94.1"\npnpm = "10.11.0"'
-readonly EXPECTED_WORKSPACE_CONTENT=$'projects:\n  - "apps/*"\n  - "packages/*"\n  - "crates/*"\n\nvcs:\n  defaultBranch: "main"\n  provider: "other"'
-readonly EXPECTED_TOOLCHAINS_CONTENT=$'node: {}\nrust: {}'
+readonly EXPECTED_ROOT_PACKAGE_CONTENT=$'{\n  "name": "my-supervisor",\n  "version": "0.1.0",\n  "private": true,\n  "packageManager": "pnpm@10.11.0",\n  "scripts": {\n    "dev": "turbo run dev --filter=@my-supervisor/ui",\n    "build": "turbo run build",\n    "build:rust": "turbo run build --filter=@my-supervisor/crates",\n    "build:ui": "turbo run build --filter=@my-supervisor/ui",\n    "typecheck": "turbo run typecheck",\n    "typecheck:rust": "turbo run typecheck --filter=@my-supervisor/crates",\n    "typecheck:ui": "turbo run typecheck --filter=@my-supervisor/ui",\n    "desktop:dev": "cargo tauri dev",\n    "desktop:build": "cargo tauri build"\n  },\n  "devDependencies": {\n    "turbo": "^2.10.3"\n  }\n}'
+readonly EXPECTED_CRATES_PACKAGE_CONTENT=$'{\n  "name": "@my-supervisor/crates",\n  "version": "0.1.0",\n  "private": true,\n  "scripts": {\n    "build": "cargo build --workspace",\n    "typecheck": "cargo check --workspace"\n  }\n}'
+readonly EXPECTED_PNPM_WORKSPACE_CONTENT=$'packages:\n  - "crates"\n  - "apps/*"\n  - "packages/*"'
+readonly EXPECTED_TURBO_CONTENT=$'{\n  "$schema": "https://turborepo.com/schema.json",\n  "tasks": {\n    "build": {\n      "dependsOn": ["^build"],\n      "outputs": ["dist/**", "../target/**"]\n    },\n    "typecheck": {\n      "dependsOn": ["^typecheck"],\n      "outputs": []\n    },\n    "dev": {\n      "cache": false,\n      "persistent": true\n    }\n  }\n}'
 
 TEMPORARY_DIRECTORY=""
 
@@ -63,7 +65,7 @@ create_workspace() {
   local workspace_path="$1"
 
   mkdir -p "${workspace_path}/scripts"
-  install -m 0755 "${REPOSITORY_ROOT}/scripts/setup-moon.sh" "${workspace_path}/scripts/setup-moon.sh"
+  install -m 0755 "${REPOSITORY_ROOT}/scripts/setup-turbo.sh" "${workspace_path}/scripts/setup-turbo.sh"
   install -m 0755 "${REPOSITORY_ROOT}/scripts/setup-proto.sh" "${workspace_path}/scripts/setup-proto.sh"
 }
 
@@ -72,12 +74,12 @@ create_mock_binaries() {
 
   mkdir -p "${mock_binary_directory}"
 
-  cat <<'EOF' > "${mock_binary_directory}/moon"
+  cat <<'EOF' > "${mock_binary_directory}/pnpm"
 #!/usr/bin/env bash
 
 set -euo pipefail
 
-printf 'moon %s\n' "$*" >> "${MOCK_TOOL_LOG_FILE:?}"
+printf 'pnpm %s\n' "$*" >> "${MOCK_TOOL_LOG_FILE:?}"
 EOF
 
   cat <<'EOF' > "${mock_binary_directory}/proto"
@@ -96,7 +98,7 @@ EOC
 fi
 EOF
 
-  chmod +x "${mock_binary_directory}/moon" "${mock_binary_directory}/proto"
+  chmod +x "${mock_binary_directory}/pnpm" "${mock_binary_directory}/proto"
 }
 
 run_in_workspace() {
@@ -114,44 +116,62 @@ run_in_workspace() {
   )
 }
 
-test_setup_moon_creates_expected_files() {
-  local workspace_path="${TEMPORARY_DIRECTORY}/moon-create"
+test_setup_turbo_creates_expected_files() {
+  local workspace_path="${TEMPORARY_DIRECTORY}/turbo-create"
 
   create_workspace "${workspace_path}"
   : > "${workspace_path}/tool.log"
 
-  run_in_workspace "${workspace_path}" "${workspace_path}/tool.log" false bash "${workspace_path}/scripts/setup-moon.sh"
+  run_in_workspace "${workspace_path}" "${workspace_path}/tool.log" false bash "${workspace_path}/scripts/setup-turbo.sh"
 
   assert_directory_exists "${workspace_path}/apps"
   assert_directory_exists "${workspace_path}/packages"
   assert_directory_exists "${workspace_path}/crates"
-  assert_file_content "${workspace_path}/.moon/workspace.yml" "${EXPECTED_WORKSPACE_CONTENT}"
-  assert_file_content "${workspace_path}/.moon/toolchains.yml" "${EXPECTED_TOOLCHAINS_CONTENT}"
+  assert_file_content "${workspace_path}/package.json" "${EXPECTED_ROOT_PACKAGE_CONTENT}"
+  assert_file_content "${workspace_path}/crates/package.json" "${EXPECTED_CRATES_PACKAGE_CONTENT}"
+  assert_file_content "${workspace_path}/pnpm-workspace.yaml" "${EXPECTED_PNPM_WORKSPACE_CONTENT}"
+  assert_file_content "${workspace_path}/turbo.json" "${EXPECTED_TURBO_CONTENT}"
 }
 
-test_setup_moon_preserves_existing_configuration() {
-  local workspace_path="${TEMPORARY_DIRECTORY}/moon-reuse"
+test_setup_turbo_preserves_existing_configuration() {
+  local workspace_path="${TEMPORARY_DIRECTORY}/turbo-reuse"
 
   create_workspace "${workspace_path}"
-  mkdir -p "${workspace_path}/.moon"
   : > "${workspace_path}/tool.log"
 
-  cat <<'EOF' > "${workspace_path}/.moon/workspace.yml"
-projects:
+  cat <<'EOF' > "${workspace_path}/package.json"
+{
+  "name": "custom"
+}
+EOF
+
+  mkdir -p "${workspace_path}/crates"
+  cat <<'EOF' > "${workspace_path}/crates/package.json"
+{
+  "name": "@custom/crates"
+}
+EOF
+
+  cat <<'EOF' > "${workspace_path}/pnpm-workspace.yaml"
+packages:
   - "custom/*"
 EOF
 
-  cat <<'EOF' > "${workspace_path}/.moon/toolchains.yml"
-deno: {}
+  cat <<'EOF' > "${workspace_path}/turbo.json"
+{
+  "tasks": {}
+}
 EOF
 
-  run_in_workspace "${workspace_path}" "${workspace_path}/tool.log" false bash "${workspace_path}/scripts/setup-moon.sh"
+  run_in_workspace "${workspace_path}" "${workspace_path}/tool.log" false bash "${workspace_path}/scripts/setup-turbo.sh"
 
   assert_directory_exists "${workspace_path}/apps"
   assert_directory_exists "${workspace_path}/packages"
   assert_directory_exists "${workspace_path}/crates"
-  assert_file_content "${workspace_path}/.moon/workspace.yml" $'projects:\n  - "custom/*"'
-  assert_file_content "${workspace_path}/.moon/toolchains.yml" 'deno: {}'
+  assert_file_content "${workspace_path}/package.json" $'{\n  "name": "custom"\n}'
+  assert_file_content "${workspace_path}/crates/package.json" $'{\n  "name": "@custom/crates"\n}'
+  assert_file_content "${workspace_path}/pnpm-workspace.yaml" $'packages:\n  - "custom/*"'
+  assert_file_content "${workspace_path}/turbo.json" $'{\n  "tasks": {}\n}'
 }
 
 test_setup_proto_creates_expected_prototools_file() {
@@ -203,8 +223,8 @@ main() {
 
   create_mock_binaries "${TEMPORARY_DIRECTORY}/bin"
 
-  test_setup_moon_creates_expected_files
-  test_setup_moon_preserves_existing_configuration
+  test_setup_turbo_creates_expected_files
+  test_setup_turbo_preserves_existing_configuration
   test_setup_proto_creates_expected_prototools_file
   test_setup_proto_preserves_existing_prototools_file
   test_setup_proto_restores_expected_prototools_file_after_proto_install

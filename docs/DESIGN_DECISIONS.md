@@ -289,12 +289,12 @@
 
 ## DD-017: Hexagonal 아키텍처 (Ports & Adapters) 채택
 
-**결정:** 모든 도메인·비즈니스 로직을 `core` + `application` crate 에 격리하고, OS·DB·HTTP 등 기술 세부는 `core::ports` 의 trait 로 추상화한다. 실제 구현은 `platform/*` · `infra/*` · `config` adapter crate 가 담당하며, 최상위 bin (`app/daemon` 등) 만 DI 로 조립한다.
+**결정:** 모든 도메인·비즈니스 로직을 `core` + `application` crate 에 격리하고, OS·DB·HTTP 등 기술 세부는 `core::ports` 의 trait 로 추상화한다. 실제 구현은 `platform/*` · `infra/*` · `config` adapter crate 가 담당하며, `app/daemon` 런타임 라이브러리가 DI 를 조립한다.
 
 **맥락:** 크로스 플랫폼 supervisor 라는 특성상 같은 개념("프로세스 생명주기", "자동 시작", "graceful shutdown")이 Linux/macOS/Windows 에서 완전히 다른 커널 API 로 구현된다. 분기를 도메인 레이어에 허용하면 코드가 3중 `#[cfg]` 로 뒤덮이고, 테스트도 매 OS 에서 돌려야만 의미를 갖는다.
 
 **이유:**
-- **플랫폼-프리 도메인**: `application::RestartProcess` 같은 use case 가 port trait 만 호출 → OS 차이를 모름. 같은 코드 경로가 3개 OS 에서 동일하게 돌아가고, `#[cfg(target_os)]` 분기는 `app/daemon` DI 지점에만 남는다.
+- **플랫폼-프리 도메인**: `application::RestartProcess` 같은 use case 가 port trait 만 호출 → OS 차이를 모름. 같은 코드 경로가 3개 OS 에서 동일하게 돌아가고, `#[cfg(target_os)]` 분기는 `app/daemon` 런타임 조립 지점에만 남는다.
 - **테스트 경량화**: `InMemoryStateRepository`, `FakeLifecycleController` 같은 가짜 adapter 를 주입해 use case 를 OS 없이 단위 테스트 가능. Phase 2 MVP 단계부터 테스트 피라미드 구성 유리.
 - **교체 가능성**: `infra/sqlite` → `infra/postgres`, axum → 다른 서버 프레임워크 전환이 adapter crate 만 손대면 된다. `core` / `application` 무변경.
 - **Server 배포 최소화**: `platform/*` · `app/desktop` 이 별도 crate 이므로 `cargo build -p my-supervisor-app-daemon` 이 GUI 의존성을 자연스럽게 배제.
@@ -306,16 +306,16 @@
 **단방향 의존 규칙:**
 
 ```
-app/*  ──▶ application ──▶ core
-  │             │            ▲
-  │             └── shared ──┤
-  │                          │
-  ├──▶ infra/*    ────────── │
-  ├──▶ platform/* ────────── │
-  └──▶ config     ────────── ┘
+app/cli ─┐
+         ├──▶ app/daemon(runtime) ──▶ application ──▶ core
+app/desktop ┘              │              │            ▲
+                           │              └── shared ──┤
+                           ├──▶ infra/*    ─────────── │
+                           ├──▶ platform/* ─────────── │
+                           └──▶ config     ─────────── ┘
 ```
 
-`core` 는 다른 워크스페이스 crate 를 의존하지 않는다. `application` 은 `core` 만. `infra/*` · `platform/*` · `config` 는 `core`(+필요 시 `shared`) 만. `app/*` 이 조립.
+`core` 는 다른 워크스페이스 crate 를 의존하지 않는다. `application` 은 `core` 만. `infra/*` · `platform/*` · `config` 는 `core`(+필요 시 `shared`) 만. `app/daemon` 이 런타임 조립을 담당하고, `app/desktop`과 `app/cli`는 이를 재사용한다.
 
 **관련 결정:** DD-004 (모노레포 + workspace) 는 유지. 이번 DD 는 그 workspace 내부의 crate 세분화 규칙.
 
@@ -331,7 +331,7 @@ app/*  ──▶ application ──▶ core
 - **빌드 타겟 독립**: `platform-linux` crate 는 `nix`, `tracing-journald` 를 의존한다. Windows 빌드에서 이 의존성 트리 자체가 다운로드·컴파일되지 않도록 하려면 crate 경계가 필요 (같은 crate 내 `#[cfg]` 로는 Cargo 가 여전히 의존성 그래프를 해석한다).
 - **unsafe / syscall 격리**: OS crate 에 갇힌 `unsafe` 블록은 감사 범위가 명확. 도메인·application 에는 `unsafe` 금지 원칙을 유지하기 쉬움.
 - **CI 병렬화**: 플랫폼별 CI job 이 자기 platform crate 만 컴파일·테스트. 3개 OS 러너에서 교차 오염이 일어나지 않음.
-- **CFG 분기의 최종 위치**: 한 곳만 — `app/daemon` 의 DI 조립부. 이것이 `#[cfg(target_os)]` 가 등장하는 유일한 곳이라는 규율을 문서와 코드로 강제 가능.
+- **CFG 분기의 최종 위치**: 한 곳만 — `app/daemon` 런타임 조립부. 이것이 `#[cfg(target_os)]` 가 등장하는 유일한 곳이라는 규율을 문서와 코드로 강제 가능.
 
 **대안:**
 - 단일 `platform` crate + 내부 `#[cfg]` module 분할. **기각** — 위 빌드·의존성 이유.
@@ -351,7 +351,7 @@ app/*  ──▶ application ──▶ core
 **맥락:** DD-017 의 하위 결정. "infra" 를 한 crate 로 묶는 관행도 있으나, 책임이 다른 기술(DB · 네트워크 · 로깅 파이프라인)을 같은 crate 에 두면 의존성 트리가 불필요하게 커지고 교체도 어렵다.
 
 **이유:**
-- **교체 용이성**: SQLite → Postgres 이전이 `infra/sqlite` → `infra/postgres` crate 교체 + `app/daemon` DI 한 줄 수정으로 끝. `application` 레이어 무변경.
+- **교체 용이성**: SQLite → Postgres 이전이 `infra/sqlite` → `infra/postgres` crate 교체 + `app/daemon` 런타임 조립 수정으로 끝. `application` 레이어 무변경.
 - **Feature 단위 옵셔널 빌드**: 향후 Server 배포에서 로깅만 교체하고 싶을 때 (예: systemd-journald-only) `infra/logging` 만 fork 또는 feature flag 로 제어.
 - **테스트 주입 단위**: `InMemoryStateRepository` 같은 테스트용 구현을 `infra/sqlite` 와 별개로 `application` 테스트 하네스에 둘 수 있음.
 

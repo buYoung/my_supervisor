@@ -55,7 +55,7 @@ GUI 의존성 없이 데몬과 CLI만 배포:
 
 ## 3. 모노레포 구조
 
-Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. 폴더는 카테고리 하위 중첩(`crates/platform/linux/`, `crates/infra/sqlite/`, `crates/app/daemon/`).
+Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. Turborepo는 `crates/package.json`을 통해 Cargo workspace 전체를 상위 태스크 그래프에 포함한다. 폴더는 카테고리 하위 중첩(`crates/platform/linux/`, `crates/infra/sqlite/`, `crates/app/daemon/`).
 
 ```
 my-supervisor/
@@ -63,8 +63,10 @@ my-supervisor/
 ├── Cargo.lock
 ├── README.md
 ├── docs/
-├── .moon/                           # moon 워크스페이스 (apps/*, packages/*, crates/*)
-├── apps/                            # (moon 규약 유지 — 현 단계 미사용)
+├── package.json                     # pnpm + Turborepo 루트 스크립트
+├── pnpm-workspace.yaml              # Node 패키지 경계 (apps/*, packages/*)
+├── turbo.json                       # Node 패키지 태스크 파이프라인
+├── apps/                            # 최상위 애플리케이션 (현 단계 미사용)
 ├── packages/
 │   └── ui/                          # React 프론트엔드 (Tauri WebView·외부 브라우저 공용)
 │       ├── package.json
@@ -79,6 +81,7 @@ my-supervisor/
 │           ├── services/            # HTTP/WS 클라이언트
 │           └── shared/              # 타입·훅·유틸
 ├── crates/
+│   ├── package.json                 # Turborepo에서 Cargo workspace를 대표하는 작업 패키지
 │   ├── core/                        # 도메인 + port trait (std/serde/uuid 수준만 의존)
 │   │   └── src/
 │   │       ├── domain/              # Process·ProcessState·RestartPolicy·ChildHandle,
@@ -122,9 +125,9 @@ my-supervisor/
 │   │   ├── macos/                   # kqueue shutdown hook, launchd plist, unified logs
 │   │   └── windows/                 # Job Object, Service, Event Log, Task Scheduler, CTRL_BREAK
 │   └── app/
-│       ├── daemon/                  # bin (`msv-daemon`) — DI 조립
+│       ├── daemon/                  # 공통 데몬 런타임 lib + thin bin (`msv-daemon`)
 │       ├── cli/                     # bin (`msv`) — reqwest 클라이언트 (shared 타입 재사용)
-│       └── desktop/                 # bin — Tauri shell (daemon spawn, tray, autostart, webview)
+│       └── desktop/                 # bin — Tauri shell (tray, invoke, webview)
 └── scripts/
     ├── install-server.sh
     └── build-packages.sh
@@ -151,13 +154,13 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 ### 3.1 의존성 방향 (단방향)
 
 ```
-  app/*  ──▶  application  ──▶  core  ◀──  port trait 정의
-    │              │                           ▲
-    │              └────── shared ─────────────┤  (DTO 재사용)
-    │                                          │
-    ├──▶ infra/*    ────────────────────────── │  adapter 구현
-    ├──▶ platform/* ────────────────────────── │  adapter 구현
-    └──▶ config     ────────────────────────── ┘
+  app/cli ─┐
+           ├──▶ app/daemon(runtime) ──▶ application ──▶ core ◀── port trait 정의
+  app/desktop ┘              │              │                    ▲
+                             │              └── shared ──────────┤
+                             ├──▶ infra/*    ─────────────────── │
+                             ├──▶ platform/* ─────────────────── │
+                             └──▶ config     ─────────────────── ┘
 ```
 
 규칙:
@@ -165,7 +168,8 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 - `core` 는 다른 어떤 워크스페이스 crate 도 의존하지 않는다. 외부 crate 도 `serde`·`uuid`·`thiserror`·`tokio`(trait async) 등 의존성이 얇은 것만.
 - `application` 은 `core` 만 의존. use case 는 port trait 를 호출할 뿐 adapter 타입을 직접 참조하지 않는다.
 - `infra/*` · `platform/*` · `config` 는 `core`(+ 필요 시 `shared`) 만 의존. 서로 의존하지 않는다.
-- `app/*` 이 조립 지점: `core` · `application` · 필요한 `infra/*` · `platform/*` · `config` · `shared` 를 모두 가져와 DI 로 조립한다. `#[cfg(target_os = "...")]` 분기는 여기서만 존재한다.
+- `app/daemon` 의 라이브러리 타깃이 공통 조립 지점이다. `core` · `application` · 필요한 `infra/*` · `platform/*` · `config` · `shared` 를 가져와 데몬 런타임을 만든다.
+- `app/desktop` 은 Tauri 셸과 invoke/devBridge만 담당하고, 데몬 런타임 조립은 `app/daemon` 라이브러리를 재사용한다. `app/cli` 는 같은 데몬 기본 접속값과 `shared` DTO를 재사용한다.
 
 ### 3.2 왜 이 구조인가
 
@@ -184,17 +188,18 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 
 실제로 빌드되는 최종 산출물. Hexagonal 의 "composition root" 역할만 한다. 도메인 로직은 들어가지 않는다.
 
-#### 4.1.1 `app/daemon` (bin `msv-daemon`)
+#### 4.1.1 `app/daemon` (lib + bin `msv-daemon`)
 
-실제 supervisor. 혼자서 완결적으로 동작하며, UI 없이도 CLI와 WebUI로 관리 가능.
+공통 데몬 런타임. 라이브러리 타깃은 `core`/`application`/adapter 조립, 데이터 경로, 기본 loopback 주소를 제공한다. `msv-daemon` 바이너리는 이 런타임을 HTTP 서버로 띄우는 얇은 launcher 이다.
 
 **책임:**
 - `core` 의 도메인 타입과 port trait 를 임포트
 - 현재 타겟 OS 에 맞는 `platform/*` adapter 를 `#[cfg(target_os = "...")]` 로 선택 → trait object 로 `application` 에 주입
 - `infra/sqlite`, `infra/http`, `infra/logging`, `config` 를 조립
-- 런타임 진입점: tokio runtime 구성, 시그널 처리, graceful shutdown
+- 공통 런타임 진입점: `build_runtime()`으로 `OperationsFacade`와 Router를 생성
+- 바이너리 진입점: tokio runtime 구성, 시그널 처리, graceful shutdown
 
-**책임 경계:** 이 crate 에는 `if` 분기 이상의 로직이 들어가지 않아야 한다. 테스트는 `application` 에서 한다.
+**책임 경계:** 이 crate 에는 조립과 호스트 생명주기 이상의 도메인 로직이 들어가지 않아야 한다. 테스트는 `application` 에서 한다.
 
 **주요 크레이트:**
 
@@ -204,11 +209,11 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 | 시그널 | `signal-hook`, `signal-hook-tokio` |
 | DI / 에러 | `anyhow`, `thiserror` |
 
-`sqlx`, `axum`, `nix`, `windows` 등은 각 infra/platform crate 의 내부 의존이며 `app/daemon` 은 직접 알 필요 없다.
+`sqlx`, `axum`, `nix`, `windows` 등은 각 infra/platform crate 의 내부 의존이며 `app/daemon` 은 concrete adapter 를 선택해 연결만 한다.
 
 #### 4.1.2 `app/cli` (bin `msv`)
 
-데몬의 HTTP API를 호출하는 얇은 클라이언트. `shared` crate 의 wire 타입을 재사용하므로 API 변경이 컴파일 타임에 잡힌다.
+데몬 HTTP API를 호출하는 얇은 클라이언트. `shared` crate 의 wire 타입을 재사용하므로 API 변경이 컴파일 타임에 잡힌다. 기본 접속 주소는 `app/daemon` 런타임의 상수를 사용한다.
 
 **명령 체계:**
 
@@ -235,7 +240,7 @@ msv ui                     # 브라우저로 WebUI 열기
 
 #### 4.1.3 `app/desktop` (Tauri bin)
 
-**GUI 가 있는 my-supervisor.** `core`/`application` 을 **인프로세스로 임베드** 하고, 내장한 axum HTTP/WS 서버를 자신의 WebView 가 소비한다. **별도 `msv-daemon` 을 spawn 하지 않으며 데몬을 필요로 하지 않는다**(DD-002). `app/daemon` 과는 같은 코어를 공유할 뿐, 서로 의존하지 않는 독립 호스트다.
+**GUI 가 있는 my-supervisor.** `app/daemon` 라이브러리의 런타임 조립을 **인프로세스로 재사용** 하고, Tauri invoke와 test-only devBridge를 제공한다. **별도 `msv-daemon` 프로세스를 spawn 하지 않는다**(DD-002).
 
 **책임:**
 - 코어 임베드 + 내장 axum HTTP/WS 서버 기동 (`127.0.0.1:<port>`)

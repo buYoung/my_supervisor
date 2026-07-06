@@ -27,6 +27,7 @@ my-supervisor-infra-http = { path = "crates/infra/http" }
 my-supervisor-infra-logging = { path = "crates/infra/logging" }
 my-supervisor-infra-scheduler = { path = "crates/infra/scheduler" }
 my-supervisor-platform-macos = { path = "crates/platform/macos" }
+my-supervisor-app-daemon = { path = "crates/app/daemon" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

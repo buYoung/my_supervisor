@@ -11,7 +11,8 @@
 | 도구 | 역할 | 설치 |
 |---|---|---|
 | [proto](https://moonrepo.dev/proto) | 언어·런타임 버전 관리. `.prototools`로 Node / Rust / pnpm 버전 고정 | 공식 설치 스크립트 참조 |
-| [moon](https://moonrepo.dev/moon) | 모노레포 태스크 러너. `.moon/workspace.yml`로 프로젝트 경계 정의 | `proto install moon` 또는 공식 설치 |
+| [pnpm](https://pnpm.io/) | Node 패키지 관리자. `pnpm-workspace.yaml`로 Node 워크스페이스 경계 정의 | `./scripts/setup-proto.sh` |
+| [Turborepo](https://turbo.build/repo) | Node 패키지 태스크 러너. `turbo.json`으로 빌드·개발 태스크 정의 | `pnpm install` |
 
 현재 `.prototools`가 고정하는 버전:
 
@@ -33,14 +34,17 @@ pnpm = "10.11.0"
 # 1) proto 설치 + .prototools에 고정된 Node/Rust/pnpm 설치
 ./scripts/setup-proto.sh
 
-# 2) moon 기반 워크스페이스 디렉터리 및 설정 파일 생성
-./scripts/setup-moon.sh
+# 2) pnpm workspace + Turborepo 설정 파일 생성
+./scripts/setup-turbo.sh
+
+# 3) Node 의존성 설치
+pnpm install
 ```
 
 각 스크립트의 동작:
 
 - `scripts/setup-proto.sh` — `proto` 명령 존재 여부 확인 → `.prototools`가 없으면 기본값으로 생성 → `proto install --yes`로 지정 버전 설치. 셸 프로필은 수정하지 않으므로 필요 시 `proto setup`을 별도 실행.
-- `scripts/setup-moon.sh` — `moon` 명령 존재 여부 확인 → `apps/`, `packages/`, `crates/` 디렉터리 보장 → `.moon/workspace.yml`, `.moon/toolchains.yml`을 없으면 기본값으로 생성.
+- `scripts/setup-turbo.sh` — `pnpm` 명령 존재 여부 확인 → `apps/`, `packages/`, `crates/` 디렉터리 보장 → `package.json`, `pnpm-workspace.yaml`, `turbo.json`을 없으면 기본값으로 생성.
 
 > 두 스크립트 모두 **이미 존재하는 설정 파일을 덮어쓰지 않고 재사용**합니다.
 
@@ -48,13 +52,15 @@ pnpm = "10.11.0"
 
 ## 3. 워크스페이스 구조
 
-`.moon/workspace.yml` 기준의 상위 프로젝트 경계:
+`pnpm-workspace.yaml` 기준의 Node 프로젝트 경계:
 
 ```
-apps/*        # 최상위 애플리케이션 (moon 규약 유지, 현 단계 미사용)
+crates         # Cargo workspace를 감싸는 Turborepo 작업 패키지
+apps/*        # 최상위 Node 애플리케이션 (현 단계 미사용)
 packages/*    # 노드 기반 공유 패키지 — packages/ui (React 프론트엔드)
-crates/*      # Rust 크레이트 — Hexagonal 5 레이어
 ```
+
+Rust 크레이트 의존성은 루트 `Cargo.toml`의 workspace members로 관리합니다. Turborepo는 `crates/package.json`을 통해 `cargo build --workspace`, `cargo check --workspace` 같은 Cargo 명령을 상위 태스크 그래프에 포함할 뿐, Rust 패키지 해석을 대체하지 않습니다.
 
 `crates/` 내부는 Hexagonal 레이어대로 중첩 폴더 구조:
 
@@ -74,9 +80,9 @@ crates/
 │   ├── macos/            # kqueue, launchd
 │   └── windows/          # Job Object, Service, Event Log, Task Scheduler
 └── app/
-    ├── daemon/           # bin `msv-daemon` — 헤드리스 호스트 (코어 임베드, 서버용)
-    ├── cli/              # bin `msv`
-    └── desktop/          # bin — Tauri 호스트 (GUI 있는 my-supervisor, 코어 임베드)
+    ├── daemon/           # 공통 데몬 런타임 lib + thin bin `msv-daemon`
+    ├── cli/              # bin `msv` — 데몬 런타임의 기본 접속값 재사용
+    └── desktop/          # bin — Tauri 호스트, 데몬 런타임 조립 재사용
 ```
 
 `packages/ui/src/` 는 feature 단위:
@@ -88,7 +94,7 @@ services/                 # HTTP/WS 클라이언트
 shared/                   # 훅·타입·유틸 (theme.css — 토큰 단일 출처)
 ```
 
-실제 디렉터리는 현재 **비어 있고** (`.gitkeep`만 존재), PoC 시작 시 위 구조로 crate 가 추가됩니다. 각 레이어의 책임과 의존성 방향은 `ARCHITECTURE.md §3`, 설계 근거는 `DESIGN_DECISIONS.md DD-017 ~ DD-024` 참조.
+각 레이어의 책임과 의존성 방향은 `ARCHITECTURE.md §3`, 설계 근거는 `DESIGN_DECISIONS.md DD-017 ~ DD-024` 참조.
 
 **Workspace members 선언 (루트 `Cargo.toml`):**
 
@@ -107,13 +113,26 @@ members = [
 
 Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-supervisor-platform-linux`, `my-supervisor-app-daemon`).
 
-`.moon/toolchains.yml`에는 `node`, `rust` 툴체인이 활성화되어 있으며, 세부 옵션은 PoC 중 확정합니다.
+Turborepo 태스크는 `turbo.json`에서 `build`, `typecheck`, `dev`를 정의합니다. Rust 쪽 `build`, `typecheck`는 `crates/package.json`에서 Cargo workspace 명령으로 연결합니다.
 
 ---
 
 ## 4. 빌드 / 테스트 / 실행
 
-현재 코드가 없어 명령만 패턴으로 정리합니다. PoC 진입 시 각 항목을 실제 명령으로 고정합니다.
+루트 명령은 Rust workspace와 Node workspace를 함께 다루고, 세부 영역별 명령은 필요할 때 직접 실행합니다.
+
+### 루트 통합 명령
+
+```bash
+# Rust workspace + UI 프로덕션 빌드
+pnpm build
+
+# UI 개발 서버
+pnpm dev
+
+# Rust cargo check + UI 타입 체크
+pnpm typecheck
+```
 
 ### Rust 크레이트
 
@@ -155,14 +174,13 @@ cargo fmt --all
 
 ```bash
 # 개발 서버
-pnpm -C packages/ui dev
+pnpm dev
 
-# 프로덕션 빌드
-pnpm -C packages/ui build
+# UI 프로덕션 빌드
+pnpm build:ui
 
-# 타입 체크 / 린트
-pnpm -C packages/ui typecheck
-pnpm -C packages/ui lint
+# 타입 체크
+pnpm typecheck:ui
 ```
 
 ### Tauri 앱
@@ -175,13 +193,15 @@ cargo tauri dev
 cargo tauri build
 ```
 
-### Moon 태스크
+### Turborepo 태스크
 
-프로젝트가 추가되면 공통 태스크(예: `:build`, `:test`, `:lint`)를 `.moon/tasks.yml`로 집약합니다. 그 시점에 다음 예시가 동작하도록 정비합니다.
+상위 태스크는 `turbo.json`으로 집약합니다. `@my-supervisor/crates`는 Cargo workspace 전체를 대표하고, `@my-supervisor/ui`는 React/Vite 프론트엔드를 대표합니다.
 
 ```bash
-moon run :build
-moon run :test
+pnpm build:rust
+pnpm build:ui
+pnpm typecheck:rust
+pnpm typecheck:ui
 ```
 
 ---
