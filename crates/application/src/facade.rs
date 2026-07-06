@@ -269,7 +269,10 @@ impl OperationsFacade {
         })
     }
 
-    pub async fn subscribe_process_logs(&self, name: &str) -> AppResult<broadcast::Receiver<LogLine>> {
+    pub async fn subscribe_process_logs(
+        &self,
+        name: &str,
+    ) -> AppResult<broadcast::Receiver<LogLine>> {
         self.require_spec(name).await?;
         Ok(self.deps.log_sink.subscribe(name))
     }
@@ -543,7 +546,11 @@ impl OperationsFacade {
         for job in loaded.jobs {
             if self.deps.job_repo.get_job(&job.name).await?.is_none() {
                 self.deps.job_repo.save_job(&job).await?;
-                self.deps.scheduler.register(&job.name, &job.trigger).await.ok();
+                self.deps
+                    .scheduler
+                    .register(&job.name, &job.trigger)
+                    .await
+                    .ok();
             }
         }
         Ok(())

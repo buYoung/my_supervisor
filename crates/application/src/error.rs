@@ -132,9 +132,9 @@ impl AppError {
         match self {
             AppError::NotFound { .. } => 404,
             AppError::Conflict { .. } | AppError::UnitNameConflict(_) => 409,
-            AppError::InvalidRequest(_)
-            | AppError::InvalidConfig(_)
-            | AppError::InvalidCron(_) => 400,
+            AppError::InvalidRequest(_) | AppError::InvalidConfig(_) | AppError::InvalidCron(_) => {
+                400
+            }
             AppError::CycleDetected => 422,
             AppError::NotSupported(_) => 422,
             AppError::SpawnFailed(_)

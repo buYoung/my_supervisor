@@ -61,7 +61,8 @@ impl MacLifecycle {
                 Ok(s) => format!("process exited: {s}"),
                 Err(e) => format!("process wait failed: {e}"),
             };
-            sink.append(&name, LogLine::now(LogStream::System, note)).await;
+            sink.append(&name, LogLine::now(LogStream::System, note))
+                .await;
         });
 
         Ok(ChildHandle {

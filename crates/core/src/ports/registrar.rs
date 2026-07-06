@@ -18,5 +18,9 @@ pub trait ProcessServiceRegistrar: Send + Sync {
     async fn start(&self, unit_name: &str) -> Result<(), RegistrarError>;
     async fn stop(&self, unit_name: &str) -> Result<(), RegistrarError>;
     async fn query_status(&self, unit_name: &str) -> Result<ProcessState, RegistrarError>;
-    async fn tail_logs(&self, unit_name: &str, lines: usize) -> Result<Vec<LogLine>, RegistrarError>;
+    async fn tail_logs(
+        &self,
+        unit_name: &str,
+        lines: usize,
+    ) -> Result<Vec<LogLine>, RegistrarError>;
 }

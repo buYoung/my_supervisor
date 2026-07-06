@@ -87,7 +87,10 @@ impl Client {
             Some(b) if b.error.code == "process_not_found" => {
                 Err(CliError::NotFound(b.error.message))
             }
-            Some(b) => Err(CliError::Failed(format!("{} ({})", b.error.message, b.error.code))),
+            Some(b) => Err(CliError::Failed(format!(
+                "{} ({})",
+                b.error.message, b.error.code
+            ))),
             None => Err(CliError::Failed(format!("request failed: HTTP {status}"))),
         }
     }
@@ -126,9 +129,13 @@ impl Client {
 
     pub async fn remove(&self, name: &str, force: bool) -> Result<(), CliError> {
         let q = if force { "?force=true" } else { "" };
-        self.send(Method::DELETE, &format!("/api/v1/processes/{name}{q}"), None)
-            .await
-            .map(|_| ())
+        self.send(
+            Method::DELETE,
+            &format!("/api/v1/processes/{name}{q}"),
+            None,
+        )
+        .await
+        .map(|_| ())
     }
 
     pub async fn add_process(&self, dto: &ProcessConfigDto) -> Result<(), CliError> {

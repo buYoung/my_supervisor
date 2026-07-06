@@ -34,7 +34,9 @@ impl From<TriggerRepr> for JobTrigger {
     fn from(r: TriggerRepr) -> Self {
         match r {
             TriggerRepr::Cron { expr } => JobTrigger::Cron(expr),
-            TriggerRepr::Interval { every_sec } => JobTrigger::Interval(Duration::from_secs(every_sec)),
+            TriggerRepr::Interval { every_sec } => {
+                JobTrigger::Interval(Duration::from_secs(every_sec))
+            }
             TriggerRepr::OneShot { at } => JobTrigger::OneShot(at),
             TriggerRepr::DependsOn { jobs } => JobTrigger::DependsOn(jobs),
         }

@@ -33,7 +33,9 @@ where
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         Ok(MaybeWs(
-            WebSocketUpgrade::from_request_parts(parts, state).await.ok(),
+            WebSocketUpgrade::from_request_parts(parts, state)
+                .await
+                .ok(),
         ))
     }
 }
@@ -49,7 +51,9 @@ pub async fn process_logs(
         let rx = f.subscribe_process_logs(&name).await?;
         Ok(upgrade.on_upgrade(move |socket| forward_logs(socket, rx)))
     } else {
-        let page = f.process_logs(&name, q.tail.unwrap_or(100), q.since).await?;
+        let page = f
+            .process_logs(&name, q.tail.unwrap_or(100), q.since)
+            .await?;
         Ok(Json(log_page_to_dto(page)).into_response())
     }
 }
@@ -139,15 +143,27 @@ fn event_to_wire(event: &DomainEvent) -> serde_json::Value {
             "job.run_started",
             json!({ "name": name, "run_id": run_id.0.to_string() }),
         ),
-        DomainEvent::JobRunSucceeded { name, run_id, exit_code } => (
+        DomainEvent::JobRunSucceeded {
+            name,
+            run_id,
+            exit_code,
+        } => (
             "job.run_succeeded",
             json!({ "name": name, "run_id": run_id.0.to_string(), "exit_code": exit_code }),
         ),
-        DomainEvent::JobRunFailed { name, run_id, exit_code } => (
+        DomainEvent::JobRunFailed {
+            name,
+            run_id,
+            exit_code,
+        } => (
             "job.run_failed",
             json!({ "name": name, "run_id": run_id.0.to_string(), "exit_code": exit_code }),
         ),
-        DomainEvent::JobRunSkipped { name, run_id, reason } => (
+        DomainEvent::JobRunSkipped {
+            name,
+            run_id,
+            reason,
+        } => (
             "job.run_skipped",
             json!({ "name": name, "run_id": run_id.0.to_string(), "reason": reason }),
         ),

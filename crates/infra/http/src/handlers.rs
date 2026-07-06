@@ -103,11 +103,9 @@ pub async fn restart_process(
 ) -> Result<Response, HttpError> {
     match f.restart_process(&name).await? {
         RestartOutcome::Accepted => Ok(StatusCode::ACCEPTED.into_response()),
-        RestartOutcome::Noop { reason } => Ok((
-            StatusCode::OK,
-            Json(RestartNoopDto { noop: true, reason }),
-        )
-            .into_response()),
+        RestartOutcome::Noop { reason } => {
+            Ok((StatusCode::OK, Json(RestartNoopDto { noop: true, reason })).into_response())
+        }
     }
 }
 
@@ -121,7 +119,12 @@ pub async fn convert_process(
         ConvertTargetDto::SystemRegistered => ConvertTarget::SystemRegistered,
     };
     let status = f
-        .convert_process(&name, target, dto.unit_name, dto.auto_start.unwrap_or(false))
+        .convert_process(
+            &name,
+            target,
+            dto.unit_name,
+            dto.auto_start.unwrap_or(false),
+        )
         .await?;
     Ok(Json(process_status_to_dto(status)).into_response())
 }
@@ -232,10 +235,10 @@ pub async fn health() -> Response {
 
 /// Parse a run id, surfacing a `run_not_found` rather than a 400 on a bad uuid.
 pub fn parse_run_id(raw: &str) -> Result<JobRunId, HttpError> {
-    uuid::Uuid::parse_str(raw)
-        .map(JobRunId)
-        .map_err(|_| HttpError(my_supervisor_application::AppError::not_found(
+    uuid::Uuid::parse_str(raw).map(JobRunId).map_err(|_| {
+        HttpError(my_supervisor_application::AppError::not_found(
             my_supervisor_application::ResourceKind::Run,
             raw,
-        )))
+        ))
+    })
 }

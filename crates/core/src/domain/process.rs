@@ -12,16 +12,13 @@ use uuid::Uuid;
 /// `Direct` — the daemon spawns / supervises / restarts the child itself.
 /// `SystemRegistered` — the OS service manager owns the lifecycle; control and
 /// status flow through `ProcessServiceRegistrar` keyed on `unit_name`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ManagementMode {
+    #[default]
     Direct,
-    SystemRegistered { unit_name: String },
-}
-
-impl Default for ManagementMode {
-    fn default() -> Self {
-        ManagementMode::Direct
-    }
+    SystemRegistered {
+        unit_name: String,
+    },
 }
 
 /// Tied children die with the daemon; detached children outlive it.

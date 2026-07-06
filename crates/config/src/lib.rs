@@ -26,7 +26,11 @@ impl TomlConfigSource {
         let file: FileConfig =
             toml::from_str(contents).map_err(|e| ConfigError::Invalid(e.to_string()))?;
         Ok(LoadedConfig {
-            processes: file.processes.into_iter().map(convert::process_spec).collect(),
+            processes: file
+                .processes
+                .into_iter()
+                .map(convert::process_spec)
+                .collect(),
             jobs: file.jobs.into_iter().map(convert::job).collect(),
         })
     }

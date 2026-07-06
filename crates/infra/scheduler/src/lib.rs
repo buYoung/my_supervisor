@@ -63,9 +63,7 @@ fn next_cron(cron: &Cron, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
 fn next_for(trigger: &JobTrigger, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
     match trigger {
         JobTrigger::Cron(expr) => parse_cron(expr).ok().and_then(|c| next_cron(&c, after)),
-        JobTrigger::Interval(dur) => {
-            chrono::Duration::from_std(*dur).ok().map(|d| after + d)
-        }
+        JobTrigger::Interval(dur) => chrono::Duration::from_std(*dur).ok().map(|d| after + d),
         JobTrigger::OneShot(at) => (*at > after).then_some(*at),
         JobTrigger::DependsOn(_) => None,
     }
@@ -104,10 +102,7 @@ impl Scheduler for TokioScheduler {
         let name = job_name.to_string();
         let trigger = trigger.clone();
         let handle = tokio::spawn(async move {
-            loop {
-                let Some(next) = next_for(&trigger, Utc::now()) else {
-                    break;
-                };
+            while let Some(next) = next_for(&trigger, Utc::now()) {
                 sleep_until(next).await;
                 let _ = tx.send(ScheduleEvent {
                     job_name: name.clone(),
@@ -118,7 +113,10 @@ impl Scheduler for TokioScheduler {
                 }
             }
         });
-        self.timers.lock().unwrap().insert(job_name.to_string(), handle);
+        self.timers
+            .lock()
+            .unwrap()
+            .insert(job_name.to_string(), handle);
         Ok(())
     }
 

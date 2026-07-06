@@ -81,7 +81,11 @@ impl LaunchdAgentProcess {
             })
             .unwrap_or_default();
 
-        let keep_alive = if spec.restart.enabled { "true" } else { "false" };
+        let keep_alive = if spec.restart.enabled {
+            "true"
+        } else {
+            "false"
+        };
 
         format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -175,7 +179,9 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
     async fn unregister(&self, unit_name: &str) -> Result<(), RegistrarError> {
         let target = self.service_target(unit_name);
         self.launchctl(&["bootout", &target]).await.ok();
-        tokio::fs::remove_file(self.plist_path(unit_name)).await.ok();
+        tokio::fs::remove_file(self.plist_path(unit_name))
+            .await
+            .ok();
         Ok(())
     }
 

@@ -54,7 +54,7 @@ impl InMemoryLogSink {
 fn snapshot(buffer: &VecDeque<LogLine>, limit: usize, since: Option<DateTime<Utc>>) -> LogTail {
     let collected: Vec<LogLine> = buffer
         .iter()
-        .filter(|l| since.map_or(true, |s| l.timestamp >= s))
+        .filter(|l| since.is_none_or(|s| l.timestamp >= s))
         .cloned()
         .collect();
     if limit == 0 || collected.len() <= limit {

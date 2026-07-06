@@ -27,9 +27,6 @@ pub trait JobRepository: Send + Sync {
     async fn delete_job(&self, name: &str) -> Result<(), RepoError>;
     async fn save_run(&self, run: &JobRun) -> Result<(), RepoError>;
     async fn list_runs(&self, job_name: &str, limit: usize) -> Result<Vec<JobRun>, RepoError>;
-    async fn get_run(
-        &self,
-        job_name: &str,
-        run_id: &JobRunId,
-    ) -> Result<Option<JobRun>, RepoError>;
+    async fn get_run(&self, job_name: &str, run_id: &JobRunId)
+        -> Result<Option<JobRun>, RepoError>;
 }

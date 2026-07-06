@@ -200,7 +200,9 @@ pub fn process_config_to_spec(dto: ProcessConfigDto) -> ProcessSpec {
 pub fn job_trigger_to_domain(dto: JobTriggerDto) -> JobTrigger {
     match dto {
         JobTriggerDto::Cron { expr } => JobTrigger::Cron(expr),
-        JobTriggerDto::Interval { every_sec } => JobTrigger::Interval(Duration::from_secs(every_sec)),
+        JobTriggerDto::Interval { every_sec } => {
+            JobTrigger::Interval(Duration::from_secs(every_sec))
+        }
         JobTriggerDto::OneShot { at } => JobTrigger::OneShot(at),
         JobTriggerDto::DependsOn { jobs } => JobTrigger::DependsOn(jobs),
     }

@@ -47,8 +47,14 @@ pub fn build_router(facade: Arc<OperationsFacade>) -> Router {
             "/api/v1/processes/{name}",
             get(handlers::get_process).delete(handlers::delete_process),
         )
-        .route("/api/v1/processes/{name}/start", post(handlers::start_process))
-        .route("/api/v1/processes/{name}/stop", post(handlers::stop_process))
+        .route(
+            "/api/v1/processes/{name}/start",
+            post(handlers::start_process),
+        )
+        .route(
+            "/api/v1/processes/{name}/stop",
+            post(handlers::stop_process),
+        )
         .route(
             "/api/v1/processes/{name}/restart",
             post(handlers::restart_process),
