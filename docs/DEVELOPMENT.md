@@ -1,6 +1,6 @@
 # Development Guide
 
-`my-supervisor` 프로젝트의 로컬 개발 환경 구성, 빌드, 테스트, 디버깅 방법을 정리합니다. 현재 리포지토리는 설계 단계로 워크스페이스 골격과 버전 고정 도구만 구성되어 있으며, 상세 빌드·테스트 플로우는 **PoC 진입 이후** 본 문서를 갱신합니다.
+`my-supervisor` 프로젝트의 로컬 개발 환경 구성, 빌드, 테스트, 디버깅 방법을 정리합니다. 현재 리포지토리는 Cargo workspace와 데스크톱 UI용 독립 pnpm 프로젝트로 구성되어 있으며, 상세 빌드·테스트 플로우는 **PoC 진입 이후** 본 문서를 갱신합니다.
 
 관련 문서: [아키텍처](./ARCHITECTURE.md) · [로드맵](./ROADMAP.md) · [설계 결정](./DESIGN_DECISIONS.md) · [API 레퍼런스](./API.md)
 
@@ -10,18 +10,8 @@
 
 | 도구 | 역할 | 설치 |
 |---|---|---|
-| [proto](https://moonrepo.dev/proto) | 언어·런타임 버전 관리. `.prototools`로 Node / Rust / pnpm 버전 고정 | 공식 설치 스크립트 참조 |
-| [moon](https://moonrepo.dev/moon) | 모노레포 태스크 러너. `.moon/workspace.yml`로 프로젝트 경계 정의 | `proto install moon` 또는 공식 설치 |
-
-현재 `.prototools`가 고정하는 버전:
-
-```
-node = "24.14.0"
-rust = "1.94.1"
-pnpm = "10.11.0"
-```
-
-버전은 진행 단계에 따라 변경될 수 있으며, 변경 시 해당 커밋과 함께 이 문서를 갱신합니다.
+| Rust / Cargo | Rust workspace 빌드·테스트 | `rustup` 또는 OS 패키지 매니저 |
+| [pnpm](https://pnpm.io/) | 데스크톱 UI 의존성 관리 (`crates/desktop/ui`) | 공식 설치 안내 참조 |
 
 ---
 
@@ -30,56 +20,43 @@ pnpm = "10.11.0"
 리포지토리를 클론한 뒤 한 번만 수행합니다.
 
 ```bash
-# 1) proto 설치 + .prototools에 고정된 Node/Rust/pnpm 설치
-./scripts/setup-proto.sh
-
-# 2) moon 기반 워크스페이스 디렉터리 및 설정 파일 생성
-./scripts/setup-moon.sh
+# 데스크톱 UI 의존성 설치
+pnpm --dir crates/desktop/ui install
 ```
-
-각 스크립트의 동작:
-
-- `scripts/setup-proto.sh` — `proto` 명령 존재 여부 확인 → `.prototools`가 없으면 기본값으로 생성 → `proto install --yes`로 지정 버전 설치. 셸 프로필은 수정하지 않으므로 필요 시 `proto setup`을 별도 실행.
-- `scripts/setup-moon.sh` — `moon` 명령 존재 여부 확인 → `apps/`, `packages/`, `crates/` 디렉터리 보장 → `.moon/workspace.yml`, `.moon/toolchains.yml`을 없으면 기본값으로 생성.
-
-> 두 스크립트 모두 **이미 존재하는 설정 파일을 덮어쓰지 않고 재사용**합니다.
 
 ---
 
 ## 3. 워크스페이스 구조
 
-`.moon/workspace.yml` 기준의 상위 프로젝트 경계:
+Rust 크레이트 의존성은 `Cargo.toml`의 workspace members로 관리합니다. 데스크톱 UI는 `crates/desktop/ui` 하위의 독립 pnpm 프로젝트이며, Tauri 설정의 `beforeDevCommand` / `beforeBuildCommand`가 필요한 UI 명령을 실행합니다.
+
+루트 workspace 내부는 Hexagonal 레이어대로 중첩 폴더 구조:
 
 ```
-apps/*        # 최상위 애플리케이션 (moon 규약 유지, 현 단계 미사용)
-packages/*    # 노드 기반 공유 패키지 — packages/ui (React 프론트엔드)
-crates/*      # Rust 크레이트 — Hexagonal 5 레이어
+├── Cargo.toml            # Rust workspace 루트
+├── Cargo.lock
+├── crates/
+│   ├── core/             # 도메인 + port trait
+│   ├── application/      # use case (ports 에만 의존)
+│   ├── shared/           # wire types (HTTP/WS DTO, 설정 스키마)
+│   ├── config/           # ConfigSource 구현 (TOML + watch)
+│   ├── infra/
+│   │   ├── sqlite/       # StateRepository + JobRepository
+│   │   ├── http/         # HttpServer (axum + WS)
+│   │   ├── logging/      # LogSink
+│   │   └── scheduler/    # Scheduler
+│   ├── platform/
+│   │   └── macos/        # launchd, kqueue, macOS 프로세스 제어
+│   ├── daemon/           # 공통 데몬 런타임 lib + thin bin `msv-daemon`
+│   ├── cli/              # bin `msv` — 데몬 런타임의 기본 접속값 재사용
+│   └── desktop/          # Tauri Rust crate
+│       ├── Cargo.toml
+│       ├── tauri.conf.json
+│       ├── src/          # Rust Tauri entry
+│       └── ui/           # React/Vite UI
 ```
 
-`crates/` 내부는 Hexagonal 레이어대로 중첩 폴더 구조:
-
-```
-crates/
-├── core/                 # 도메인 + port trait
-├── application/          # use case (ports 에만 의존)
-├── shared/               # wire types (HTTP/WS DTO, 설정 스키마)
-├── config/               # ConfigSource 구현 (TOML + watch)
-├── infra/
-│   ├── sqlite/           # StateRepository + JobRepository
-│   ├── http/             # HttpServer (axum + WS)
-│   ├── logging/          # LogSink (로테이션·백프레셔; run 단위 아카이브)
-│   └── scheduler/        # Scheduler (cron/interval/one-shot/의존성)
-├── platform/
-│   ├── linux/            # prctl, systemd, journald
-│   ├── macos/            # kqueue, launchd
-│   └── windows/          # Job Object, Service, Event Log, Task Scheduler
-└── app/
-    ├── daemon/           # bin `msv-daemon` — 헤드리스 호스트 (코어 임베드, 서버용)
-    ├── cli/              # bin `msv`
-    └── desktop/          # bin — Tauri 호스트 (GUI 있는 my-supervisor, 코어 임베드)
-```
-
-`packages/ui/src/` 는 feature 단위:
+`crates/desktop/ui/src/` 는 feature 단위:
 
 ```
 features/{processes,jobs,logs,daemon,settings}/
@@ -88,9 +65,9 @@ services/                 # HTTP/WS 클라이언트
 shared/                   # 훅·타입·유틸 (theme.css — 토큰 단일 출처)
 ```
 
-실제 디렉터리는 현재 **비어 있고** (`.gitkeep`만 존재), PoC 시작 시 위 구조로 crate 가 추가됩니다. 각 레이어의 책임과 의존성 방향은 `ARCHITECTURE.md §3`, 설계 근거는 `DESIGN_DECISIONS.md DD-017 ~ DD-024` 참조.
+각 레이어의 책임과 의존성 방향은 `ARCHITECTURE.md §3`, 설계 근거는 `DESIGN_DECISIONS.md DD-017 ~ DD-024` 참조.
 
-**Workspace members 선언 (루트 `Cargo.toml`):**
+**Workspace members 선언 (`Cargo.toml`):**
 
 ```toml
 [workspace]
@@ -101,19 +78,19 @@ members = [
     "crates/config",
     "crates/infra/*",
     "crates/platform/*",
-    "crates/app/*",
+    "crates/daemon",
+    "crates/cli",
+    "crates/desktop",
 ]
 ```
 
 Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-supervisor-platform-linux`, `my-supervisor-app-daemon`).
 
-`.moon/toolchains.yml`에는 `node`, `rust` 툴체인이 활성화되어 있으며, 세부 옵션은 PoC 중 확정합니다.
-
 ---
 
 ## 4. 빌드 / 테스트 / 실행
 
-현재 코드가 없어 명령만 패턴으로 정리합니다. PoC 진입 시 각 항목을 실제 명령으로 고정합니다.
+기본 단위는 Cargo workspace입니다. UI 명령은 `crates/desktop/ui`에서 직접 실행하거나, `cargo tauri dev/build`가 Tauri 설정을 통해 실행합니다.
 
 ### Rust 크레이트
 
@@ -151,37 +128,27 @@ cargo fmt --all
 
 ### 프론트엔드 (React + Vite)
 
-위치: `packages/ui/` (`ARCHITECTURE.md` §3 · §4.8 참조).
+위치: `crates/desktop/ui/` (`ARCHITECTURE.md` §3 · §4.8 참조).
 
 ```bash
 # 개발 서버
-pnpm -C packages/ui dev
+pnpm --dir crates/desktop/ui dev
 
-# 프로덕션 빌드
-pnpm -C packages/ui build
+# UI 프로덕션 빌드
+pnpm --dir crates/desktop/ui build
 
-# 타입 체크 / 린트
-pnpm -C packages/ui typecheck
-pnpm -C packages/ui lint
+# 타입 체크
+pnpm --dir crates/desktop/ui typecheck
 ```
 
 ### Tauri 앱
 
 ```bash
 # Tauri 개발 모드 (프론트엔드 dev 서버 + Rust 쉘)
-cargo tauri dev
+cargo tauri dev --manifest-path crates/desktop/Cargo.toml
 
 # 배포용 패키징
-cargo tauri build
-```
-
-### Moon 태스크
-
-프로젝트가 추가되면 공통 태스크(예: `:build`, `:test`, `:lint`)를 `.moon/tasks.yml`로 집약합니다. 그 시점에 다음 예시가 동작하도록 정비합니다.
-
-```bash
-moon run :build
-moon run :test
+cargo tauri build --manifest-path crates/desktop/Cargo.toml
 ```
 
 ---
@@ -239,8 +206,6 @@ feat(ui/jobs): Job Runs 탭 가상화 테이블 추가
 
 PoC·MVP 진행 중 발견되는 빈발 이슈를 축적합니다. 아래는 틀만 유지합니다.
 
-- **Q. `proto install`이 Rust 설치 단계에서 실패합니다.**
-  - A. *PoC 중 실제 케이스 수집 후 해결책 기록.*
 - **Q. Tauri dev 모드에서 WebView가 로드되지 않습니다.**
   - A. *PoC 중 실제 케이스 수집 후 해결책 기록.*
 - **Q. macOS에서 `codesign` 관련 경고가 뜹니다.**

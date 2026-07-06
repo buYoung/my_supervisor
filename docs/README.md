@@ -40,12 +40,12 @@
 ```
    데스크톱 (macOS)                      서버 (헤드리스)
   ┌─────────────────────────┐         ┌─────────────────────────┐
-  │ app/desktop (Tauri)     │         │ app/daemon              │
+  │ desktop (Tauri)        │         │ msv-daemon launcher     │
   │  · WebView · tray       │         │  · GUI 없음             │
   │  · 자동화 권한 (AX/핫키) │         │  · 운영 전용            │
   │ ─────────────────────── │         │ ─────────────────────── │
-  │ core + application 임베드│         │ core + application 임베드│
-  │ + axum HTTP/WS 내장      │         │ + axum HTTP/WS 내장      │
+  │ daemon runtime 재사용│         │ daemon runtime 실행 │
+  │ + invoke/devBridge       │         │ + axum HTTP/WS 내장      │
   └───────────┬─────────────┘         └───────────┬─────────────┘
               │ HTTP/WS (localhost)               │ HTTP/WS
         ┌─────┴──────┐                      ┌─────┴──────┐
@@ -57,19 +57,19 @@
    • Rule = OS 이벤트 → 액션 (윈도우·핫키)      ─ 자동화 (윈도우/핫키는 데스크톱 macOS 전용)
 ```
 
-`core`/`application` 은 공유 라이브러리이고, **데스크톱은 Tauri 앱(`app/desktop`)이, 서버는 헤드리스 데몬(`app/daemon`)이 각각 이 코어를 임베드** 합니다(DD-002). 두 호스트 모두 axum HTTP/WS 서버를 내장하므로 CLI·외부 브라우저가 동일 API 로 붙습니다. 데스크톱에서 창을 닫아도 Tauri 가 tray 로 상주하여 자식 프로세스·등록된 Rule 이 유지됩니다 — **별도 데몬 프로세스를 spawn 하지 않습니다.**
+`core`/`application` 은 도메인·유스케이스 라이브러리이고, **`daemon`은 이를 실제 adapter와 조립하는 공통 런타임** 입니다. 데스크톱(`desktop`)은 이 런타임을 인프로세스로 재사용하고, 서버 배포는 같은 런타임을 `msv-daemon` launcher로 실행합니다. 데스크톱에서 창을 닫아도 Tauri 가 tray 로 상주하여 자식 프로세스·등록된 Rule 이 유지됩니다 — **별도 데몬 프로세스를 spawn 하지 않습니다.**
 
 내부 모듈은 Hexagonal (Ports & Adapters) 로 분리되어 있습니다. 도메인 로직은 OS·DB·HTTP 세부를 모르고, 플랫폼·인프라 adapter crate 가 port trait 를 구현합니다. **단, 윈도우·핫키처럼 OS 마다 개념 자체가 다른 자동화 기능은 여러 OS 구현을 강제하지 않고, 구현자가 `platform/macos` 하나뿐인 단일 구현 seam 으로 둡니다** (DD-027). `application` 은 `Option<&dyn …>` 로만 소비하므로 `#[cfg]`·`platform/*` 의존이 침투하지 않습니다.
 
 ```
-  app/*  ──▶ application ──▶ core  ◀── port trait 정의 (크로스 플랫폼)
-    │             │             ▲
-    │             └── shared ───┤  (DTO 재사용)
-    │                           │
-    ├──▶ infra/*    ─────────── │   adapter 구현
-    ├──▶ platform/* ─────────── │   adapter 구현
-    │        └ macos: 윈도우·핫키 단일 구현 (구현자 1개·stub 없음)
-    └──▶ config     ─────────── ┘
+  cli ─┐
+           ├──▶ daemon runtime ──▶ application ──▶ core
+  desktop ┘              │              │             ▲
+                             │              └── shared ───┤
+                             ├──▶ infra/*    ──────────── │
+                             ├──▶ platform/* ──────────── │
+                             │        └ macos: 단일 구현 seam
+                             └──▶ config     ──────────── ┘
 ```
 
 상세는 [ARCHITECTURE.md §3](./ARCHITECTURE.md#3-모노레포-구조) · [DESIGN_DECISIONS.md DD-017~DD-020, DD-026~DD-029](./DESIGN_DECISIONS.md) 참조.
@@ -87,7 +87,7 @@
 - **언어**: Rust (전 컴포넌트)
 - **UI 셸**: Tauri v2
 - **데몬**: tokio + axum
-- **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`packages/ui`, feature 단위 모듈 — DD-020). 다크/라이트 양립.
+- **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`crates/desktop/ui`, feature 단위 모듈 — DD-020). 다크/라이트 양립.
 - **상위 IA (동등 이원)**:
   - **운영**: Processes · Jobs · Logs
   - **자동화**: Rules (이벤트→액션, 윈도우·핫키 포함)
@@ -95,7 +95,7 @@
 - **영속화**: TOML (설정) + SQLite (런타임 상태 · JobRun 이력 · Rule 실행 이력)
 - **배치 스케줄러**: 데몬 내장 (`infra/scheduler`, `tokio-cron-scheduler` 기반). cron 5-field + interval + one-shot + 의존성.
 - **자동화 엔진**: 데몬 내장. 이벤트 소스는 크로스 플랫폼(`notify` 파일 watch, 타이머)과 macOS 전용(Accessibility API 윈도우 제어, event tap 글로벌 핫키, NSWorkspace/IOKit 시스템 이벤트)으로 구성.
-- **모듈 구조**: Hexagonal Cargo workspace — `core` / `application` / `shared`·`config` / `infra/*` / `platform/*` / `app/*`. Cargo 패키지 prefix `my-supervisor-`, 바이너리는 `msv` · `msv-daemon`.
+- **모듈 구조**: Hexagonal Cargo workspace — `core` / `application` / `shared`·`config` / `infra/*` / `platform/*` / `daemon`·`cli`·`desktop`. 데스크톱 UI는 `desktop/ui`에 포함한다. Cargo 패키지 prefix `my-supervisor-`, 바이너리는 `msv` · `msv-daemon`.
 
 ## 문서
 

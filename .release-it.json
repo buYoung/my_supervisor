@@ -1,0 +1,35 @@
+{
+  "$schema": "https://unpkg.com/release-it@20/schema/release-it.json",
+  "git": {
+    "commitMessage": "chore(release): v${version}",
+    "requireBranch": ["main", "release/*"],
+    "requireCleanWorkingDir": false,
+    "requireCommits": true,
+    "addUntrackedFiles": true,
+    "tagName": "v${version}",
+    "tagAnnotation": "Release v${version}"
+  },
+  "npm": false,
+  "github": {
+    "release": true
+  },
+  "hooks": {
+    "before:init": [
+      "cargo fmt --all -- --check",
+      "cargo clippy --workspace --all-targets -- -D warnings"
+    ],
+    "before:git:release": "git add -A"
+  },
+  "plugins": {
+    "@release-it/bumper": {
+      "in": {
+        "file": "Cargo.toml",
+        "path": "workspace.package.version"
+      },
+      "out": {
+        "file": "Cargo.toml",
+        "path": "workspace.package.version"
+      }
+    }
+  }
+}

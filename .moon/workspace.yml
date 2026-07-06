@@ -1,8 +1,0 @@
-projects:
-  - "apps/*"
-  - "packages/*"
-  - "crates/*"
-
-vcs:
-  defaultBranch: "main"
-  provider: "other"

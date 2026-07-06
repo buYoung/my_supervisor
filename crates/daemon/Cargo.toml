@@ -1,0 +1,28 @@
+[package]
+name = "my-supervisor-app-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "msv-daemon"
+path = "src/main.rs"
+
+[dependencies]
+my-supervisor-core = { workspace = true }
+my-supervisor-application = { workspace = true }
+my-supervisor-shared = { workspace = true }
+my-supervisor-config = { workspace = true }
+my-supervisor-infra-http = { workspace = true }
+my-supervisor-infra-sqlite = { workspace = true }
+my-supervisor-infra-scheduler = { workspace = true }
+my-supervisor-infra-logging = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dirs = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+my-supervisor-platform-macos = { workspace = true }

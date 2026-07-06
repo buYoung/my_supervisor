@@ -1,0 +1,21 @@
+[package]
+name = "my-supervisor-platform-macos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+my-supervisor-core = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+libc = "0.2"
+tokio = { version = "1", default-features = false, features = [
+    "process",
+    "io-util",
+    "rt",
+    "time",
+    "sync",
+    "macros",
+] }

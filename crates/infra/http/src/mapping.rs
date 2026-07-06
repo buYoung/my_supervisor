@@ -1,0 +1,232 @@
+//! Domain ↔ wire DTO mapping. The single home for the contract translation so
+//! HTTP routes (and the Tauri invoke adapter in child 03) stay thin. The
+//! DTO→domain direction mirrors `config::convert` by design (no shared module
+//! without a dependency cycle); both compile against `shared`'s one definition.
+
+use std::path::PathBuf;
+use std::time::Duration;
+
+use my_supervisor_application::views::{DaemonInfo, JobView, LogPage};
+use my_supervisor_core::domain::{
+    DependencyFailurePolicy, Job, JobId, JobRun, JobRunState, JobTrigger, LifecycleMode, LogLine,
+    LogRetention, LogStream, ManagementMode, OverlapPolicy, ProcessSpec, ProcessState,
+    ProcessStatus, RestartPolicy, ShutdownPolicy, TriggeredBy,
+};
+use my_supervisor_shared::api::{
+    DaemonStatusDto, JobConfigDto, JobDependenciesDto, JobRunDto, JobRunStateDto, JobRunSummaryDto,
+    JobStatusDto, JobTriggerDto, LifecycleModeDto, LogLineDto, LogStreamDto, LogsResponseDto,
+    ManagementModeDto, OnDependencyFailureDto, OnOverlapDto, ProcessConfigDto, ProcessStateDto,
+    ProcessStatusDto, TriggeredByDto,
+};
+
+// --- domain -> DTO ----------------------------------------------------------
+
+pub fn process_state_to_dto(state: ProcessState) -> ProcessStateDto {
+    match state {
+        ProcessState::Starting => ProcessStateDto::Starting,
+        ProcessState::Running => ProcessStateDto::Running,
+        ProcessState::Stopping => ProcessStateDto::Stopping,
+        ProcessState::Crashed => ProcessStateDto::Crashed,
+        ProcessState::Stopped => ProcessStateDto::Stopped,
+    }
+}
+
+pub fn management_mode_to_dto(mode: &ManagementMode) -> ManagementModeDto {
+    match mode {
+        ManagementMode::Direct => ManagementModeDto::Direct,
+        ManagementMode::SystemRegistered { unit_name } => ManagementModeDto::SystemRegistered {
+            unit_name: unit_name.clone(),
+        },
+    }
+}
+
+pub fn process_status_to_dto(status: ProcessStatus) -> ProcessStatusDto {
+    ProcessStatusDto {
+        name: status.name,
+        state: process_state_to_dto(status.state),
+        management_mode: management_mode_to_dto(&status.management_mode),
+        pid: status.pid,
+        unit_name: status.unit_name,
+        restart_count: status.restart_count,
+        started_at: status.started_at,
+        cpu_percent: status.cpu_percent,
+        memory_bytes: status.memory_bytes,
+    }
+}
+
+pub fn job_trigger_to_dto(trigger: &JobTrigger) -> JobTriggerDto {
+    match trigger {
+        JobTrigger::Cron(expr) => JobTriggerDto::Cron { expr: expr.clone() },
+        JobTrigger::Interval(d) => JobTriggerDto::Interval {
+            every_sec: d.as_secs(),
+        },
+        JobTrigger::OneShot(at) => JobTriggerDto::OneShot { at: *at },
+        JobTrigger::DependsOn(jobs) => JobTriggerDto::DependsOn { jobs: jobs.clone() },
+    }
+}
+
+pub fn overlap_to_dto(p: OverlapPolicy) -> OnOverlapDto {
+    match p {
+        OverlapPolicy::Skip => OnOverlapDto::Skip,
+        OverlapPolicy::Queue => OnOverlapDto::Queue,
+        OverlapPolicy::Parallel => OnOverlapDto::Parallel,
+    }
+}
+
+pub fn run_state_to_dto(s: JobRunState) -> JobRunStateDto {
+    match s {
+        JobRunState::Pending => JobRunStateDto::Pending,
+        JobRunState::Running => JobRunStateDto::Running,
+        JobRunState::Succeeded => JobRunStateDto::Succeeded,
+        JobRunState::Failed => JobRunStateDto::Failed,
+        JobRunState::Cancelled => JobRunStateDto::Cancelled,
+        JobRunState::Skipped => JobRunStateDto::Skipped,
+    }
+}
+
+pub fn triggered_by_to_dto(t: &TriggeredBy) -> TriggeredByDto {
+    match t {
+        TriggeredBy::Schedule => TriggeredByDto::Schedule,
+        TriggeredBy::Manual => TriggeredByDto::Manual,
+        TriggeredBy::Dependency { upstream_run_id } => TriggeredByDto::Dependency {
+            upstream_run_id: upstream_run_id.0.to_string(),
+        },
+    }
+}
+
+pub fn job_run_to_dto(run: &JobRun) -> JobRunDto {
+    JobRunDto {
+        run_id: run.run_id.0.to_string(),
+        job_name: run.job_name.clone(),
+        triggered_by: triggered_by_to_dto(&run.triggered_by),
+        scheduled_at: run.scheduled_at,
+        started_at: run.started_at,
+        ended_at: run.ended_at,
+        exit_code: run.exit_code,
+        state: run_state_to_dto(run.state),
+    }
+}
+
+fn run_summary_to_dto(run: &JobRun) -> JobRunSummaryDto {
+    let duration_sec = match (run.started_at, run.ended_at) {
+        (Some(s), Some(e)) => Some((e - s).num_seconds()),
+        _ => None,
+    };
+    JobRunSummaryDto {
+        run_id: run.run_id.0.to_string(),
+        state: run_state_to_dto(run.state),
+        ended_at: run.ended_at,
+        duration_sec,
+    }
+}
+
+pub fn job_view_to_dto(view: JobView) -> JobStatusDto {
+    JobStatusDto {
+        name: view.job.name.clone(),
+        trigger: job_trigger_to_dto(&view.job.trigger),
+        on_overlap: overlap_to_dto(view.job.on_overlap),
+        last_run: view.last_run.as_ref().map(run_summary_to_dto),
+        next_run_at: view.next_run_at,
+        success_rate_recent: view.success_rate_recent,
+        dependencies: JobDependenciesDto {
+            upstream: view.upstream,
+            downstream: view.downstream,
+        },
+    }
+}
+
+pub fn log_stream_to_dto(s: LogStream) -> LogStreamDto {
+    match s {
+        LogStream::Stdout => LogStreamDto::Stdout,
+        LogStream::Stderr => LogStreamDto::Stderr,
+        LogStream::System => LogStreamDto::System,
+    }
+}
+
+pub fn log_line_to_dto(line: &LogLine) -> LogLineDto {
+    LogLineDto {
+        timestamp: line.timestamp,
+        stream: log_stream_to_dto(line.stream),
+        line: line.line.clone(),
+    }
+}
+
+pub fn log_page_to_dto(page: LogPage) -> LogsResponseDto {
+    LogsResponseDto {
+        lines: page.lines.iter().map(log_line_to_dto).collect(),
+        truncated: page.truncated,
+        dropped_count: page.dropped_count,
+    }
+}
+
+pub fn daemon_info_to_dto(info: DaemonInfo) -> DaemonStatusDto {
+    DaemonStatusDto {
+        version: info.version,
+        started_at: info.started_at,
+        pid: info.pid,
+        process_count: info.process_count,
+        config_path: info.config_path,
+        log_dir: info.log_dir,
+    }
+}
+
+// --- DTO -> domain (request bodies) ----------------------------------------
+
+pub fn process_config_to_spec(dto: ProcessConfigDto) -> ProcessSpec {
+    let management_mode = match dto.management_mode {
+        Some(ManagementModeDto::SystemRegistered { unit_name }) => {
+            ManagementMode::SystemRegistered { unit_name }
+        }
+        _ => ManagementMode::Direct,
+    };
+    let lifecycle = match dto.lifecycle {
+        Some(LifecycleModeDto::Detached) => LifecycleMode::Detached,
+        _ => LifecycleMode::Tied,
+    };
+    ProcessSpec {
+        name: dto.name,
+        command: dto.command,
+        args: dto.args,
+        cwd: dto.cwd.map(PathBuf::from),
+        env: dto.env,
+        management_mode,
+        lifecycle,
+        autostart: dto.autostart.unwrap_or(false),
+        restart: RestartPolicy::default(),
+        shutdown: ShutdownPolicy::default(),
+    }
+}
+
+pub fn job_trigger_to_domain(dto: JobTriggerDto) -> JobTrigger {
+    match dto {
+        JobTriggerDto::Cron { expr } => JobTrigger::Cron(expr),
+        JobTriggerDto::Interval { every_sec } => {
+            JobTrigger::Interval(Duration::from_secs(every_sec))
+        }
+        JobTriggerDto::OneShot { at } => JobTrigger::OneShot(at),
+        JobTriggerDto::DependsOn { jobs } => JobTrigger::DependsOn(jobs),
+    }
+}
+
+pub fn job_config_to_job(dto: JobConfigDto) -> Job {
+    Job {
+        id: JobId::new(),
+        name: dto.name,
+        command: dto.command,
+        args: dto.args,
+        cwd: dto.cwd.map(PathBuf::from),
+        env: dto.env,
+        trigger: job_trigger_to_domain(dto.trigger),
+        on_overlap: match dto.on_overlap {
+            Some(OnOverlapDto::Queue) => OverlapPolicy::Queue,
+            Some(OnOverlapDto::Parallel) => OverlapPolicy::Parallel,
+            _ => OverlapPolicy::Skip,
+        },
+        on_dependency_failure: match dto.on_dependency_failure {
+            Some(OnDependencyFailureDto::RunAnyway) => DependencyFailurePolicy::RunAnyway,
+            _ => DependencyFailurePolicy::Skip,
+        },
+        timeout: dto.timeout_sec.map(Duration::from_secs),
+        log_retention: LogRetention::default(),
+    }
+}

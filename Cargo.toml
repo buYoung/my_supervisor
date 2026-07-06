@@ -1,0 +1,75 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/application",
+    "crates/shared",
+    "crates/config",
+    "crates/infra/*",
+    "crates/platform/*",
+    "crates/daemon",
+    "crates/cli",
+    "crates/desktop",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/buYoung/my_supervisor"
+
+[workspace.dependencies]
+# Internal crates
+my-supervisor-core = { path = "crates/core" }
+my-supervisor-application = { path = "crates/application" }
+my-supervisor-shared = { path = "crates/shared" }
+my-supervisor-config = { path = "crates/config" }
+my-supervisor-infra-sqlite = { path = "crates/infra/sqlite" }
+my-supervisor-infra-http = { path = "crates/infra/http" }
+my-supervisor-infra-logging = { path = "crates/infra/logging" }
+my-supervisor-infra-scheduler = { path = "crates/infra/scheduler" }
+my-supervisor-platform-macos = { path = "crates/platform/macos" }
+my-supervisor-app-daemon = { path = "crates/daemon" }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures-util = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Time / identity
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Errors / logging
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP / WS
+axum = { version = "0.8", features = ["ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+
+# Persistence
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "sqlite",
+    "chrono",
+    "uuid",
+    "macros",
+] }
+
+# Scheduling
+croner = "2"
+
+# Paths
+dirs = "5"
+
+[profile.release]
+strip = true

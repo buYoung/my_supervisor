@@ -5,10 +5,6 @@
 # tools
 .serena/
 
-# moon
-.moon/cache
-.moon/docker
-
 # node
 node_modules
 dist
