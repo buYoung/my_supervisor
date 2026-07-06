@@ -1,6 +1,6 @@
 # Development Guide
 
-`my-supervisor` 프로젝트의 로컬 개발 환경 구성, 빌드, 테스트, 디버깅 방법을 정리합니다. 현재 리포지토리는 설계 단계로 워크스페이스 골격과 버전 고정 도구만 구성되어 있으며, 상세 빌드·테스트 플로우는 **PoC 진입 이후** 본 문서를 갱신합니다.
+`my-supervisor` 프로젝트의 로컬 개발 환경 구성, 빌드, 테스트, 디버깅 방법을 정리합니다. 현재 리포지토리는 Cargo workspace와 데스크톱 UI용 독립 pnpm 프로젝트로 구성되어 있으며, 상세 빌드·테스트 플로우는 **PoC 진입 이후** 본 문서를 갱신합니다.
 
 관련 문서: [아키텍처](./ARCHITECTURE.md) · [로드맵](./ROADMAP.md) · [설계 결정](./DESIGN_DECISIONS.md) · [API 레퍼런스](./API.md)
 
@@ -10,18 +10,8 @@
 
 | 도구 | 역할 | 설치 |
 |---|---|---|
-| [proto](https://moonrepo.dev/proto) | 언어·런타임 버전 관리. `.prototools`로 Node / Rust / pnpm 버전 고정 | 공식 설치 스크립트 참조 |
-| [pnpm](https://pnpm.io/) | 데스크톱 UI 의존성 관리 (`crates/desktop/ui`) | `./scripts/setup-proto.sh` |
-
-현재 `.prototools`가 고정하는 버전:
-
-```
-node = "24.14.0"
-rust = "1.94.1"
-pnpm = "10.11.0"
-```
-
-버전은 진행 단계에 따라 변경될 수 있으며, 변경 시 해당 커밋과 함께 이 문서를 갱신합니다.
+| Rust / Cargo | Rust workspace 빌드·테스트 | `rustup` 또는 OS 패키지 매니저 |
+| [pnpm](https://pnpm.io/) | 데스크톱 UI 의존성 관리 (`crates/desktop/ui`) | 공식 설치 안내 참조 |
 
 ---
 
@@ -30,16 +20,9 @@ pnpm = "10.11.0"
 리포지토리를 클론한 뒤 한 번만 수행합니다.
 
 ```bash
-# 1) proto 설치 + .prototools에 고정된 Node/Rust/pnpm 설치
-./scripts/setup-proto.sh
-
-# 2) 데스크톱 UI 의존성 설치
+# 데스크톱 UI 의존성 설치
 pnpm --dir crates/desktop/ui install
 ```
-
-각 스크립트의 동작:
-
-- `scripts/setup-proto.sh` — `proto` 명령 존재 여부 확인 → `.prototools`가 없으면 기본값으로 생성 → `proto install --yes`로 지정 버전 설치. 셸 프로필은 수정하지 않으므로 필요 시 `proto setup`을 별도 실행.
 
 ---
 
@@ -223,8 +206,6 @@ feat(ui/jobs): Job Runs 탭 가상화 테이블 추가
 
 PoC·MVP 진행 중 발견되는 빈발 이슈를 축적합니다. 아래는 틀만 유지합니다.
 
-- **Q. `proto install`이 Rust 설치 단계에서 실패합니다.**
-  - A. *PoC 중 실제 케이스 수집 후 해결책 기록.*
 - **Q. Tauri dev 모드에서 WebView가 로드되지 않습니다.**
   - A. *PoC 중 실제 케이스 수집 후 해결책 기록.*
 - **Q. macOS에서 `codesign` 관련 경고가 뜹니다.**
