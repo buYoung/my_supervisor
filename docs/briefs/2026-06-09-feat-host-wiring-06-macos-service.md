@@ -6,7 +6,7 @@ feat
 ## Current State (As-Is)
 - The foundation (child 01) implements Direct-mode process lifecycle only; `ManagementMode` is modeled in the domain but only the `Direct` variant is operational, and `POST /api/v1/processes/{name}/convert` is not yet served.
 - `docs/API.md` §2 defines `convert` (body `{ to, unit_name?, auto_start? }`) with error codes `409 unit_name_conflict` and `service_registration_failed`, and `restart` is a documented no-op for SystemRegistered (DD-025).
-- `apps/my_supervisor/crates/desktop/ui/src/features/processes/ProcessesView.tsx` already renders a SystemRegistered registration *preview* (launchd plist + `launchctl` commands via `getServiceRegistrationPreview`) and a "관리 모드 전환" panel with a rollback message — but it only copies static snippets; nothing is registered.
+- `crates/desktop/ui/src/features/processes/ProcessesView.tsx` already renders a SystemRegistered registration *preview* (launchd plist + `launchctl` commands via `getServiceRegistrationPreview`) and a "관리 모드 전환" panel with a rollback message — but it only copies static snippets; nothing is registered.
 - `docs/ARCHITECTURE.md` (§4.3 ports, §6.4, §11.2) defines `ProcessServiceRegistrar` as the per-process SystemRegistered port (distinct from the daemon-autostart `AutoStartService`), implemented by a `platform/macos` `LaunchdAgentProcess` adapter; `application::StartProcess` branches on `management_mode` between `LifecycleController` (Direct) and `ProcessServiceRegistrar` (SystemRegistered). `crates/platform/macos` does not exist yet.
 
 ## Desired Outcome (To-Be)
@@ -37,7 +37,7 @@ feat
 
 ## Related Files / Entry Points
 - `crates/platform/macos/` (proposed) — new macOS launchd adapter crate.
-- `apps/my_supervisor/crates/desktop/ui/src/features/processes/ProcessesView.tsx` — the existing SystemRegistered preview (`getServiceRegistrationPreview` macOS branch) and the "관리 모드 전환" panel to make real.
+- `crates/desktop/ui/src/features/processes/ProcessesView.tsx` — the existing SystemRegistered preview (`getServiceRegistrationPreview` macOS branch) and the "관리 모드 전환" panel to make real.
 - `docs/API.md` — §2 `convert` route and §5 error codes (`unit_name_conflict`, `service_registration_failed`); the SystemRegistered `restart` no-op.
 - `docs/ARCHITECTURE.md` — §4.3/§11.2 `ProcessServiceRegistrar` (per-process port) vs `AutoStartService` (daemon autostart); §6.4 management-mode branch; `LaunchdAgentProcess` in the platform crate table.
 - `docs/DESIGN_DECISIONS.md` — DD-025 (SystemRegistered restart delegation) and DD-018 (cfg only in host DI).

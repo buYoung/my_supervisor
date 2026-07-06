@@ -35,7 +35,7 @@
 
 ### 진입 조건
 - 아키텍처 문서 확정
-- 모노레포 스켈레톤 생성 — `apps/my_supervisor/{core, application, shared, config, infra/{sqlite,http,logging}, platform/{linux,macos,windows}, daemon, cli, desktop}` 빈 crate 가 workspace 에 등록되어 `cargo check --workspace` 통과
+- 모노레포 스켈레톤 생성 — `{core, application, shared, config, infra/{sqlite,http,logging}, platform/{linux,macos,windows}, daemon, cli, desktop}` 빈 crate 가 workspace 에 등록되어 `cargo check --workspace` 통과
 
 ### 범위 (검증 대상)
 
@@ -44,7 +44,7 @@
 - 창을 닫아도 tray 상주로 자식 프로세스 유지 → 다시 열면 복귀
 - `tauri-plugin-single-instance` 로 앱 이중 실행 방지
 - `daemon` (헤드리스) 이 같은 코어를 임베드해 GUI 없이 동일 API 제공 — **두 호스트가 서로 의존하지 않음** 을 확인 (Tauri 는 데몬을 필요로 하지 않음)
-- React + Vite 번들 (`apps/my_supervisor/crates/desktop/ui`) 이 Tauri WebView 와 외부 브라우저에서 동일 렌더링·동작
+- React + Vite 번들 (`crates/desktop/ui`) 이 Tauri WebView 와 외부 브라우저에서 동일 렌더링·동작
 - 호스트 bin 이 타겟 OS 에 따라 `platform/*` 의 `LifecycleController` 구현을 `#[cfg(target_os)]` 로 DI 조립하는 경로 확인
 
 #### 2. `LifecycleController` port 구현 검증 (OS 별)

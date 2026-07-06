@@ -4,13 +4,13 @@
 feat
 
 ## Current State (As-Is)
-- No Tauri scaffolding exists: a repo scan finds no `tauri.conf.json`, no desktop Cargo crate, and no `.rs` files for the host. The `apps/my_supervisor/crates/desktop` host from `docs/ARCHITECTURE.md` §4.1.3 is unimplemented.
-- `apps/my_supervisor/crates/desktop/ui` is a Vite + React 19 app currently runnable standalone (`pnpm -C apps/my_supervisor/crates/desktop/ui dev`) on mock data; it is not yet loaded by any native shell.
+- No Tauri scaffolding exists: a repo scan finds no `tauri.conf.json`, no desktop Cargo crate, and no `.rs` files for the host. The `crates/desktop` host from `docs/ARCHITECTURE.md` §4.1.3 is unimplemented.
+- `crates/desktop/ui` is a Vite + React 19 app currently runnable standalone (`pnpm -C crates/desktop/ui dev`) on mock data; it is not yet loaded by any native shell.
 - The docs define `app/desktop` as the GUI my-supervisor that embeds core in-process and must not spawn or depend on a daemon (DD-002 amended; `docs/ARCHITECTURE.md` §1 and §4.1.3).
 - Decided (2026-06-09): the production Tauri UI ↔ core path is `tauri invoke`; the devBridge is a **test-only** HTTP mirror of that invoke surface, separate from the daemon.
 
 ## Desired Outcome (To-Be)
-- `apps/my_supervisor/crates/desktop` is a Tauri v2 binary that calls child 01's composition function in-process and hosts a WebView loading `apps/my_supervisor/crates/desktop/ui`.
+- `crates/desktop` is a Tauri v2 binary that calls child 01's composition function in-process and hosts a WebView loading `crates/desktop/ui`.
 - The production UI ↔ core path is `tauri invoke`: thin invoke handlers cover the operations surface (start/stop/list, jobs, logs — delegating to the shared facade) plus native actions (tray, window control, notifications/permission prompts — native APIs). No domain logic in either.
 - The **devBridge** is a **test-only** HTTP mirror: it mounts child 01's operations Router on loopback so test automation can drive the same operations over HTTP instead of `invoke`. It is separate from the daemon (the desktop host runs no daemon) and is not the production transport. Parity holds because each facade-backed `invoke` operations command and its matching devBridge HTTP endpoint call the same facade method.
 - The devBridge binds `127.0.0.1` on a configurable port (default `9876`; override one when both run at once), loopback-only with **no authentication** — a test-only feature consistent with DD-011's loopback-no-auth posture. It writes its base URL to `~/Library/Application Support/my-supervisor/devbridge.json` (`{base_url}`, created on start, removed on exit) so an out-of-process test harness can discover the (possibly non-default) port.
@@ -18,7 +18,7 @@ feat
 
 ## Scope
 ### In Scope
-- `apps/my_supervisor/crates/desktop` Tauri v2 crate plus `tauri.conf.json`, with `frontendDist` / dev URL pointed at `apps/my_supervisor/crates/desktop/ui`.
+- `crates/desktop` Tauri v2 crate plus `tauri.conf.json`, with `frontendDist` / dev URL pointed at `crates/desktop/ui`.
 - In-process composition via child 01.
 - Thin `tauri invoke` handlers: operations commands delegating to the shared facade (the production UI transport) + native actions via native APIs — no domain logic in either.
 - The devBridge: mount child 01's operations Router on a configurable loopback port (no auth — test-only); write its base URL to the discovery file `~/Library/Application Support/my-supervisor/devbridge.json` for out-of-process test-automation discovery.
@@ -39,9 +39,9 @@ feat
 - Tauri v2 only, per `docs/ROADMAP.md` and `docs/ARCHITECTURE.md`.
 
 ## Related Files / Entry Points
-- `apps/my_supervisor/crates/desktop/` (proposed) — new Tauri host crate location.
-- `apps/my_supervisor/crates/desktop/ui/package.json` — frontend scripts and the build the WebView loads.
-- `apps/my_supervisor/crates/desktop/ui/vite.config.ts` — dev server URL and build output dir the Tauri config must point at.
+- `crates/desktop/` (proposed) — new Tauri host crate location.
+- `crates/desktop/ui/package.json` — frontend scripts and the build the WebView loads.
+- `crates/desktop/ui/vite.config.ts` — dev server URL and build output dir the Tauri config must point at.
 - `docs/ARCHITECTURE.md` — §1 and §4.1.3: host duality and "GUI my-supervisor embeds core, no daemon spawn".
 - `docs/DESIGN_DECISIONS.md` — DD-002: host-dual rationale and the rejected "Tauri spawns daemon" option.
 - `docs/DEVELOPMENT.md` — the "Tauri 앱" subsection in §4 (build/run commands) and §5 (WebView2, dev URL notes).
@@ -54,7 +54,7 @@ feat
 - [ ] The devBridge is loopback-only (`127.0.0.1`) and not reachable off-loopback; it has no auth (test-only), like the separate daemon (DD-011).
 
 ## Acceptance Criteria
-- [ ] `cargo tauri dev` launches the desktop app loading `apps/my_supervisor/crates/desktop/ui` in a WebView, with the UI driving operations via `invoke`.
+- [ ] `cargo tauri dev` launches the desktop app loading `crates/desktop/ui` in a WebView, with the UI driving operations via `invoke`.
 - [ ] The devBridge answers the operations routes (e.g. `GET /api/v1/processes`) on its loopback port — mirroring the facade-backed `invoke` commands — with no auth.
 - [ ] Starting a process via the devBridge HTTP API starts a real OS child, verified via the API response (and equivalently via the matching `invoke` command).
 - [ ] Every `tauri invoke` handler delegates to the shared facade or a native API — none contains domain logic (verified by code review).
@@ -63,4 +63,4 @@ feat
 ## Open Questions
 - Should the devBridge be compiled out of release builds (test/dev-only), or always present (loopback-only)? (light default: present, loopback-only)
 - devBridge default port — reuse the daemon's `9876` (only one host typically runs at a time), or pick a distinct default so the daemon and desktop can run simultaneously? (recommend reuse `9876`, override when co-running)
-- Exact crate/dir layout for the Tauri host — follow the docs' `apps/my_supervisor/crates/desktop` placement and keep the React/Vite app under `ui/`.
+- Exact crate/dir layout for the Tauri host — follow the docs' `crates/desktop` placement and keep the React/Vite app under `ui/`.

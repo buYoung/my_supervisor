@@ -11,7 +11,7 @@
 | 도구 | 역할 | 설치 |
 |---|---|---|
 | [proto](https://moonrepo.dev/proto) | 언어·런타임 버전 관리. `.prototools`로 Node / Rust / pnpm 버전 고정 | 공식 설치 스크립트 참조 |
-| [pnpm](https://pnpm.io/) | 데스크톱 UI 의존성 관리 (`apps/my_supervisor/crates/desktop/ui`) | `./scripts/setup-proto.sh` |
+| [pnpm](https://pnpm.io/) | 데스크톱 UI 의존성 관리 (`crates/desktop/ui`) | `./scripts/setup-proto.sh` |
 
 현재 `.prototools`가 고정하는 버전:
 
@@ -34,7 +34,7 @@ pnpm = "10.11.0"
 ./scripts/setup-proto.sh
 
 # 2) 데스크톱 UI 의존성 설치
-pnpm --dir apps/my_supervisor/crates/desktop/ui install
+pnpm --dir crates/desktop/ui install
 ```
 
 각 스크립트의 동작:
@@ -45,13 +45,13 @@ pnpm --dir apps/my_supervisor/crates/desktop/ui install
 
 ## 3. 워크스페이스 구조
 
-Rust 크레이트 의존성은 `apps/my_supervisor/Cargo.toml`의 workspace members로 관리합니다. 데스크톱 UI는 `crates/desktop/ui` 하위의 독립 pnpm 프로젝트이며, Tauri 설정의 `beforeDevCommand` / `beforeBuildCommand`가 필요한 UI 명령을 실행합니다.
+Rust 크레이트 의존성은 `Cargo.toml`의 workspace members로 관리합니다. 데스크톱 UI는 `crates/desktop/ui` 하위의 독립 pnpm 프로젝트이며, Tauri 설정의 `beforeDevCommand` / `beforeBuildCommand`가 필요한 UI 명령을 실행합니다.
 
-`apps/my_supervisor/` 내부는 Hexagonal 레이어대로 중첩 폴더 구조:
+루트 workspace 내부는 Hexagonal 레이어대로 중첩 폴더 구조:
 
 ```
-apps/my_supervisor/
 ├── Cargo.toml            # Rust workspace 루트
+├── Cargo.lock
 ├── crates/
 │   ├── core/             # 도메인 + port trait
 │   ├── application/      # use case (ports 에만 의존)
@@ -73,7 +73,7 @@ apps/my_supervisor/
 │       └── ui/           # React/Vite UI
 ```
 
-`apps/my_supervisor/crates/desktop/ui/src/` 는 feature 단위:
+`crates/desktop/ui/src/` 는 feature 단위:
 
 ```
 features/{processes,jobs,logs,daemon,settings}/
@@ -84,7 +84,7 @@ shared/                   # 훅·타입·유틸 (theme.css — 토큰 단일 출
 
 각 레이어의 책임과 의존성 방향은 `ARCHITECTURE.md §3`, 설계 근거는 `DESIGN_DECISIONS.md DD-017 ~ DD-024` 참조.
 
-**Workspace members 선언 (`apps/my_supervisor/Cargo.toml`):**
+**Workspace members 선언 (`Cargo.toml`):**
 
 ```toml
 [workspace]
@@ -107,7 +107,7 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 
 ## 4. 빌드 / 테스트 / 실행
 
-기본 단위는 Cargo workspace입니다. UI 명령은 `apps/my_supervisor/crates/desktop/ui`에서 직접 실행하거나, `cargo tauri dev/build`가 Tauri 설정을 통해 실행합니다.
+기본 단위는 Cargo workspace입니다. UI 명령은 `crates/desktop/ui`에서 직접 실행하거나, `cargo tauri dev/build`가 Tauri 설정을 통해 실행합니다.
 
 ### Rust 크레이트
 
@@ -145,27 +145,27 @@ cargo fmt --all
 
 ### 프론트엔드 (React + Vite)
 
-위치: `apps/my_supervisor/crates/desktop/ui/` (`ARCHITECTURE.md` §3 · §4.8 참조).
+위치: `crates/desktop/ui/` (`ARCHITECTURE.md` §3 · §4.8 참조).
 
 ```bash
 # 개발 서버
-pnpm --dir apps/my_supervisor/crates/desktop/ui dev
+pnpm --dir crates/desktop/ui dev
 
 # UI 프로덕션 빌드
-pnpm --dir apps/my_supervisor/crates/desktop/ui build
+pnpm --dir crates/desktop/ui build
 
 # 타입 체크
-pnpm --dir apps/my_supervisor/crates/desktop/ui typecheck
+pnpm --dir crates/desktop/ui typecheck
 ```
 
 ### Tauri 앱
 
 ```bash
 # Tauri 개발 모드 (프론트엔드 dev 서버 + Rust 쉘)
-cargo tauri dev --manifest-path apps/my_supervisor/crates/desktop/Cargo.toml
+cargo tauri dev --manifest-path crates/desktop/Cargo.toml
 
 # 배포용 패키징
-cargo tauri build --manifest-path apps/my_supervisor/crates/desktop/Cargo.toml
+cargo tauri build --manifest-path crates/desktop/Cargo.toml
 ```
 
 ---

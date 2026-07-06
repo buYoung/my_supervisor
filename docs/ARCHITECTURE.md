@@ -55,35 +55,35 @@ GUI 의존성 없이 데몬과 CLI만 배포:
 
 ## 3. 모노레포 구조
 
-Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. 폴더는 카테고리 하위 중첩(`apps/my_supervisor/crates/platform/linux/`, `apps/my_supervisor/crates/infra/sqlite/`, `apps/my_supervisor/crates/daemon/`)을 사용한다. 데스크톱 앱도 Cargo workspace member인 `crates/desktop`으로 두고, React/Vite 프론트엔드는 그 하위 `ui/`에 둔다.
+Hexagonal 레이어를 **Cargo workspace 의 개별 crate** 로 분리한다. 폴더는 카테고리 하위 중첩(`crates/platform/linux/`, `crates/infra/sqlite/`, `crates/daemon/`)을 사용한다. 데스크톱 앱도 Cargo workspace member인 `crates/desktop`으로 두고, React/Vite 프론트엔드는 그 하위 `ui/`에 둔다.
 
 ```
 my-supervisor/
 ├── README.md
 ├── docs/
-├── apps/my_supervisor/
-│   ├── Cargo.toml                   # Rust workspace 루트
-│   ├── crates/
-│   │   ├── core/                    # 도메인 + port trait (std/serde/uuid 수준만 의존)
-│   │   ├── application/             # use case (ports 에만 의존)
-│   │   ├── shared/                  # wire types (HTTP/WS DTO, 설정 스키마 — serde)
-│   │   ├── config/                  # TOML 파싱·검증·watch (shared::config 재사용)
-│   │   ├── infra/
-│   │   │   ├── sqlite/              # StateRepository + JobRepository 구현 (sqlx/SQLite)
-│   │   │   ├── http/                # axum HTTP + WS hub (core::ports 소비)
-│   │   │   ├── logging/             # LogSink 구현 + 로테이션·백프레셔
-│   │   │   └── scheduler/           # Scheduler 구현
-│   │   ├── platform/
-│   │   │   └── macos/               # launchd, kqueue, macOS 프로세스 제어
-│   │   ├── daemon/                  # 공통 데몬 런타임 lib + thin bin (`msv-daemon`)
-│   │   ├── cli/                     # bin (`msv`) — shared 타입 재사용
-│   │   └── desktop/                 # Tauri 데스크톱 앱 crate
-│   │       ├── Cargo.toml
-│   │       ├── tauri.conf.json
-│   │       ├── src/main.rs
-│   │       └── ui/                  # React/Vite UI
-│   │           ├── package.json
-│   │           └── src/
+├── Cargo.toml                       # Rust workspace 루트
+├── Cargo.lock
+├── crates/
+│   ├── core/                        # 도메인 + port trait (std/serde/uuid 수준만 의존)
+│   ├── application/                 # use case (ports 에만 의존)
+│   ├── shared/                      # wire types (HTTP/WS DTO, 설정 스키마 — serde)
+│   ├── config/                      # TOML 파싱·검증·watch (shared::config 재사용)
+│   ├── infra/
+│   │   ├── sqlite/                  # StateRepository + JobRepository 구현 (sqlx/SQLite)
+│   │   ├── http/                    # axum HTTP + WS hub (core::ports 소비)
+│   │   ├── logging/                 # LogSink 구현 + 로테이션·백프레셔
+│   │   └── scheduler/               # Scheduler 구현
+│   ├── platform/
+│   │   └── macos/                   # launchd, kqueue, macOS 프로세스 제어
+│   ├── daemon/                      # 공통 데몬 런타임 lib + thin bin (`msv-daemon`)
+│   ├── cli/                         # bin (`msv`) — shared 타입 재사용
+│   └── desktop/                     # Tauri 데스크톱 앱 crate
+│       ├── Cargo.toml
+│       ├── tauri.conf.json
+│       ├── src/main.rs
+│       └── ui/                      # React/Vite UI
+│           ├── package.json
+│           └── src/
 └── scripts/
     ├── install-server.sh
     └── build-packages.sh
@@ -92,7 +92,7 @@ my-supervisor/
 **Workspace members 선언**:
 
 ```toml
-# apps/my_supervisor/Cargo.toml
+# Cargo.toml
 [workspace]
 members = [
     "crates/core",
@@ -136,7 +136,7 @@ Cargo 패키지명은 `my-supervisor-` prefix (예: `my-supervisor-core`, `my-su
 - **Infra 카테고리 분리**: SQLite → Postgres, axum → 다른 서버 프레임워크로의 교체가 `infra-sqlite` · `infra-http` 만 손대면 된다. `infra-logging` 도 같은 이유로 분리 — Phase 3 의 JSON 로테이션·백프레셔 변경이 다른 crate 를 건드리지 않는다.
 - **Server 배포 크기 최소화**: `cargo build -p my-supervisor-app-daemon` 은 `desktop` (Tauri, GTK/WebView2) 을 건드리지 않는다. 플랫폼별로도 `platform/<현재_OS>` 만 링크된다.
 - **`shared` 와 `core` 의 역할 분리**: `shared` 는 네트워크·파일로 나가는 **wire format** 만 (DTO, 설정 파일 스키마). `core` 는 **도메인 모델** 과 **port trait**. 둘을 섞지 않아야 API 스펙이 도메인 변경에 휘둘리지 않고, 역으로 도메인이 wire 포맷 호환성에 묶이지 않는다.
-- **Feature 단위 프론트엔드**: `apps/my_supervisor/crates/desktop/ui` 의 `features/*` 가 백엔드 port 분리와 대칭. 각 feature 폴더는 자기 UI + service 호출 + 훅을 자기 안에 둔다. 공용 shadcn 컴포넌트는 `components/ui`, HTTP/WS 클라이언트는 `services/` 에 분리.
+- **Feature 단위 프론트엔드**: `crates/desktop/ui` 의 `features/*` 가 백엔드 port 분리와 대칭. 각 feature 폴더는 자기 UI + service 호출 + 훅을 자기 안에 둔다. 공용 shadcn 컴포넌트는 `components/ui`, HTTP/WS 클라이언트는 `services/` 에 분리.
 
 ## 4. 컴포넌트 설계
 
@@ -202,7 +202,7 @@ msv ui                     # 브라우저로 WebUI 열기
 
 **책임:**
 - 코어 임베드 + 내장 axum HTTP/WS 서버 기동 (`127.0.0.1:<port>`)
-- WebView 에 `http://127.0.0.1:<port>` 로드 (번들된 `apps/my_supervisor/crates/desktop/ui` 를 서빙)
+- WebView 에 `http://127.0.0.1:<port>` 로드 (번들된 `crates/desktop/ui` 를 서빙)
 - 트레이 아이콘 + 메뉴 (창을 닫아도 tray 로 상주 → supervision 유지)
 - **macOS 자동화 권한(Accessibility / Input Monitoring) 보유 주체** — 윈도우·핫키 Rule 실행 (DD-027 · DD-029). 헤드리스 `daemon` 은 이 경로가 비활성
 - 네이티브 알림 (crash loop 진입 등)
@@ -214,11 +214,11 @@ msv ui                     # 브라우저로 WebUI 열기
 - `tauri-plugin-notification` — 네이티브 알림
 - `tauri-plugin-shell` — 브라우저 열기 등
 
-**프론트엔드:** `apps/my_supervisor/crates/desktop/ui` 빌드 산출물을 Tauri WebView 와 외부 브라우저가 **동일하게** 로드. Tauri 의 `invoke` IPC 에 의존하지 않고 순수 HTTP/WebSocket 만 사용 → 같은 UI 가 Server 배포의 브라우저 접속에도 그대로 작동. 근거는 DD-016.
+**프론트엔드:** `crates/desktop/ui` 빌드 산출물을 Tauri WebView 와 외부 브라우저가 **동일하게** 로드. Tauri 의 `invoke` IPC 에 의존하지 않고 순수 HTTP/WebSocket 만 사용 → 같은 UI 가 Server 배포의 브라우저 접속에도 그대로 작동. 근거는 DD-016.
 
 ### 4.2 Application — Use Case 레이어
 
-`apps/my_supervisor/crates/application`. `core::ports` 의 trait 만 소비하는 순수 로직. 각 use case 는 한 파일·한 struct.
+`crates/application`. `core::ports` 의 trait 만 소비하는 순수 로직. 각 use case 는 한 파일·한 struct.
 
 **Process 영역 use case:**
 
@@ -247,12 +247,12 @@ Use case 는 OS 를 모른다 (#[cfg] 없음). 모든 플랫폼 차이는 port �
 
 ### 4.3 Core — 도메인 + Ports
 
-`apps/my_supervisor/crates/core`. 프로젝트의 중심. 다른 워크스페이스 crate 에 **의존하지 않는다**.
+`crates/core`. 프로젝트의 중심. 다른 워크스페이스 crate 에 **의존하지 않는다**.
 
 **`core::domain`** — 값 객체와 엔티티.
 
 ```rust
-// apps/my_supervisor/crates/core/src/domain/process.rs 발췌
+// crates/core/src/domain/process.rs 발췌
 pub struct ProcessSpec {
     pub name: String,
     pub command: String,
@@ -287,7 +287,7 @@ pub struct ChildHandle {
 Job 영역의 도메인 타입은 §12 에 상세. 요약:
 
 ```rust
-// apps/my_supervisor/crates/core/src/domain/job.rs 발췌
+// crates/core/src/domain/job.rs 발췌
 pub struct Job {
     pub id: JobId,
     pub name: String,
@@ -315,7 +315,7 @@ pub enum JobRunState { Pending, Running, Succeeded, Failed, Cancelled, Skipped }
 Rule(자동화) 영역의 도메인 타입은 §13 에 상세. 요약:
 
 ```rust
-// apps/my_supervisor/crates/core/src/domain/rule.rs 발췌
+// crates/core/src/domain/rule.rs 발췌
 pub struct Rule {
     pub id: RuleId,
     pub name: String,
@@ -366,10 +366,10 @@ pub enum RuleFireState { Fired, ActionsSucceeded, ActionsFailed, Skipped }
 
 ### 4.4 Shared — Wire Types
 
-`apps/my_supervisor/crates/shared`. HTTP/WS DTO 와 TOML 설정 스키마만 담는다. `core` 와 분리된 이유: wire format 호환성 제약(`#[serde(rename_all = "snake_case")]` 같은 어노테이션)이 도메인 타입으로 누출되지 않게 하기 위함.
+`crates/shared`. HTTP/WS DTO 와 TOML 설정 스키마만 담는다. `core` 와 분리된 이유: wire format 호환성 제약(`#[serde(rename_all = "snake_case")]` 같은 어노테이션)이 도메인 타입으로 누출되지 않게 하기 위함.
 
 ```rust
-// apps/my_supervisor/crates/shared/src/api.rs 예시
+// crates/shared/src/api.rs 예시
 #[derive(Serialize, Deserialize)]
 pub struct ProcessStatusDto {
     pub name: String,
@@ -386,11 +386,11 @@ pub struct ProcessStatusDto {
 
 ### 4.5 Config
 
-`apps/my_supervisor/crates/config`. `ConfigSource` port 의 참조 구현. `shared::config` 스키마를 사용하여 TOML 을 파싱하고, `notify` 크레이트로 파일 변경을 감지한다. `core` 외에는 의존하지 않기 때문에 테스트에서 `InMemoryConfigSource` 와 교체 가능.
+`crates/config`. `ConfigSource` port 의 참조 구현. `shared::config` 스키마를 사용하여 TOML 을 파싱하고, `notify` 크레이트로 파일 변경을 감지한다. `core` 외에는 의존하지 않기 때문에 테스트에서 `InMemoryConfigSource` 와 교체 가능.
 
 ### 4.6 Infrastructure Adapters
 
-`apps/my_supervisor/crates/infra/*`. 기술 스택에 종속적인 port 구현.
+`crates/infra/*`. 기술 스택에 종속적인 port 구현.
 
 | Crate | 구현 port | 주요 의존 |
 |---|---|---|
@@ -403,7 +403,7 @@ pub struct ProcessStatusDto {
 
 ### 4.7 Platform Adapters
 
-`apps/my_supervisor/crates/platform/*`. OS 에 종속적인 port 구현. 각 crate 는 **자기 OS 에서만 컴파일**되도록 `[target]` 블록 또는 `#[cfg]` 로 가드한다.
+`crates/platform/*`. OS 에 종속적인 port 구현. 각 crate 는 **자기 OS 에서만 컴파일**되도록 `[target]` 블록 또는 `#[cfg]` 로 가드한다.
 
 | Crate | 대표 구현 | OS-native API |
 |---|---|---|
@@ -432,12 +432,12 @@ let lifecycle: Arc<dyn LifecycleController> =
 
 이후 `application` 레이어는 `Arc<dyn LifecycleController>` 만 보고 동작 → OS 분기가 application 코드에는 전혀 등장하지 않는다.
 
-### 4.8 Frontend (`apps/my_supervisor/crates/desktop/ui`)
+### 4.8 Frontend (`crates/desktop/ui`)
 
 React + Vite 기반 단일 번들. feature 단위로 모듈화한다 (DD-020).
 
 ```
-apps/my_supervisor/crates/desktop/ui/src/
+crates/desktop/ui/src/
 ├── features/
 │   ├── processes/    # [운영] 목록 / 상세 / 시작·중지·재시작 / 설정 폼
 │   ├── jobs/         # [운영] Jobs 목록 / 상세(Overview·Runs·Config·Dependencies) / Run 상세 / 수동 트리거
@@ -553,7 +553,7 @@ WebSocket 채널은 연결 해제 시 close frame의 reason에 같은 `code`를 
 생명주기 제어는 **OS별로 사용하는 커널 기능이 완전히 다르다**. 같은 "tied 모드"여도 Linux 는 `PR_SET_PDEATHSIG`, Windows 는 Job Object 의 `KILL_ON_JOB_CLOSE`, macOS 는 shutdown hook 이라는 식. 이 차이를 `application` 레이어가 알면 코드가 3중 분기투성이가 된다. 따라서 단일 port trait 로 묶고 OS crate 가 각자 구현한다.
 
 ```rust
-// apps/my_supervisor/crates/core/src/ports/lifecycle.rs
+// crates/core/src/ports/lifecycle.rs
 #[async_trait]
 pub trait LifecycleController: Send + Sync {
     async fn spawn_tied(&self, spec: &ProcessSpec) -> Result<ChildHandle, SpawnError>;
@@ -574,7 +574,7 @@ pub trait LifecycleController: Send + Sync {
 `application::StartProcess` 는 위 표의 어느 항목도 직접 알지 않는다. 또한 `management_mode` 에 따라 `LifecycleController` (Direct) 또는 `ProcessServiceRegistrar` (SystemRegistered) 로 분기한다 (§6.4 참조):
 
 ```rust
-// apps/my_supervisor/crates/application/src/start_process.rs 발췌
+// crates/application/src/start_process.rs 발췌
 pub async fn start_process(
     spec: &ProcessSpec,
     lifecycle: &dyn LifecycleController,
@@ -644,7 +644,7 @@ pub async fn start_process(
 자식 프로세스로 "정지하라" 는 신호를 보내는 방식은 OS 마다 다르지만, `application` 레이어에는 "정상 요청 → grace period → 강제 종료" 라는 동일한 논리가 있다. 이를 port 로 추상화한다.
 
 ```rust
-// apps/my_supervisor/crates/core/src/ports/shutdown.rs
+// crates/core/src/ports/shutdown.rs
 #[async_trait]
 pub trait ShutdownSignaler: Send + Sync {
     async fn request_graceful(&self, target: &ChildHandle, cfg: &ShutdownPolicy)
@@ -806,7 +806,7 @@ OS 서비스 매니저(systemd user unit / launchd agent / Windows Service) 와�
 #### Port: `AutoStartService`
 
 ```rust
-// apps/my_supervisor/crates/core/src/ports/autostart.rs
+// crates/core/src/ports/autostart.rs
 #[async_trait]
 pub trait AutoStartService: Send + Sync {
     async fn enable(&self, scope: AutoStartScope) -> Result<(), AutoStartError>;
@@ -834,7 +834,7 @@ UI/CLI 는 `AutoStartService` trait 만 호출 → OS 분기는 `daemon` DI 지�
 #### Port: `ProcessServiceRegistrar`
 
 ```rust
-// apps/my_supervisor/crates/core/src/ports/process_service.rs
+// crates/core/src/ports/process_service.rs
 #[async_trait]
 pub trait ProcessServiceRegistrar: Send + Sync {
     /// unit 파일 생성 + register (daemon-reload 등 부수 절차 포함).
