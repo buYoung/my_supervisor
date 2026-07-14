@@ -53,6 +53,42 @@ pub struct ProcessListDto {
     pub processes: Vec<ProcessStatusDto>,
 }
 
+/// Restart settings shared by TOML config and process-registration requests.
+/// Jitter follows the selected backoff library's timing behavior.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct RestartPolicyDto {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_retries: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backoff_initial_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backoff_max_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backoff_multiplier: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jitter: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_after_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ShutdownSignalDto {
+    Term,
+    Int,
+    Kill,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ShutdownPolicyDto {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signal: Option<ShutdownSignalDto>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grace_period_ms: Option<u64>,
+}
+
 /// POST `/api/v1/processes` body — one `[[process]]` config entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProcessConfigDto {
@@ -70,6 +106,10 @@ pub struct ProcessConfigDto {
     pub lifecycle: Option<LifecycleModeDto>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autostart: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restart: Option<RestartPolicyDto>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shutdown: Option<ShutdownPolicyDto>,
 }
 
 /// Response of `POST /api/v1/processes/{name}/restart` for SystemRegistered
@@ -227,6 +267,14 @@ pub struct JobRunListDto {
     pub truncated: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct LogRetentionDto {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_runs: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_age_days: Option<u32>,
+}
+
 /// POST `/api/v1/jobs` body — one `[[job]]` config entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct JobConfigDto {
@@ -245,6 +293,8 @@ pub struct JobConfigDto {
     pub on_dependency_failure: Option<OnDependencyFailureDto>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_sec: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log_retention: Option<LogRetentionDto>,
 }
 
 // ---------------------------------------------------------------------------

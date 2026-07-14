@@ -8,4 +8,5 @@ license.workspace = true
 my-supervisor-core = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
-tokio = { version = "1", default-features = false, features = ["sync"] }
+serde_json = { workspace = true }
+tokio = { version = "1", default-features = false, features = ["sync", "fs", "io-util"] }

@@ -35,6 +35,7 @@ my-supervisor-app-daemon = { path = "crates/daemon" }
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 futures-util = "0.3"
+backon = "1.6"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

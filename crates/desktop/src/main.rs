@@ -211,6 +211,7 @@ fn main() {
                 facade.bootstrap().await.ok();
             });
             tauri::async_runtime::spawn(facade.clone().run_scheduler_loop());
+            tauri::async_runtime::spawn(facade.clone().run_process_supervisor_loop());
 
             let data_dir = data_dir();
             let port = std::env::var("MSV_DEVBRIDGE_PORT")

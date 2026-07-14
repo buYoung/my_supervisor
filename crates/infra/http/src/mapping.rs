@@ -10,13 +10,13 @@ use my_supervisor_application::views::{DaemonInfo, JobView, LogPage};
 use my_supervisor_core::domain::{
     DependencyFailurePolicy, Job, JobId, JobRun, JobRunState, JobTrigger, LifecycleMode, LogLine,
     LogRetention, LogStream, ManagementMode, OverlapPolicy, ProcessSpec, ProcessState,
-    ProcessStatus, RestartPolicy, ShutdownPolicy, TriggeredBy,
+    ProcessStatus, RestartPolicy, ShutdownPolicy, ShutdownSignal, TriggeredBy,
 };
 use my_supervisor_shared::api::{
     DaemonStatusDto, JobConfigDto, JobDependenciesDto, JobRunDto, JobRunStateDto, JobRunSummaryDto,
     JobStatusDto, JobTriggerDto, LifecycleModeDto, LogLineDto, LogStreamDto, LogsResponseDto,
     ManagementModeDto, OnDependencyFailureDto, OnOverlapDto, ProcessConfigDto, ProcessStateDto,
-    ProcessStatusDto, TriggeredByDto,
+    ProcessStatusDto, RestartPolicyDto, ShutdownPolicyDto, ShutdownSignalDto, TriggeredByDto,
 };
 
 // --- domain -> DTO ----------------------------------------------------------
@@ -172,6 +172,51 @@ pub fn daemon_info_to_dto(info: DaemonInfo) -> DaemonStatusDto {
 
 // --- DTO -> domain (request bodies) ----------------------------------------
 
+fn restart_policy(dto: Option<RestartPolicyDto>) -> RestartPolicy {
+    let defaults = RestartPolicy::default();
+    let Some(dto) = dto else {
+        return defaults;
+    };
+    RestartPolicy {
+        enabled: dto.enabled.unwrap_or(defaults.enabled),
+        max_retries: dto.max_retries,
+        backoff_initial: Duration::from_millis(
+            dto.backoff_initial_ms
+                .unwrap_or(defaults.backoff_initial.as_millis() as u64),
+        ),
+        backoff_max: Duration::from_millis(
+            dto.backoff_max_ms
+                .unwrap_or(defaults.backoff_max.as_millis() as u64),
+        ),
+        backoff_multiplier: dto
+            .backoff_multiplier
+            .unwrap_or(defaults.backoff_multiplier),
+        jitter: dto.jitter.unwrap_or(defaults.jitter),
+        reset_after: Duration::from_millis(
+            dto.reset_after_ms
+                .unwrap_or(defaults.reset_after.as_millis() as u64),
+        ),
+    }
+}
+
+fn shutdown_policy(dto: Option<ShutdownPolicyDto>) -> ShutdownPolicy {
+    let defaults = ShutdownPolicy::default();
+    let Some(dto) = dto else {
+        return defaults;
+    };
+    ShutdownPolicy {
+        signal: match dto.signal {
+            Some(ShutdownSignalDto::Int) => ShutdownSignal::Int,
+            Some(ShutdownSignalDto::Kill) => ShutdownSignal::Kill,
+            _ => ShutdownSignal::Term,
+        },
+        grace_period: Duration::from_millis(
+            dto.grace_period_ms
+                .unwrap_or(defaults.grace_period.as_millis() as u64),
+        ),
+    }
+}
+
 pub fn process_config_to_spec(dto: ProcessConfigDto) -> ProcessSpec {
     let management_mode = match dto.management_mode {
         Some(ManagementModeDto::SystemRegistered { unit_name }) => {
@@ -192,8 +237,8 @@ pub fn process_config_to_spec(dto: ProcessConfigDto) -> ProcessSpec {
         management_mode,
         lifecycle,
         autostart: dto.autostart.unwrap_or(false),
-        restart: RestartPolicy::default(),
-        shutdown: ShutdownPolicy::default(),
+        restart: restart_policy(dto.restart),
+        shutdown: shutdown_policy(dto.shutdown),
     }
 }
 
@@ -227,6 +272,12 @@ pub fn job_config_to_job(dto: JobConfigDto) -> Job {
             _ => DependencyFailurePolicy::Skip,
         },
         timeout: dto.timeout_sec.map(Duration::from_secs),
-        log_retention: LogRetention::default(),
+        log_retention: dto
+            .log_retention
+            .map(|retention| LogRetention {
+                max_runs: retention.max_runs,
+                max_age_days: retention.max_age_days,
+            })
+            .unwrap_or_default(),
     }
 }

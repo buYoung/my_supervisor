@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 
-use crate::domain::{ChildHandle, JobRunId, ProcessSpec};
+use crate::domain::{ChildHandle, JobRunId, LogLine, ProcessSpec};
 
 /// Result of an aliveness probe.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +52,13 @@ pub trait LifecycleController: Send + Sync {
     async fn spawn_detached(&self, spec: &ProcessSpec) -> Result<ChildHandle, SpawnError>;
     /// Check whether a previously-spawned child is still alive.
     async fn probe_alive(&self, handle: &ChildHandle) -> Result<Aliveness, ProbeError>;
+    /// Read logs written directly by a detached child so they remain available
+    /// while the daemon is not running.
+    async fn tail_detached_logs(
+        &self,
+        spec: &ProcessSpec,
+        lines: usize,
+    ) -> Result<Vec<LogLine>, ProbeError>;
     /// Clean up the given handles during daemon shutdown.
     async fn reap_on_shutdown(&self, handles: &[ChildHandle]) -> Result<(), ReapError>;
     /// Spawn a transient process, capture its output to the run log, wait for

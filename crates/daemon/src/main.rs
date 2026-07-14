@@ -25,6 +25,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("bootstrap (config load + scheduler arm + autostart)")?;
     tokio::spawn(facade.clone().run_scheduler_loop());
+    tokio::spawn(facade.clone().run_process_supervisor_loop());
 
     let listener = TcpListener::bind(DEFAULT_BIND_ADDR)
         .await

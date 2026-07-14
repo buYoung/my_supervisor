@@ -43,8 +43,8 @@ pub async fn build_deps() -> anyhow::Result<AppDeps> {
         .map(|path| path.join("my-supervisor").join("config.toml"))
         .unwrap_or_else(|| base.join("config.toml"));
 
-    let log_sink: Arc<dyn LogSink> = Arc::new(InMemoryLogSink::new());
-    let (lifecycle, shutdown) = platform_adapters(log_sink.clone());
+    let log_sink: Arc<dyn LogSink> = Arc::new(InMemoryLogSink::with_log_dir(log_dir.clone()));
+    let (lifecycle, shutdown) = platform_adapters(log_sink.clone(), log_dir.clone());
     let registrar = process_service_registrar(log_dir.clone());
 
     let store = Arc::new(
@@ -70,10 +70,11 @@ pub async fn build_deps() -> anyhow::Result<AppDeps> {
 #[cfg(target_os = "macos")]
 fn platform_adapters(
     log_sink: Arc<dyn LogSink>,
+    log_dir: PathBuf,
 ) -> (Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>) {
     use my_supervisor_platform_macos::{MacLifecycle, UnixShutdown};
     (
-        Arc::new(MacLifecycle::new(log_sink)),
+        Arc::new(MacLifecycle::new(log_sink, log_dir)),
         Arc::new(UnixShutdown::new()),
     )
 }
@@ -81,6 +82,7 @@ fn platform_adapters(
 #[cfg(not(target_os = "macos"))]
 fn platform_adapters(
     _log_sink: Arc<dyn LogSink>,
+    _log_dir: PathBuf,
 ) -> (Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>) {
     unimplemented!("daemon runtime currently supports macOS only (Linux/Windows deferred)")
 }

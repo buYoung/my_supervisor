@@ -6,9 +6,15 @@ license.workspace = true
 
 [dependencies]
 my-supervisor-core = { workspace = true }
+backon = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { version = "1", default-features = false, features = ["sync", "rt", "macros", "time"] }
+
+[dev-dependencies]
+my-supervisor-infra-logging = { workspace = true }
+my-supervisor-infra-scheduler = { workspace = true }
+my-supervisor-infra-sqlite = { workspace = true }

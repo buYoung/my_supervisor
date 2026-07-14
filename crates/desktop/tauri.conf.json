@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.my-supervisor.desktop",
   "build": {
-    "beforeDevCommand": "pnpm --dir ui dev",
-    "beforeBuildCommand": "pnpm --dir ui build",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "ui/dist",
     "devUrl": "http://localhost:5173"
   },

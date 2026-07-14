@@ -8,8 +8,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use my_supervisor_shared::api::{
-    DaemonStatusDto, JobConfigDto, JobListDto, JobRunListDto, LogsResponseDto, ProcessConfigDto,
-    ProcessListDto,
+    ConvertRequestDto, DaemonStatusDto, JobConfigDto, JobListDto, JobRunListDto, JobStatusDto,
+    LogsResponseDto, ProcessConfigDto, ProcessListDto, ProcessStatusDto, RestartNoopDto,
 };
 use my_supervisor_shared::error::ErrorBody;
 
@@ -22,6 +22,21 @@ pub enum CliError {
     DaemonDown,
     /// Any other API error or local failure — exit 1.
     Failed(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Client;
+
+    #[test]
+    fn resource_names_are_encoded_as_one_path_segment() {
+        assert_eq!(Client::encode_path_segment("name with/slash"), "name%20with%2Fslash");
+    }
+
+    #[test]
+    fn unsupported_url_scheme_is_rejected() {
+        assert!(Client::new("ftp://localhost").is_err());
+    }
 }
 
 impl CliError {
@@ -50,11 +65,32 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(base: impl Into<String>) -> Self {
-        Client {
-            base: base.into().trim_end_matches('/').to_string(),
-            http: reqwest::Client::new(),
+    pub fn new(base: impl Into<String>) -> Result<Self, CliError> {
+        let base = base.into();
+        let parsed = reqwest::Url::parse(&base)
+            .map_err(|error| CliError::Failed(format!("invalid --url: {error}")))?;
+        if !matches!(parsed.scheme(), "http" | "https") {
+            return Err(CliError::Failed(
+                "invalid --url: only http and https are supported".into(),
+            ));
         }
+        let http = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(3))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|error| CliError::Failed(format!("building HTTP client: {error}")))?;
+        Ok(Client {
+            base: base.trim_end_matches('/').to_string(),
+            http,
+        })
+    }
+
+    fn encode_path_segment(value: &str) -> String {
+        let mut url = reqwest::Url::parse("http://localhost/").expect("static URL is valid");
+        url.path_segments_mut()
+            .expect("static URL accepts path segments")
+            .push(value);
+        url.path().trim_start_matches('/').to_string()
     }
 
     async fn send(
@@ -84,7 +120,7 @@ impl Client {
         let status = resp.status();
         let envelope = resp.json::<ErrorBody>().await.ok();
         match envelope {
-            Some(b) if b.error.code == "process_not_found" => {
+            Some(b) if b.error.code.ends_with("_not_found") => {
                 Err(CliError::NotFound(b.error.message))
             }
             Some(b) => Err(CliError::Failed(format!(
@@ -106,7 +142,13 @@ impl Client {
         self.get_json("/api/v1/processes").await
     }
 
+    pub async fn get_process(&self, name: &str) -> Result<ProcessStatusDto, CliError> {
+        let name = Self::encode_path_segment(name);
+        self.get_json(&format!("/api/v1/processes/{name}")).await
+    }
+
     pub async fn process_action(&self, name: &str, action: &str) -> Result<(), CliError> {
+        let name = Self::encode_path_segment(name);
         self.send(
             Method::POST,
             &format!("/api/v1/processes/{name}/{action}"),
@@ -117,6 +159,7 @@ impl Client {
     }
 
     pub async fn stop(&self, name: &str, force: bool) -> Result<(), CliError> {
+        let name = Self::encode_path_segment(name);
         let q = if force { "?force=true" } else { "" };
         self.send(
             Method::POST,
@@ -127,7 +170,29 @@ impl Client {
         .map(|_| ())
     }
 
+    pub async fn restart(&self, name: &str) -> Result<Option<RestartNoopDto>, CliError> {
+        let name = Self::encode_path_segment(name);
+        let response = self
+            .send(
+                Method::POST,
+                &format!("/api/v1/processes/{name}/restart"),
+                None,
+            )
+            .await?;
+        let body = response
+            .bytes()
+            .await
+            .map_err(|error| CliError::Failed(format!("reading response: {error}")))?;
+        if body.is_empty() {
+            return Ok(None);
+        }
+        serde_json::from_slice(&body)
+            .map(Some)
+            .map_err(|error| CliError::Failed(format!("decoding response: {error}")))
+    }
+
     pub async fn remove(&self, name: &str, force: bool) -> Result<(), CliError> {
+        let name = Self::encode_path_segment(name);
         let q = if force { "?force=true" } else { "" };
         self.send(
             Method::DELETE,
@@ -152,13 +217,28 @@ impl Client {
             .map(|_| ())
     }
 
+    pub async fn remove_job(&self, name: &str, force: bool) -> Result<(), CliError> {
+        let name = Self::encode_path_segment(name);
+        let query = if force { "?force=true" } else { "" };
+        self.send(Method::DELETE, &format!("/api/v1/jobs/{name}{query}"), None)
+            .await
+            .map(|_| ())
+    }
+
     pub async fn process_logs(&self, name: &str, tail: usize) -> Result<LogsResponseDto, CliError> {
+        let name = Self::encode_path_segment(name);
         self.get_json(&format!("/api/v1/processes/{name}/logs?tail={tail}"))
             .await
     }
 
     pub async fn reload(&self) -> Result<(), CliError> {
         self.send(Method::POST, "/api/v1/daemon/reload", None)
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn shutdown(&self) -> Result<(), CliError> {
+        self.send(Method::POST, "/api/v1/daemon/shutdown", None)
             .await
             .map(|_| ())
     }
@@ -171,7 +251,13 @@ impl Client {
         self.get_json("/api/v1/jobs").await
     }
 
+    pub async fn get_job(&self, name: &str) -> Result<JobStatusDto, CliError> {
+        let name = Self::encode_path_segment(name);
+        self.get_json(&format!("/api/v1/jobs/{name}")).await
+    }
+
     pub async fn trigger_job(&self, name: &str) -> Result<String, CliError> {
+        let name = Self::encode_path_segment(name);
         let resp = self
             .send(Method::POST, &format!("/api/v1/jobs/{name}/trigger"), None)
             .await?;
@@ -179,26 +265,38 @@ impl Client {
             .json::<Value>()
             .await
             .map_err(|e| CliError::Failed(e.to_string()))?;
-        Ok(value
+        value
             .get("run_id")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string())
+            .filter(|run_id| !run_id.is_empty())
+            .map(str::to_string)
+            .ok_or_else(|| CliError::Failed("response did not contain run_id".into()))
     }
 
     pub async fn list_runs(&self, name: &str, limit: usize) -> Result<JobRunListDto, CliError> {
+        let name = Self::encode_path_segment(name);
         self.get_json(&format!("/api/v1/jobs/{name}/runs?limit={limit}"))
             .await
     }
 
-    /// WebSocket base (`ws://…`) derived from the HTTP base URL.
-    pub fn ws_base(&self) -> String {
-        if let Some(rest) = self.base.strip_prefix("https://") {
-            format!("wss://{rest}")
-        } else if let Some(rest) = self.base.strip_prefix("http://") {
-            format!("ws://{rest}")
-        } else {
-            self.base.clone()
-        }
+    pub async fn convert_process(
+        &self,
+        name: &str,
+        request: &ConvertRequestDto,
+    ) -> Result<ProcessStatusDto, CliError> {
+        let name = Self::encode_path_segment(name);
+        let body = serde_json::to_value(request).map_err(|error| CliError::Failed(error.to_string()))?;
+        let response = self
+            .send(
+                Method::POST,
+                &format!("/api/v1/processes/{name}/convert"),
+                Some(body),
+            )
+            .await?;
+        response
+            .json::<ProcessStatusDto>()
+            .await
+            .map_err(|error| CliError::Failed(format!("decoding response: {error}")))
     }
+
 }

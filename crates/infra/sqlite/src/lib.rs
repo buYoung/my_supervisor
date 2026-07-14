@@ -15,7 +15,7 @@ use sqlx::{Row, SqlitePool};
 
 use my_supervisor_core::domain::{
     Job, JobId, JobRun, JobRunId, JobRunState, LifecycleMode, LogRetention, ManagementMode,
-    ProcessSpec, RestartPolicy, ShutdownPolicy,
+    ProcessSpec, RestartPolicy, ShutdownPolicy, ShutdownSignal,
 };
 use my_supervisor_core::ports::error::RepoError;
 use my_supervisor_core::ports::{JobRepository, StateRepository};
@@ -153,6 +153,85 @@ impl SqliteStore {
                 .await
                 .map_err(backend)?;
         }
+        self.ensure_process_spec_column("restart_enabled", "INTEGER NOT NULL DEFAULT 1")
+            .await?;
+        self.ensure_process_spec_column("restart_max_retries", "INTEGER")
+            .await?;
+        self.ensure_process_spec_column(
+            "restart_backoff_initial_ms",
+            "INTEGER NOT NULL DEFAULT 1000",
+        )
+        .await?;
+        self.ensure_process_spec_column(
+            "restart_backoff_max_ms",
+            "INTEGER NOT NULL DEFAULT 60000",
+        )
+        .await?;
+        self.ensure_process_spec_column(
+            "restart_backoff_multiplier",
+            "INTEGER NOT NULL DEFAULT 2",
+        )
+        .await?;
+        self.ensure_process_spec_column("restart_jitter", "INTEGER NOT NULL DEFAULT 1")
+            .await?;
+        self.ensure_process_spec_column(
+            "restart_reset_after_ms",
+            "INTEGER NOT NULL DEFAULT 60000",
+        )
+        .await?;
+        self.ensure_process_spec_column("runtime_process_id", "TEXT")
+            .await?;
+        self.ensure_process_spec_column("runtime_pid", "INTEGER")
+            .await?;
+        self.ensure_process_spec_column("runtime_started_at", "TEXT")
+            .await?;
+        self.ensure_process_spec_column("shutdown_signal", "TEXT NOT NULL DEFAULT 'term'")
+            .await?;
+        self.ensure_process_spec_column(
+            "shutdown_grace_period_ms",
+            "INTEGER NOT NULL DEFAULT 10000",
+        )
+        .await?;
+        self.ensure_table_column("jobs", "log_retention_max_runs", "INTEGER")
+            .await?;
+        self.ensure_table_column("jobs", "log_retention_max_age_days", "INTEGER")
+            .await?;
+        Ok(())
+    }
+
+    async fn ensure_process_spec_column(
+        &self,
+        column_name: &str,
+        definition: &str,
+    ) -> Result<(), RepoError> {
+        self.ensure_table_column("process_specs", column_name, definition)
+            .await
+    }
+
+    async fn ensure_table_column(
+        &self,
+        table_name: &str,
+        column_name: &str,
+        definition: &str,
+    ) -> Result<(), RepoError> {
+        let columns = sqlx::query(&format!("PRAGMA table_info({table_name})"))
+            .fetch_all(&self.pool)
+            .await
+            .map_err(backend)?;
+        let exists = columns.iter().any(|row| {
+            row.try_get::<String, _>("name")
+                .map(|name| name == column_name)
+                .unwrap_or(false)
+        });
+        if !exists {
+            let statement = format!(
+                "ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
+            );
+            sqlx::query(&statement)
+                .execute(&self.pool)
+                .await
+                .map_err(backend)?;
+        }
         Ok(())
     }
 }
@@ -179,6 +258,26 @@ fn spec_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<ProcessSpec, RepoError
     let env: String = row.try_get("env").map_err(backend)?;
     let cwd: Option<String> = row.try_get("cwd").map_err(backend)?;
     let autostart: i64 = row.try_get("autostart").map_err(backend)?;
+    let restart_enabled: i64 = row.try_get("restart_enabled").map_err(backend)?;
+    let restart_max_retries: Option<i64> =
+        row.try_get("restart_max_retries").map_err(backend)?;
+    let restart_backoff_initial_ms: i64 = row
+        .try_get("restart_backoff_initial_ms")
+        .map_err(backend)?;
+    let restart_backoff_max_ms: i64 = row
+        .try_get("restart_backoff_max_ms")
+        .map_err(backend)?;
+    let restart_backoff_multiplier: i64 = row
+        .try_get("restart_backoff_multiplier")
+        .map_err(backend)?;
+    let restart_jitter: i64 = row.try_get("restart_jitter").map_err(backend)?;
+    let restart_reset_after_ms: i64 = row
+        .try_get("restart_reset_after_ms")
+        .map_err(backend)?;
+    let shutdown_signal: String = row.try_get("shutdown_signal").map_err(backend)?;
+    let shutdown_grace_period_ms: i64 = row
+        .try_get("shutdown_grace_period_ms")
+        .map_err(backend)?;
 
     Ok(ProcessSpec {
         name: row.try_get("name").map_err(backend)?,
@@ -193,8 +292,31 @@ fn spec_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<ProcessSpec, RepoError
             LifecycleMode::Tied
         },
         autostart: autostart != 0,
-        restart: RestartPolicy::default(),
-        shutdown: ShutdownPolicy::default(),
+        restart: RestartPolicy {
+            enabled: restart_enabled != 0,
+            max_retries: restart_max_retries.map(|value| value.max(0) as u32),
+            backoff_initial: std::time::Duration::from_millis(
+                restart_backoff_initial_ms.max(0) as u64,
+            ),
+            backoff_max: std::time::Duration::from_millis(
+                restart_backoff_max_ms.max(0) as u64,
+            ),
+            backoff_multiplier: restart_backoff_multiplier.max(1) as u32,
+            jitter: restart_jitter != 0,
+            reset_after: std::time::Duration::from_millis(
+                restart_reset_after_ms.max(0) as u64,
+            ),
+        },
+        shutdown: ShutdownPolicy {
+            signal: match shutdown_signal.as_str() {
+                "int" => ShutdownSignal::Int,
+                "kill" => ShutdownSignal::Kill,
+                _ => ShutdownSignal::Term,
+            },
+            grace_period: std::time::Duration::from_millis(
+                shutdown_grace_period_ms.max(0) as u64,
+            ),
+        },
     })
 }
 
@@ -207,6 +329,11 @@ fn job_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<Job, RepoError> {
     let on_overlap: String = row.try_get("on_overlap").map_err(backend)?;
     let on_dep: String = row.try_get("on_dependency_failure").map_err(backend)?;
     let timeout: Option<i64> = row.try_get("timeout_sec").map_err(backend)?;
+    let log_retention_max_runs: Option<i64> =
+        row.try_get("log_retention_max_runs").map_err(backend)?;
+    let log_retention_max_age_days: Option<i64> = row
+        .try_get("log_retention_max_age_days")
+        .map_err(backend)?;
 
     let trigger_repr: TriggerRepr = serde_json::from_str(&trigger).map_err(backend)?;
 
@@ -228,7 +355,10 @@ fn job_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<Job, RepoError> {
             _ => my_supervisor_core::domain::DependencyFailurePolicy::Skip,
         },
         timeout: timeout.map(|s| std::time::Duration::from_secs(s as u64)),
-        log_retention: LogRetention::default(),
+        log_retention: LogRetention {
+            max_runs: log_retention_max_runs.map(|value| value.max(0) as u32),
+            max_age_days: log_retention_max_age_days.map(|value| value.max(0) as u32),
+        },
     })
 }
 
@@ -285,10 +415,20 @@ impl StateRepository for SqliteStore {
             LifecycleMode::Tied => "tied",
             LifecycleMode::Detached => "detached",
         };
+        let shutdown_signal = match spec.shutdown.signal {
+            ShutdownSignal::Term => "term",
+            ShutdownSignal::Int => "int",
+            ShutdownSignal::Kill => "kill",
+        };
         sqlx::query(
             r#"INSERT INTO process_specs
-                (name, command, args, cwd, env, mode, unit_name, lifecycle, autostart, restart_count)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT restart_count FROM process_specs WHERE name = ?), 0))
+                (name, command, args, cwd, env, mode, unit_name, lifecycle, autostart,
+                 restart_enabled, restart_max_retries, restart_backoff_initial_ms,
+                 restart_backoff_max_ms, restart_backoff_multiplier, restart_jitter,
+                 restart_reset_after_ms, shutdown_signal, shutdown_grace_period_ms,
+                 restart_count)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                       COALESCE((SELECT restart_count FROM process_specs WHERE name = ?), 0))
                ON CONFLICT(name) DO UPDATE SET
                 command = excluded.command,
                 args = excluded.args,
@@ -297,7 +437,16 @@ impl StateRepository for SqliteStore {
                 mode = excluded.mode,
                 unit_name = excluded.unit_name,
                 lifecycle = excluded.lifecycle,
-                autostart = excluded.autostart"#,
+                autostart = excluded.autostart,
+                restart_enabled = excluded.restart_enabled,
+                restart_max_retries = excluded.restart_max_retries,
+                restart_backoff_initial_ms = excluded.restart_backoff_initial_ms,
+                restart_backoff_max_ms = excluded.restart_backoff_max_ms,
+                restart_backoff_multiplier = excluded.restart_backoff_multiplier,
+                restart_jitter = excluded.restart_jitter,
+                restart_reset_after_ms = excluded.restart_reset_after_ms,
+                shutdown_signal = excluded.shutdown_signal,
+                shutdown_grace_period_ms = excluded.shutdown_grace_period_ms"#,
         )
         .bind(&spec.name)
         .bind(&spec.command)
@@ -308,6 +457,15 @@ impl StateRepository for SqliteStore {
         .bind(unit_name)
         .bind(lifecycle)
         .bind(spec.autostart as i64)
+        .bind(spec.restart.enabled as i64)
+        .bind(spec.restart.max_retries.map(i64::from))
+        .bind(spec.restart.backoff_initial.as_millis().min(i64::MAX as u128) as i64)
+        .bind(spec.restart.backoff_max.as_millis().min(i64::MAX as u128) as i64)
+        .bind(i64::from(spec.restart.backoff_multiplier))
+        .bind(spec.restart.jitter as i64)
+        .bind(spec.restart.reset_after.as_millis().min(i64::MAX as u128) as i64)
+        .bind(shutdown_signal)
+        .bind(spec.shutdown.grace_period.as_millis().min(i64::MAX as u128) as i64)
         .bind(&spec.name)
         .execute(&self.pool)
         .await
@@ -348,6 +506,58 @@ impl StateRepository for SqliteStore {
             .map_err(backend)?;
         Ok(())
     }
+
+    async fn get_runtime_handle(&self, name: &str) -> Result<Option<my_supervisor_core::domain::ChildHandle>, RepoError> {
+        let row = sqlx::query(
+            "SELECT runtime_process_id, runtime_pid, runtime_started_at FROM process_specs WHERE name = ?",
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(backend)?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let process_id: Option<String> = row.try_get("runtime_process_id").map_err(backend)?;
+        let pid: Option<i64> = row.try_get("runtime_pid").map_err(backend)?;
+        let started_at: Option<String> = row.try_get("runtime_started_at").map_err(backend)?;
+        match (process_id, pid, started_at) {
+            (Some(process_id), Some(pid), Some(started_at)) => Ok(Some(
+                my_supervisor_core::domain::ChildHandle {
+                    process_id: uuid::Uuid::parse_str(&process_id).map_err(backend)?,
+                    pid: u32::try_from(pid).map_err(backend)?,
+                    started_at: str_to_dt(&started_at)?,
+                },
+            )),
+            _ => Ok(None),
+        }
+    }
+
+    async fn set_runtime_handle(
+        &self,
+        name: &str,
+        handle: Option<&my_supervisor_core::domain::ChildHandle>,
+    ) -> Result<(), RepoError> {
+        let (process_id, pid, started_at) = match handle {
+            Some(handle) => (
+                Some(handle.process_id.to_string()),
+                Some(i64::from(handle.pid)),
+                Some(dt_to_str(&handle.started_at)),
+            ),
+            None => (None, None, None),
+        };
+        sqlx::query(
+            "UPDATE process_specs SET runtime_process_id = ?, runtime_pid = ?, runtime_started_at = ? WHERE name = ?",
+        )
+        .bind(process_id)
+        .bind(pid)
+        .bind(started_at)
+        .bind(name)
+        .execute(&self.pool)
+        .await
+        .map_err(backend)?;
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -381,8 +591,9 @@ impl JobRepository for SqliteStore {
         };
         sqlx::query(
             r#"INSERT INTO jobs
-                (name, id, command, args, cwd, env, trigger, on_overlap, on_dependency_failure, timeout_sec)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (name, id, command, args, cwd, env, trigger, on_overlap, on_dependency_failure,
+                 timeout_sec, log_retention_max_runs, log_retention_max_age_days)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(name) DO UPDATE SET
                 command = excluded.command,
                 args = excluded.args,
@@ -391,7 +602,9 @@ impl JobRepository for SqliteStore {
                 trigger = excluded.trigger,
                 on_overlap = excluded.on_overlap,
                 on_dependency_failure = excluded.on_dependency_failure,
-                timeout_sec = excluded.timeout_sec"#,
+                timeout_sec = excluded.timeout_sec,
+                log_retention_max_runs = excluded.log_retention_max_runs,
+                log_retention_max_age_days = excluded.log_retention_max_age_days"#,
         )
         .bind(&job.name)
         .bind(job.id.0.to_string())
@@ -403,6 +616,8 @@ impl JobRepository for SqliteStore {
         .bind(on_overlap)
         .bind(on_dep)
         .bind(job.timeout.map(|d| d.as_secs() as i64))
+        .bind(job.log_retention.max_runs.map(i64::from))
+        .bind(job.log_retention.max_age_days.map(i64::from))
         .execute(&self.pool)
         .await
         .map_err(backend)?;

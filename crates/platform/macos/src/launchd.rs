@@ -128,6 +128,24 @@ impl LaunchdAgentProcess {
             .map(|o| o.status.success())
             .unwrap_or(false)
     }
+
+    async fn bootstrap(&self, unit_name: &str) -> Result<(), RegistrarError> {
+        let domain = self.domain();
+        let plist_path = self.plist_path(unit_name);
+        if !plist_path.exists() {
+            return Err(RegistrarError::NotFound(unit_name.to_string()));
+        }
+        let plist = plist_path.display().to_string();
+        let output = self.launchctl(&["bootstrap", &domain, &plist]).await?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(RegistrarError::RegistrationFailed(format!(
+                "launchctl bootstrap failed: {}",
+                stderr.trim()
+            )));
+        }
+        Ok(())
+    }
 }
 
 /// Minimal XML text escaping for plist string values.
@@ -159,20 +177,10 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
             .await
             .map_err(|e| RegistrarError::RegistrationFailed(e.to_string()))?;
 
-        // Replace any prior instance, then bootstrap the fresh plist.
+        // Registration only prepares the unit. Starting is a separate action
+        // so callers can honor autostart/auto_start explicitly.
         let target = self.service_target(unit_name);
         self.launchctl(&["bootout", &target]).await.ok();
-        let domain = self.domain();
-        let plist_str = plist_path.display().to_string();
-        let output = self.launchctl(&["bootstrap", &domain, &plist_str]).await?;
-        if !output.status.success() {
-            tokio::fs::remove_file(&plist_path).await.ok();
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(RegistrarError::RegistrationFailed(format!(
-                "launchctl bootstrap failed: {}",
-                stderr.trim()
-            )));
-        }
         Ok(())
     }
 
@@ -186,6 +194,13 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
     }
 
     async fn start(&self, unit_name: &str) -> Result<(), RegistrarError> {
+        if !self.is_registered(unit_name).await {
+            self.bootstrap(unit_name).await?;
+            return Ok(());
+        }
+        if matches!(self.query_status(unit_name).await, Ok(ProcessState::Running)) {
+            return Ok(());
+        }
         let target = self.service_target(unit_name);
         let output = self.launchctl(&["kickstart", "-k", &target]).await?;
         if !output.status.success() {
@@ -196,8 +211,15 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
 
     async fn stop(&self, unit_name: &str) -> Result<(), RegistrarError> {
         let target = self.service_target(unit_name);
-        self.launchctl(&["kill", "SIGTERM", &target]).await.ok();
-        Ok(())
+        let output = self.launchctl(&["bootout", &target]).await?;
+        if output.status.success() || !self.is_registered(unit_name).await {
+            return Ok(());
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(RegistrarError::RegistrationFailed(format!(
+            "launchctl bootout failed: {}",
+            stderr.trim()
+        )))
     }
 
     async fn query_status(&self, unit_name: &str) -> Result<ProcessState, RegistrarError> {
@@ -219,17 +241,38 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
         unit_name: &str,
         lines: usize,
     ) -> Result<Vec<LogLine>, RegistrarError> {
-        let path = self.out_log(unit_name);
-        let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
-        let collected: Vec<&str> = content.lines().collect();
-        let start = collected.len().saturating_sub(lines);
-        Ok(collected[start..]
+        let stdout = tokio::fs::read_to_string(self.out_log(unit_name))
+            .await
+            .unwrap_or_default();
+        let stderr = tokio::fs::read_to_string(self.err_log(unit_name))
+            .await
+            .unwrap_or_default();
+        let stdout_lines: Vec<&str> = stdout.lines().collect();
+        let stderr_lines: Vec<&str> = stderr.lines().collect();
+        let stdout_start = if lines == 0 {
+            0
+        } else {
+            stdout_lines.len().saturating_sub((lines + 1) / 2)
+        };
+        let stderr_start = if lines == 0 {
+            0
+        } else {
+            stderr_lines.len().saturating_sub(lines / 2)
+        };
+        let timestamp = Utc::now();
+        let collected = stdout_lines[stdout_start..]
             .iter()
-            .map(|l| LogLine {
-                timestamp: Utc::now(),
+            .map(|line| LogLine {
+                timestamp,
                 stream: LogStream::Stdout,
-                line: l.to_string(),
+                line: (*line).to_string(),
             })
-            .collect())
+            .chain(stderr_lines[stderr_start..].iter().map(|line| LogLine {
+                timestamp,
+                stream: LogStream::Stderr,
+                line: (*line).to_string(),
+            }))
+            .collect();
+        Ok(collected)
     }
 }

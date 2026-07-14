@@ -86,8 +86,20 @@ impl JobRunner for ProcessJobRunner {
         });
 
         let spec = job_to_spec(job);
-        match self.lifecycle.run_transient(&spec, run_id).await {
-            Ok(outcome) => {
+        let execution_result = if let Some(timeout) = job.timeout {
+            match tokio::time::timeout(timeout, self.lifecycle.run_transient(&spec, run_id)).await {
+                Ok(result) => Some(result),
+                Err(_) => {
+                    tracing::warn!(job = %job.name, ?timeout, "job run timed out");
+                    None
+                }
+            }
+        } else {
+            Some(self.lifecycle.run_transient(&spec, run_id).await)
+        };
+
+        match execution_result {
+            Some(Ok(outcome)) => {
                 run.started_at = Some(outcome.started_at);
                 run.ended_at = Some(outcome.ended_at);
                 run.exit_code = outcome.exit_code;
@@ -97,8 +109,12 @@ impl JobRunner for ProcessJobRunner {
                     JobRunState::Failed
                 };
             }
-            Err(e) => {
+            Some(Err(e)) => {
                 tracing::warn!(job = %job.name, error = %e, "job run failed to launch");
+                run.ended_at = Some(self.clock.now());
+                run.state = JobRunState::Failed;
+            }
+            None => {
                 run.ended_at = Some(self.clock.now());
                 run.state = JobRunState::Failed;
             }

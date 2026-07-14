@@ -49,14 +49,17 @@ pub enum ShutdownSignal {
     Kill,
 }
 
-/// Restart behavior. In `SystemRegistered` mode this is translated to an OS
-/// `Restart=` directive and the in-daemon restart engine is a no-op (DD-025).
+/// Restart behavior. Direct-mode delays are produced by the application's
+/// backoff library. System-registered mode delegates restarting to the OS.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RestartPolicy {
     pub enabled: bool,
     pub max_retries: Option<u32>,
     pub backoff_initial: Duration,
     pub backoff_max: Duration,
+    pub backoff_multiplier: u32,
+    pub jitter: bool,
+    pub reset_after: Duration,
 }
 
 impl Default for RestartPolicy {
@@ -66,6 +69,9 @@ impl Default for RestartPolicy {
             max_retries: None,
             backoff_initial: Duration::from_secs(1),
             backoff_max: Duration::from_secs(60),
+            backoff_multiplier: 2,
+            jitter: true,
+            reset_after: Duration::from_secs(60),
         }
     }
 }

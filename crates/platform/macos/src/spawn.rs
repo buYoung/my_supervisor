@@ -1,6 +1,7 @@
 //! Shared spawn plumbing: build a process in its own session/group and pump its
 //! stdout/stderr into the `LogSink`.
 
+use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 
@@ -82,9 +83,10 @@ pub fn attach_pumps(
 /// Spawn the child and return it with its captured pipes detached for pumping.
 pub fn spawn_child(
     spec: &ProcessSpec,
+    kill_on_drop: bool,
 ) -> Result<(Child, Option<ChildStdout>, Option<ChildStderr>), SpawnError> {
     let mut cmd = build_command(spec)?;
-    cmd.kill_on_drop(false);
+    cmd.kill_on_drop(kill_on_drop);
     let mut child = cmd.spawn().map_err(|e| SpawnError::Io {
         name: spec.name.clone(),
         message: e.to_string(),
@@ -92,4 +94,37 @@ pub fn spawn_child(
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     Ok((child, stdout, stderr))
+}
+
+/// Spawn a long-lived detached child with stdout/stderr appended directly to
+/// files. The files remain usable after the daemon process exits.
+pub fn spawn_detached_child(
+    spec: &ProcessSpec,
+    stdout_path: &Path,
+    stderr_path: &Path,
+) -> Result<Child, SpawnError> {
+    let stdout = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(stdout_path)
+        .map_err(|error| SpawnError::Io {
+            name: spec.name.clone(),
+            message: error.to_string(),
+        })?;
+    let stderr = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(stderr_path)
+        .map_err(|error| SpawnError::Io {
+            name: spec.name.clone(),
+            message: error.to_string(),
+        })?;
+    let mut command = build_command(spec)?;
+    command.stdout(Stdio::from(stdout));
+    command.stderr(Stdio::from(stderr));
+    command.kill_on_drop(false);
+    command.spawn().map_err(|error| SpawnError::Io {
+        name: spec.name.clone(),
+        message: error.to_string(),
+    })
 }

@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::{Job, JobRun, JobRunId, ProcessSpec};
+use crate::domain::{ChildHandle, Job, JobRun, JobRunId, ProcessSpec};
 use crate::ports::error::RepoError;
 
 /// Durable process registry. Survives daemon restart so the managed-process
@@ -16,6 +16,12 @@ pub trait StateRepository: Send + Sync {
     async fn delete_spec(&self, name: &str) -> Result<(), RepoError>;
     async fn get_restart_count(&self, name: &str) -> Result<u32, RepoError>;
     async fn set_restart_count(&self, name: &str, count: u32) -> Result<(), RepoError>;
+    async fn get_runtime_handle(&self, name: &str) -> Result<Option<ChildHandle>, RepoError>;
+    async fn set_runtime_handle(
+        &self,
+        name: &str,
+        handle: Option<&ChildHandle>,
+    ) -> Result<(), RepoError>;
 }
 
 /// Job definitions plus run history.
