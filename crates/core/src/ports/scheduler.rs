@@ -16,12 +16,27 @@ pub struct ScheduleEvent {
     pub scheduled_at: DateTime<Utc>,
 }
 
+/// Scheduler state that can be restored without reconstructing timer timing
+/// from an already-mutated config definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchedulerSnapshot {
+    pub entries: Vec<ScheduledJob>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScheduledJob {
+    pub name: String,
+    pub trigger: JobTrigger,
+}
+
 #[async_trait]
 pub trait Scheduler: Send + Sync {
     /// Arm (or re-arm) the timer for a job. Re-registering replaces the prior arming.
     async fn register(&self, job_name: &str, trigger: &JobTrigger) -> Result<(), SchedulerError>;
     /// Disarm a job's timer.
     async fn unregister(&self, job_name: &str) -> Result<(), SchedulerError>;
+    async fn snapshot(&self) -> Result<SchedulerSnapshot, SchedulerError>;
+    async fn restore(&self, snapshot: &SchedulerSnapshot) -> Result<(), SchedulerError>;
     /// Pure computation of the next fire time after `after` (None for `DependsOn`).
     fn next_run(&self, trigger: &JobTrigger, after: DateTime<Utc>) -> Option<DateTime<Utc>>;
     /// Subscribe to fire events.

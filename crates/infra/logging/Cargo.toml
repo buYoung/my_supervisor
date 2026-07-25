@@ -9,4 +9,9 @@ my-supervisor-core = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
 tokio = { version = "1", default-features = false, features = ["sync", "fs", "io-util"] }
+
+[dev-dependencies]
+tokio = { workspace = true }

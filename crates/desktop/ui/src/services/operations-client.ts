@@ -19,6 +19,8 @@ import type {
 } from "../shared/types";
 import type { ConvertTargetDto, JobConfigDto, ProcessConfigDto } from "./wire-types";
 
+const EVENT_DEDUP_CACHE_CAPACITY = 1_024;
+
 /** Target management mode for a convert request. */
 export type ConvertTarget = ConvertTargetDto;
 
@@ -57,6 +59,48 @@ export interface FollowLogsHandlers {
   onError?: (error: OperationsError) => void;
 }
 
+/** Transport-independent global event shape exposed to desktop features. */
+export interface EventEnvelope {
+  eventType: string;
+  eventId?: string;
+  timestamp: string;
+  payload: unknown;
+}
+
+export interface FollowEventsHandlers {
+  /** Called once per accepted event. Durable terminal duplicates share eventId. */
+  onEvent: (event: EventEnvelope) => void;
+  /** Called for an unexpected transport failure before a reconnect attempt. */
+  onError?: (error: OperationsError) => void;
+}
+
+/**
+ * Return session-memory ID de-duplication for terminal event consumers. Server
+ * durability belongs to the SQLite outbox; this bounded cache intentionally
+ * disappears when the renderer reloads and accepts ID-less legacy envelopes.
+ */
+export function createEventDeduper(capacity = EVENT_DEDUP_CACHE_CAPACITY): (eventId?: string) => boolean {
+  const eventIds = new Set<string>();
+  const insertionOrder: string[] = [];
+  return (eventId?: string): boolean => {
+    if (!eventId) {
+      return true;
+    }
+    if (eventIds.has(eventId)) {
+      return false;
+    }
+    eventIds.add(eventId);
+    insertionOrder.push(eventId);
+    if (insertionOrder.length > capacity) {
+      const expiredEventId = insertionOrder.shift();
+      if (expiredEventId) {
+        eventIds.delete(expiredEventId);
+      }
+    }
+    return true;
+  };
+}
+
 export interface OperationsClient {
   /** Identifies which transport is active (for diagnostics / handoff visibility). */
   readonly transport: "invoke" | "http";
@@ -81,6 +125,8 @@ export interface OperationsClient {
   processLogsTail(name: string, tail?: number): Promise<ProcessLogsTail>;
   /** Follow a single process's logs. Returns an unsubscribe function. */
   followProcessLogs(name: string, handlers: FollowLogsHandlers): () => void;
+  /** Follow global events; terminal duplicates are removed in renderer session memory. */
+  followEvents(handlers: FollowEventsHandlers): () => void;
 
   // Jobs
   listJobs(): Promise<JobStatus[]>;

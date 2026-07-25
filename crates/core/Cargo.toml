@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 async-trait = { workspace = true }
 chrono = { workspace = true }
+serde = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }
-tokio = { version = "1", default-features = false, features = ["sync"] }
+tokio = { version = "1", default-features = false, features = ["sync", "time"] }

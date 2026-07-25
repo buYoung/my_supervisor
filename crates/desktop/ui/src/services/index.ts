@@ -12,6 +12,8 @@ import type { OperationsClient } from "./operations-client";
 
 export { OperationsError } from "./operations-client";
 export type {
+  EventEnvelope,
+  FollowEventsHandlers,
   FollowLogsHandlers,
   JobRunsResult,
   OperationsClient,

@@ -22,6 +22,8 @@ pub struct LogPage {
     pub lines: Vec<LogLine>,
     pub truncated: bool,
     pub dropped_count: u64,
+    pub high_watermark: u64,
+    pub next_sequence: u64,
 }
 
 /// Daemon identity + live counts.
@@ -33,6 +35,23 @@ pub struct DaemonInfo {
     pub process_count: u32,
     pub config_path: String,
     pub log_dir: String,
+}
+
+/// One durable recovery record safe to expose to an operator. Native handles,
+/// target commands, and environment values deliberately stay internal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryDiagnostic {
+    pub kind: String,
+    pub id: String,
+    pub resource: String,
+    pub stage: String,
+    pub attempts: u32,
+    pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RecoveryDiagnostics {
+    pub records: Vec<RecoveryDiagnostic>,
 }
 
 /// Outcome of a restart request — Direct restarts are accepted; SystemRegistered

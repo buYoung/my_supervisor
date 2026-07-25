@@ -43,6 +43,7 @@ pub enum ConflictReason {
     NameConflict,
     JobNameConflict,
     HasDependents,
+    JobHasActiveRuns,
     RunAlreadyFinished,
 }
 
@@ -55,6 +56,7 @@ impl ConflictReason {
             ConflictReason::NameConflict => "name_conflict",
             ConflictReason::JobNameConflict => "job_name_conflict",
             ConflictReason::HasDependents => "has_dependents",
+            ConflictReason::JobHasActiveRuns => "job_has_active_runs",
             ConflictReason::RunAlreadyFinished => "run_already_finished",
         }
     }
@@ -67,6 +69,7 @@ impl ConflictReason {
             ConflictReason::NameConflict => "a process with this name already exists",
             ConflictReason::JobNameConflict => "a job with this name already exists",
             ConflictReason::HasDependents => "job has downstream dependents",
+            ConflictReason::JobHasActiveRuns => "job has active or queued runs",
             ConflictReason::RunAlreadyFinished => "run is already finished",
         }
     }
@@ -92,6 +95,10 @@ pub enum AppError {
     ServiceRegistrationFailed(String),
     #[error("unit name conflict: {0}")]
     UnitNameConflict(String),
+    #[error("config apply recovery is required: {0}")]
+    ConfigRecoveryRequired(String),
+    #[error("job deletion recovery is required: {0}")]
+    JobDeletionRecoveryRequired(String),
     #[error("not supported on this platform: {0}")]
     NotSupported(String),
     #[error("internal error: {0}")]
@@ -122,6 +129,8 @@ impl AppError {
             AppError::SpawnFailed(_) => "spawn_failed",
             AppError::ServiceRegistrationFailed(_) => "service_registration_failed",
             AppError::UnitNameConflict(_) => "unit_name_conflict",
+            AppError::ConfigRecoveryRequired(_) => "config_recovery_required",
+            AppError::JobDeletionRecoveryRequired(_) => "job_deletion_recovery_required",
             AppError::NotSupported(_) => "not_supported_on_platform",
             AppError::Internal(_) => "internal_error",
         }
@@ -131,7 +140,7 @@ impl AppError {
     pub fn http_status(&self) -> u16 {
         match self {
             AppError::NotFound { .. } => 404,
-            AppError::Conflict { .. } | AppError::UnitNameConflict(_) => 409,
+            AppError::Conflict { .. } | AppError::UnitNameConflict(_) | AppError::ConfigRecoveryRequired(_) | AppError::JobDeletionRecoveryRequired(_) => 409,
             AppError::InvalidRequest(_) | AppError::InvalidConfig(_) | AppError::InvalidCron(_) => {
                 400
             }

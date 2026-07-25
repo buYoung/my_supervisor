@@ -152,6 +152,10 @@ pub enum LogStreamDto {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LogLineDto {
+    /// Source-local durable cursor.  Older servers may omit it, so clients
+    /// must treat zero as a compatibility-only value rather than a cursor.
+    #[serde(default)]
+    pub sequence: u64,
     pub timestamp: DateTime<Utc>,
     pub stream: LogStreamDto,
     pub line: String,
@@ -162,6 +166,12 @@ pub struct LogsResponseDto {
     pub lines: Vec<LogLineDto>,
     pub truncated: bool,
     pub dropped_count: u64,
+    /// Last durable sequence included in the snapshot boundary.
+    #[serde(default)]
+    pub high_watermark: u64,
+    /// Cursor for the next REST gap-recovery request.
+    #[serde(default)]
+    pub next_sequence: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +209,7 @@ pub enum JobRunStateDto {
     Running,
     Succeeded,
     Failed,
+    TimedOut,
     Cancelled,
     Skipped,
 }
@@ -267,6 +278,43 @@ pub struct JobRunListDto {
     pub truncated: bool,
 }
 
+// ---------------------------------------------------------------------------
+// Config apply
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfigApplyModeDto {
+    #[default]
+    Merge,
+    Replace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ConfigDiffDto {
+    #[serde(default)]
+    pub added_processes: Vec<String>,
+    #[serde(default)]
+    pub updated_processes: Vec<String>,
+    #[serde(default)]
+    pub removed_processes: Vec<String>,
+    #[serde(default)]
+    pub added_jobs: Vec<String>,
+    #[serde(default)]
+    pub updated_jobs: Vec<String>,
+    #[serde(default)]
+    pub removed_jobs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ConfigApplyResultDto {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub apply_id: Option<String>,
+    pub mode: ConfigApplyModeDto,
+    pub diff: ConfigDiffDto,
+    pub dry_run: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct LogRetentionDto {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -309,4 +357,22 @@ pub struct DaemonStatusDto {
     pub process_count: u32,
     pub config_path: String,
     pub log_dir: String,
+}
+
+/// A bounded, pending recovery record. It deliberately excludes command,
+/// environment, PID, and native identity details.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecoveryDiagnosticDto {
+    pub kind: String,
+    pub id: String,
+    pub resource: String,
+    pub stage: String,
+    pub attempts: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct RecoveryDiagnosticsDto {
+    pub records: Vec<RecoveryDiagnosticDto>,
 }

@@ -29,6 +29,9 @@ impl ProcessServiceRegistrar for NullProcessServiceRegistrar {
     async fn query_status(&self, _unit_name: &str) -> Result<ProcessState, RegistrarError> {
         Err(RegistrarError::NotSupported)
     }
+    async fn query_pid(&self, _unit_name: &str) -> Result<Option<u32>, RegistrarError> {
+        Err(RegistrarError::NotSupported)
+    }
     async fn tail_logs(
         &self,
         _unit_name: &str,

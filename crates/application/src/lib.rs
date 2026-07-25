@@ -2,6 +2,7 @@
 //! transport-agnostic `OperationsFacade` that HTTP routes and Tauri invoke
 //! handlers call identically (the parity precondition).
 
+pub mod config_apply;
 pub mod deps;
 pub mod error;
 pub mod events;
@@ -12,8 +13,11 @@ pub mod views;
 
 pub use deps::{AppDeps, DaemonMeta};
 pub use error::{AppError, AppResult, ConflictReason, ResourceKind};
-pub use events::DomainEvent;
+pub use events::{DomainEvent, PublishedEvent};
 pub use facade::OperationsFacade;
 pub use registrar_null::NullProcessServiceRegistrar;
 pub use runner::ProcessJobRunner;
-pub use views::{ConvertTarget, DaemonInfo, JobView, LogPage, RestartOutcome};
+pub use views::{
+    ConvertTarget, DaemonInfo, JobView, LogPage, RecoveryDiagnostic, RecoveryDiagnostics,
+    RestartOutcome,
+};

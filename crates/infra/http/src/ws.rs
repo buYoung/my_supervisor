@@ -13,7 +13,8 @@ use futures_util::{SinkExt, StreamExt};
 use serde_json::json;
 use tokio::sync::broadcast;
 
-use my_supervisor_application::DomainEvent;
+use my_supervisor_application::{DomainEvent, PublishedEvent};
+use my_supervisor_application::views::LogPage;
 use my_supervisor_core::domain::LogLine;
 
 use crate::error::HttpError;
@@ -49,11 +50,12 @@ pub async fn process_logs(
 ) -> Result<Response, HttpError> {
     if let Some(upgrade) = upgrade {
         let rx = f.subscribe_process_logs(&name).await?;
-        Ok(upgrade.on_upgrade(move |socket| forward_logs(socket, rx)))
+        // Subscribe before taking the snapshot.  The high-watermark filter in
+        // `forward_logs` then turns this into one no-gap boundary.
+        let page = process_log_page(&f, &name, &q).await?;
+        Ok(upgrade.on_upgrade(move |socket| forward_logs(socket, page, rx)))
     } else {
-        let page = f
-            .process_logs(&name, q.tail.unwrap_or(100), q.since)
-            .await?;
+        let page = process_log_page(&f, &name, &q).await?;
         Ok(Json(log_page_to_dto(page)).into_response())
     }
 }
@@ -62,13 +64,19 @@ pub async fn process_logs(
 pub async fn run_logs(
     State(f): State<Facade>,
     Path((name, run_id)): Path<(String, String)>,
-    upgrade: WebSocketUpgrade,
+    Query(q): Query<LogQuery>,
+    MaybeWs(upgrade): MaybeWs,
 ) -> Result<Response, HttpError> {
     let rid = crate::handlers::parse_run_id(&run_id)?;
     // Confirm the run exists so a bad id closes cleanly rather than hanging.
     f.get_run(&name, &rid).await?;
-    let rx = f.subscribe_run_logs(rid);
-    Ok(upgrade.on_upgrade(move |socket| forward_logs(socket, rx)))
+    if let Some(upgrade) = upgrade {
+        let rx = f.subscribe_run_logs(rid);
+        let page = run_log_page(&f, &name, rid, &q).await?;
+        Ok(upgrade.on_upgrade(move |socket| forward_logs(socket, page, rx)))
+    } else {
+        Ok(Json(log_page_to_dto(run_log_page(&f, &name, rid, &q).await?)).into_response())
+    }
 }
 
 /// `WS /api/v1/events` — global event stream.
@@ -77,19 +85,64 @@ pub async fn events(State(f): State<Facade>, upgrade: WebSocketUpgrade) -> Respo
     upgrade.on_upgrade(move |socket| forward_events(socket, rx))
 }
 
-async fn forward_logs(socket: WebSocket, mut rx: broadcast::Receiver<LogLine>) {
+async fn process_log_page(facade: &Facade, name: &str, query: &LogQuery) -> Result<LogPage, HttpError> {
+    let page = facade
+        .process_logs_with_cursor(name, query.tail.unwrap_or(100).min(10_000), query.since, query.after_sequence)
+        .await?;
+    Ok(page)
+}
+
+async fn run_log_page(
+    facade: &Facade,
+    name: &str,
+    run_id: my_supervisor_core::domain::JobRunId,
+    query: &LogQuery,
+) -> Result<LogPage, HttpError> {
+    Ok(facade
+        .run_logs(
+            name,
+            run_id,
+            query.tail.unwrap_or(100).min(10_000),
+            query.since,
+            query.after_sequence,
+        )
+        .await?)
+}
+
+async fn forward_logs(
+    socket: WebSocket,
+    page: LogPage,
+    mut rx: broadcast::Receiver<LogLine>,
+) {
     let (mut sender, mut receiver) = socket.split();
+    let mut last_sequence = page.lines.last().map(|line| line.sequence).unwrap_or(0);
+    let high_watermark = page.high_watermark;
+    for line in page.lines {
+        let payload = serde_json::to_string(&log_line_to_dto(&line)).unwrap_or_default();
+        if sender.send(Message::Text(payload.into())).await.is_err() {
+            return;
+        }
+    }
     loop {
         tokio::select! {
             incoming = rx.recv() => match incoming {
                 Ok(line) => {
+                    if line.sequence != 0
+                        && (line.sequence <= high_watermark || line.sequence <= last_sequence)
+                    {
+                        continue;
+                    }
                     let payload = serde_json::to_string(&log_line_to_dto(&line)).unwrap_or_default();
                     if sender.send(Message::Text(payload.into())).await.is_err() {
                         break;
                     }
+                    last_sequence = last_sequence.max(line.sequence);
                 }
                 Err(broadcast::error::RecvError::Lagged(count)) => {
-                    let frame = json!({ "type": "log.dropped", "payload": { "count": count } });
+                    let frame = json!({ "type": "log.dropped", "payload": {
+                        "count": count,
+                        "after_sequence": last_sequence,
+                    } });
                     let _ = sender.send(Message::Text(frame.to_string().into())).await;
                 }
                 Err(broadcast::error::RecvError::Closed) => break,
@@ -102,7 +155,7 @@ async fn forward_logs(socket: WebSocket, mut rx: broadcast::Receiver<LogLine>) {
     }
 }
 
-async fn forward_events(socket: WebSocket, mut rx: broadcast::Receiver<DomainEvent>) {
+async fn forward_events(socket: WebSocket, mut rx: broadcast::Receiver<PublishedEvent>) {
     let (mut sender, mut receiver) = socket.split();
     loop {
         tokio::select! {
@@ -112,6 +165,10 @@ async fn forward_events(socket: WebSocket, mut rx: broadcast::Receiver<DomainEve
                     if sender.send(Message::Text(payload.into())).await.is_err() {
                         break;
                     }
+                    // Only an actual external socket write may release a
+                    // durable terminal outbox record; internal subscribers do
+                    // not complete this receipt.
+                    event.complete_delivery();
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(broadcast::error::RecvError::Closed) => break,
@@ -124,9 +181,12 @@ async fn forward_events(socket: WebSocket, mut rx: broadcast::Receiver<DomainEve
     }
 }
 
-/// Map a `DomainEvent` onto the `{type, timestamp, payload}` wire envelope.
-fn event_to_wire(event: &DomainEvent) -> serde_json::Value {
-    let (event_type, payload) = match event {
+/// Map a published event onto the `{type, timestamp, payload}` wire envelope.
+/// Convert a published event to the shared public envelope. Desktop Tauri
+/// forwarding reuses this exact mapping so its event IDs and timestamps remain
+/// transport-equivalent to the HTTP WebSocket stream.
+pub fn event_to_wire(published: &PublishedEvent) -> serde_json::Value {
+    let (event_type, payload) = match &published.event {
         DomainEvent::ProcessStateChanged { name, from, to } => (
             "process.state_changed",
             json!({
@@ -159,6 +219,14 @@ fn event_to_wire(event: &DomainEvent) -> serde_json::Value {
             "job.run_failed",
             json!({ "name": name, "run_id": run_id.0.to_string(), "exit_code": exit_code }),
         ),
+        DomainEvent::JobRunTimedOut { name, run_id } => (
+            "job.run_timed_out",
+            json!({ "name": name, "run_id": run_id.0.to_string() }),
+        ),
+        DomainEvent::JobRunCancelled { name, run_id } => (
+            "job.run_cancelled",
+            json!({ "name": name, "run_id": run_id.0.to_string() }),
+        ),
         DomainEvent::JobRunSkipped {
             name,
             run_id,
@@ -168,9 +236,13 @@ fn event_to_wire(event: &DomainEvent) -> serde_json::Value {
             json!({ "name": name, "run_id": run_id.0.to_string(), "reason": reason }),
         ),
     };
-    json!({
+    let mut envelope = json!({
         "type": event_type,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "timestamp": published.occurred_at.unwrap_or_else(chrono::Utc::now).to_rfc3339(),
         "payload": payload,
-    })
+    });
+    if let Some(event_id) = published.event_id {
+        envelope["event_id"] = json!(event_id.to_string());
+    }
+    envelope
 }

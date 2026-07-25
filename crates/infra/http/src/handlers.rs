@@ -12,16 +12,18 @@ use serde::Deserialize;
 use serde_json::json;
 
 use my_supervisor_application::{ConvertTarget, OperationsFacade, RestartOutcome};
-use my_supervisor_core::domain::JobRunId;
+use my_supervisor_core::domain::{JobRunId, JobRunState};
 use my_supervisor_shared::api::{
-    ConvertRequestDto, ConvertTargetDto, JobConfigDto, JobListDto, JobRunListDto, ProcessConfigDto,
-    ProcessListDto, RestartNoopDto,
+    ConfigApplyResultDto, ConvertRequestDto, ConvertTargetDto, JobConfigDto, JobListDto,
+    JobRunListDto, JobRunStateDto, ProcessConfigDto, ProcessListDto, RestartNoopDto,
 };
+use my_supervisor_shared::config::ConfigApplyRequestDto;
 
 use crate::error::HttpError;
 use crate::mapping::{
-    daemon_info_to_dto, job_config_to_job, job_run_to_dto, job_view_to_dto, process_config_to_spec,
-    process_status_to_dto,
+    config_apply_mode_to_domain, config_apply_result_to_dto, daemon_info_to_dto,
+    file_config_to_loaded, job_config_to_job, job_run_to_dto, job_view_to_dto,
+    process_config_to_spec, process_status_to_dto, recovery_diagnostics_to_dto,
 };
 
 pub type Facade = Arc<OperationsFacade>;
@@ -36,11 +38,14 @@ pub struct ForceQuery {
 pub struct LogQuery {
     pub tail: Option<usize>,
     pub since: Option<DateTime<Utc>>,
+    pub after_sequence: Option<u64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 pub struct RunsQuery {
     pub limit: Option<usize>,
+    pub since: Option<DateTime<Utc>>,
+    pub state: Option<JobRunStateDto>,
 }
 
 // --- Processes -------------------------------------------------------------
@@ -189,16 +194,35 @@ pub async fn trigger_job(
         .into_response())
 }
 
+pub async fn cancel_run(
+    State(f): State<Facade>,
+    Path((name, run_id)): Path<(String, String)>,
+) -> Result<StatusCode, HttpError> {
+    f.cancel_run(&name, parse_run_id(&run_id)?).await?;
+    Ok(StatusCode::ACCEPTED)
+}
+
 pub async fn list_runs(
     State(f): State<Facade>,
     Path(name): Path<String>,
     Query(q): Query<RunsQuery>,
 ) -> Result<Response, HttpError> {
     let limit = q.limit.unwrap_or(50).min(500);
-    let runs = f.list_runs(&name, limit).await?;
+    let state = q.state.map(|state| match state {
+        JobRunStateDto::Pending => JobRunState::Pending,
+        JobRunStateDto::Running => JobRunState::Running,
+        JobRunStateDto::Succeeded => JobRunState::Succeeded,
+        JobRunStateDto::Failed => JobRunState::Failed,
+        JobRunStateDto::TimedOut => JobRunState::TimedOut,
+        JobRunStateDto::Cancelled => JobRunState::Cancelled,
+        JobRunStateDto::Skipped => JobRunState::Skipped,
+    });
+    let mut runs = f.list_runs_filtered(&name, state, q.since, limit.saturating_add(1)).await?;
+    let truncated = runs.len() > limit;
+    runs.truncate(limit);
     let dto = JobRunListDto {
         runs: runs.iter().map(job_run_to_dto).collect(),
-        truncated: false,
+        truncated,
     };
     Ok(Json(dto).into_response())
 }
@@ -219,9 +243,41 @@ pub async fn daemon_status(State(f): State<Facade>) -> Result<Response, HttpErro
     Ok(Json(daemon_info_to_dto(info)).into_response())
 }
 
+pub async fn recovery_diagnostics(State(f): State<Facade>) -> Result<Response, HttpError> {
+    let diagnostics = f.recovery_diagnostics().await?;
+    Ok(Json(recovery_diagnostics_to_dto(diagnostics)).into_response())
+}
+
 pub async fn reload(State(f): State<Facade>) -> Result<StatusCode, HttpError> {
     f.reload().await?;
     Ok(StatusCode::ACCEPTED)
+}
+
+pub async fn validate_config(
+    State(f): State<Facade>,
+    Json(request): Json<ConfigApplyRequestDto>,
+) -> Result<Json<ConfigApplyResultDto>, HttpError> {
+    let result = f
+        .validate_config(
+            &file_config_to_loaded(request.config),
+            config_apply_mode_to_domain(request.mode),
+        )
+        .await?;
+    Ok(Json(config_apply_result_to_dto(result)))
+}
+
+pub async fn apply_config(
+    State(f): State<Facade>,
+    Json(request): Json<ConfigApplyRequestDto>,
+) -> Result<Json<ConfigApplyResultDto>, HttpError> {
+    let result = f
+        .apply_config(
+            file_config_to_loaded(request.config),
+            config_apply_mode_to_domain(request.mode),
+            request.dry_run,
+        )
+        .await?;
+    Ok(Json(config_apply_result_to_dto(result)))
 }
 
 pub async fn shutdown(State(f): State<Facade>) -> StatusCode {

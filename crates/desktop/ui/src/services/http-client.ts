@@ -7,6 +7,9 @@
 
 import type { ProcessStatus } from "../shared/types";
 import {
+  createEventDeduper,
+  type EventEnvelope,
+  type FollowEventsHandlers,
   type FollowLogsHandlers,
   type JobRunsResult,
   OperationsError,
@@ -15,6 +18,7 @@ import {
 } from "./operations-client";
 import {
   mapDaemonStatus,
+  mapEventEnvelope,
   mapJobRun,
   mapJobStatus,
   mapLogLine,
@@ -22,6 +26,7 @@ import {
 } from "./wire-mapping";
 import type {
   DaemonStatusDto,
+  EventEnvelopeDto,
   JobConfigDto,
   JobStatusDto,
   ListJobsDto,
@@ -49,6 +54,16 @@ function toWebSocketOrigin(baseUrl: string): string {
 
 interface ErrorEnvelope {
   error?: { code?: string; message?: string; details?: unknown };
+}
+
+function isEventEnvelopeDto(value: unknown): value is EventEnvelopeDto {
+  return Boolean(
+    value
+      && typeof value === "object"
+      && typeof (value as { type?: unknown }).type === "string"
+      && typeof (value as { timestamp?: unknown }).timestamp === "string"
+      && "payload" in value,
+  );
 }
 
 async function parseErrorEnvelope(response: Response): Promise<OperationsError> {
@@ -205,6 +220,63 @@ export function createHttpClient(): OperationsClient {
       return () => {
         closedByCaller = true;
         if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+          socket.close();
+        }
+      };
+    },
+
+    followEvents(handlers: FollowEventsHandlers) {
+      const shouldEmit = createEventDeduper();
+      let socket: WebSocket | null = null;
+      let retryTimer: number | undefined;
+      let retryMs = 100;
+      let isCancelled = false;
+
+      const connect = () => {
+        if (isCancelled) {
+          return;
+        }
+        socket = new WebSocket(`${webSocketOrigin}/api/v1/events`);
+        socket.addEventListener("open", () => {
+          retryMs = 100;
+        });
+        socket.addEventListener("message", (message) => {
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(message.data as string);
+          } catch {
+            return;
+          }
+          if (!isEventEnvelopeDto(parsed)) {
+            return;
+          }
+          const event: EventEnvelope = mapEventEnvelope(parsed);
+          if (shouldEmit(event.eventId)) {
+            handlers.onEvent(event);
+          }
+        });
+        socket.addEventListener("close", () => {
+          if (isCancelled) {
+            return;
+          }
+          const waitMs = retryMs;
+          retryMs = Math.min(retryMs * 2, 2_000);
+          retryTimer = window.setTimeout(connect, waitMs);
+        });
+        socket.addEventListener("error", () => {
+          if (!isCancelled) {
+            handlers.onError?.(new OperationsError("transport_error", "이벤트 스트림 연결에 실패했습니다."));
+          }
+        });
+      };
+
+      connect();
+      return () => {
+        isCancelled = true;
+        if (retryTimer !== undefined) {
+          window.clearTimeout(retryTimer);
+        }
+        if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
           socket.close();
         }
       };

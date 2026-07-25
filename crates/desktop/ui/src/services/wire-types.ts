@@ -92,6 +92,15 @@ export interface DaemonStatusDto {
   log_dir: string;
 }
 
+/** Global `/api/v1/events` and Tauri `global-event` envelope. `event_id` is
+ * optional so a renderer can interoperate with an older daemon. */
+export interface EventEnvelopeDto {
+  type: string;
+  event_id?: string;
+  timestamp: string;
+  payload: unknown;
+}
+
 /** A single wire log line, shared by REST `/logs` and the per-process WS stream. */
 export interface LogLineDto {
   timestamp: string;

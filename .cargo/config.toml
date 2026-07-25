@@ -1,0 +1,5 @@
+[alias]
+# The server distribution is one target/profile-coherent artifact set.  It
+# intentionally includes the platform package so Cargo emits both detached
+# helper binaries beside `msv-daemon` and `msv` in `target/release`.
+msv-release = "build --release -p my-supervisor-app-daemon -p my-supervisor-app-cli -p my-supervisor-platform-macos"

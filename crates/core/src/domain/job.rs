@@ -7,10 +7,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Stable identity of a Job.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct JobId(pub Uuid);
 
 impl JobId {
@@ -26,7 +27,7 @@ impl Default for JobId {
 }
 
 /// Stable identity of a single Job execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct JobRunId(pub Uuid);
 
 impl JobRunId {
@@ -41,8 +42,44 @@ impl Default for JobRunId {
     }
 }
 
+/// Durable forward-recovery state for a destructive Job removal.  The journal
+/// retains the original definition because a process restart can occur after
+/// dispatch has been frozen but before the database rows are removed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JobDeletionStage {
+    Prepared,
+    DispatchFrozen,
+    SchedulerUnregistered,
+    /// A failure before cancellation must converge by restoring dispatch, not
+    /// by retrying the destructive path after a restart.
+    RollbackRequired,
+    CancellationStarted,
+    RunsDraining,
+    RowsDeleted,
+    LogsCleaning,
+    Completed,
+}
+
+impl JobDeletionStage {
+    pub fn is_irreversible(self) -> bool {
+        matches!(self, Self::CancellationStarted | Self::RunsDraining | Self::RowsDeleted | Self::LogsCleaning | Self::Completed)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JobDeletionJournal {
+    pub deletion_id: Uuid,
+    pub job: Job,
+    pub stage: JobDeletionStage,
+    /// Persisted before the Job/Run rows are committed away so log cleanup can
+    /// resume after a crash without rediscovering a potentially reused name.
+    pub run_ids: Vec<JobRunId>,
+    pub last_error: Option<String>,
+}
+
 /// One-of trigger that decides when a Job runs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JobTrigger {
     /// 5-field cron expression, e.g. `0 */6 * * *`.
     Cron(String),
@@ -55,7 +92,7 @@ pub enum JobTrigger {
 }
 
 /// What happens when a trigger fires while a prior run is still in flight.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum OverlapPolicy {
     #[default]
     Skip,
@@ -64,7 +101,7 @@ pub enum OverlapPolicy {
 }
 
 /// What happens when an upstream dependency failed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum DependencyFailurePolicy {
     #[default]
     Skip,
@@ -72,14 +109,14 @@ pub enum DependencyFailurePolicy {
 }
 
 /// Run-log retention bounds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct LogRetention {
     pub max_runs: Option<u32>,
     pub max_age_days: Option<u32>,
 }
 
 /// A registered batch-job definition. Mirrors a single `[[job]]` config block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Job {
     pub id: JobId,
     pub name: String,
@@ -95,12 +132,13 @@ pub struct Job {
 }
 
 /// State machine for a single run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JobRunState {
     Pending,
     Running,
     Succeeded,
     Failed,
+    TimedOut,
     Cancelled,
     Skipped,
 }
@@ -111,6 +149,7 @@ impl JobRunState {
             self,
             JobRunState::Succeeded
                 | JobRunState::Failed
+                | JobRunState::TimedOut
                 | JobRunState::Cancelled
                 | JobRunState::Skipped
         )
@@ -118,7 +157,7 @@ impl JobRunState {
 }
 
 /// What caused a run to be created.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TriggeredBy {
     Schedule,
     Manual,
@@ -126,10 +165,13 @@ pub enum TriggeredBy {
 }
 
 /// A single execution instance of a Job.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JobRun {
     pub run_id: JobRunId,
     pub job_name: String,
+    /// Identity of the definition that created this run.  Names may be reused
+    /// after deletion, so a late runner must never attach to a replacement job.
+    pub job_id: JobId,
     pub triggered_by: TriggeredBy,
     pub scheduled_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,

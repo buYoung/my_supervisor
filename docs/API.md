@@ -32,7 +32,7 @@
 | `POST` | `/api/v1/processes/{name}/start` | 시작 |
 | `POST` | `/api/v1/processes/{name}/stop` | 중지 (graceful → force) |
 | `POST` | `/api/v1/processes/{name}/restart` | 재시작 (crash loop 카운터 리셋). **`management_mode = SystemRegistered` 시 no-op + 안내 메시지** — OS 가 재시작 담당 (DD-025) |
-| `GET` | `/api/v1/processes/{name}/logs` | 최근 로그. 쿼리: `tail`, `since`. SystemRegistered 는 journald/launchd logs/Event Log 에서 집계 |
+| `GET` | `/api/v1/processes/{name}/logs` | 최근 로그. 쿼리: `tail`, `since`, `after_sequence`. WebSocket으로 연결하면 cursor 경계 뒤의 새 로그를 실시간 전달 |
 | `POST` | `/api/v1/processes/{name}/convert` | 관리 모드 전환. body: `{ to: "direct" \| "system_registered", unit_name?: string, auto_start?: boolean }` |
 
 #### GET /api/v1/processes
@@ -133,6 +133,7 @@
 |---|---|---|
 | `tail` | `100` | 반환할 최근 라인 수 (최대 10000) |
 | `since` | *(생략 시 무제한)* | RFC3339 타임스탬프. 해당 시각 이후 로그만 |
+| `after_sequence` | *(생략 시 제한 없음)* | 이 sequence보다 큰 로그만. 재연결 gap 복구에 사용 |
 
 응답 예시:
 
@@ -141,24 +142,32 @@
   "lines": [
     {
       "timestamp": "2026-04-21T10:30:45.123Z",
+      "sequence": 42,
       "stream": "stdout",
       "line": "Server listening on :3000"
     }
   ],
   "truncated": false,
-  "dropped_count": 0
+  "dropped_count": 0,
+  "high_watermark": 42,
+  "next_sequence": 43
 }
 ```
 
 - `truncated`: `tail`/`since` 필터로 잘려나간 라인이 있는지
 - `dropped_count`: 백프레셔로 버려진 라인 수 (DD-012)
+- `sequence`: source-local 단조 증가 cursor. `after_sequence`과 WebSocket 재연결에 사용한다.
+- `high_watermark`: 이 snapshot을 만들 때 확정된 마지막 sequence이며, `next_sequence`은 다음 gap 조회 cursor다.
 
 ### 2.2 데몬 리소스
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | `GET` | `/api/v1/daemon/status` | 데몬 상태 |
+| `GET` | `/api/v1/daemon/recovery` | 보류 중인 durable 복구 진단 |
 | `POST` | `/api/v1/daemon/reload` | 설정 파일 리로드 (SIGHUP과 동등) |
+| `POST` | `/api/v1/daemon/config/validate` | 설정 batch 검증 및 diff 반환 |
+| `POST` | `/api/v1/daemon/config/apply` | 설정 batch를 원자적으로 적용 |
 | `POST` | `/api/v1/daemon/shutdown` | 데몬 종료 (graceful shutdown 시퀀스 시작) |
 
 #### GET /api/v1/daemon/status
@@ -174,14 +183,53 @@
 }
 ```
 
+#### GET /api/v1/daemon/recovery
+
+보류 중인 recovery record를 최대 100개씩 종류별로 반환한다. record는 `kind`, `id`, `resource`, `stage`, `attempts`, 선택적 `last_error`만 포함하며 command, environment, PID, native identity는 노출하지 않는다. 완료된 record는 응답에 포함되지 않는다.
+
+```json
+{
+  "records": [
+    {
+      "kind": "transient_cleanup",
+      "id": "a2b8c4c8-9a9f-4cd3-ae6b-6d12af4e1ad0",
+      "resource": "nightly-report/6a1cc0bb-0e6e-4c46-a4dc-67d5feae044f",
+      "stage": "persist_terminal",
+      "attempts": 2,
+      "last_error": "database temporarily unavailable"
+    }
+  ]
+}
+```
+
+`msv daemon status --recovery`는 같은 정보를 조회한다. 이 표면은 pending durable recovery의 관찰용이며, 완료 여부 또는 consumer별 event delivery를 보장하지 않는다.
+
 #### POST /api/v1/daemon/reload
 
 - `202 Accepted` — 리로드 시작.
 - `400 invalid_config` — 리로드 대상 설정이 유효하지 않음. 데몬은 기존 설정 유지.
+- 파일 리로드는 선언 파일을 권위로 하는 `replace` 적용이다. 명시적 `merge`는 `/daemon/config/apply` 요청에서만 선택한다.
+
+#### POST /api/v1/daemon/config/validate · /apply
+
+요청은 두 endpoint가 같은 형식을 사용한다.
+
+```json
+{
+  "mode": "merge",
+  "dry_run": false,
+  "config": { "process": [], "job": [] }
+}
+```
+
+- `mode`: `merge`는 지정 항목만 병합하고, `replace`는 누락된 process/job을 제거한다.
+- `validate`는 항상 변경 없이 동일 diff를 반환한다. `apply`의 `dry_run: true`도 변경 없이 diff만 반환한다.
+- 성공 응답은 `{ apply_id?, mode, diff, dry_run }`이며 `diff`는 process/job의 added/updated/removed 이름 배열을 담는다.
+- scheduler/registrar 준비 단계에서 실패하면 apply는 이전 snapshot으로 보상한다. 다만 `replace` 제거의 Run 취소, 기존 Direct stop, DB commit 또는 새 Direct start 이후에는 이전 실행 집합을 복원했다고 주장하지 않는다. 이 경우 응답은 `409 config_recovery_required`이고 오류 본문에 durable `apply_id`가 포함되며, journal은 목표 snapshot으로의 forward recovery를 완료할 때까지 다음 apply를 거부한다. 복구의 Direct 실행 목표는 target의 `autostart=true` 항목뿐 아니라 적용 직전 실행 중이었고 target에도 남아 있는 Direct 항목을 포함한다. 따라서 변경된 `autostart=false` 항목도 target spec으로 다시 시작한다. 각 target spawn 의도와 확인된 native generation은 journal에 남으며, 재시작 뒤 동일 identity가 확인되면 중복 spawn하지 않는다.
 
 #### POST /api/v1/daemon/shutdown
 
-- `202 Accepted`. 자식 프로세스의 생명주기 모드(`tied` / `detached`)에 따라 자식 정리 후 종료.
+- `202 Accepted`. 새 dispatch를 닫은 뒤 queued Run을 취소하고 active Run의 child/pump 완료를 기다린 다음 tied 자식을 회수한다. 회수 실패는 성공 종료로 축약하지 않는다.
 
 ### 2.3 Jobs 리소스
 
@@ -193,12 +241,12 @@
 | `POST` | `/api/v1/jobs` | Job 등록 (body: `JobConfig`) |
 | `GET` | `/api/v1/jobs/{name}` | Job 상세 |
 | `PATCH` | `/api/v1/jobs/{name}` | Job 수정 (부분 업데이트) |
-| `DELETE` | `/api/v1/jobs/{name}` | Job 제거 (쿼리 `?force=true` 로 downstream 의존 해제) |
+| `DELETE` | `/api/v1/jobs/{name}` | Job 제거 (`?force=true`은 해당 Job의 own Run 취소·회수만 허용) |
 | `POST` | `/api/v1/jobs/{name}/trigger` | 수동 즉시 실행 (trigger 타입과 무관) |
 | `GET` | `/api/v1/jobs/{name}/runs` | Run 이력. 쿼리: `limit`, `since`, `state` |
 | `GET` | `/api/v1/jobs/{name}/runs/{run_id}` | Run 상세 |
 | `POST` | `/api/v1/jobs/{name}/runs/{run_id}/cancel` | 진행 중 Run 중단 |
-| `GET` | `/api/v1/jobs/{name}/runs/{run_id}/logs` | Run 로그 (REST 일회성). 쿼리: `tail`, `since` |
+| `GET` | `/api/v1/jobs/{name}/runs/{run_id}/logs` | Run 로그 (REST/WS). 쿼리: `tail`, `since`, `after_sequence` |
 
 #### GET /api/v1/jobs
 
@@ -245,9 +293,11 @@
 
 #### DELETE /api/v1/jobs/{name}
 
-- `204 No Content` — 제거 완료
+- `204 No Content` — scheduler 등록, active/queued/cleanup Run, Job/Run 행과 해당 sealed JSONL 로그, `run_log_cleanup` 및 deletion journal까지 모두 제거된 뒤에만 반환한다. Job/Run 행 삭제, 로그 정리 대기열 등록, 삭제 저널의 `rows_deleted` 전이는 하나의 durable commit으로 기록된다.
 - `404 job_not_found`
-- `409 has_dependents` — downstream 의존 Job 존재. `?force=true` 시 의존 해제 후 제거
+- `409 has_dependents` — downstream 의존 Job 존재. `force`는 의존 그래프를 변경하지 않는다.
+- `409 job_has_active_runs` — `force=false`에서 대기/실행 Run이 남아 있음.
+- `409 job_deletion_recovery_required` — `force=true` 삭제가 취소 이후의 비가역 단계에서 일시 실패했다. 같은 요청을 재시도하거나 데몬 재시작 뒤의 복구가 같은 deletion id로 삭제를 계속한다. 취소 이전의 scheduler/queued Run 저장 실패는 `rollback_required`로 기록하고 기존 Job의 dispatch와 scheduler 등록, journal 제거만 재시도하며 삭제 경로로 다시 진입하지 않는다.
 
 #### POST /api/v1/jobs/{name}/trigger
 
@@ -264,7 +314,7 @@
 |---|---|---|
 | `limit` | `50` | 반환 개수 (최대 500) |
 | `since` | *(생략 시 제한 없음)* | RFC3339. 해당 시각 이후 시작된 Run |
-| `state` | *(생략 시 전부)* | `pending` / `running` / `succeeded` / `failed` / `cancelled` / `skipped` 중 하나 |
+| `state` | *(생략 시 전부)* | `pending` / `running` / `succeeded` / `failed` / `timed_out` / `cancelled` / `skipped` 중 하나 |
 
 응답:
 
@@ -328,10 +378,15 @@
 ```json
 {
   "type": "process.state_changed",
+  "event_id": "c0f10fc5-7f64-4dc5-9e42-69a9b5161c89",
   "timestamp": "2026-04-21T10:30:45.123Z",
   "payload": { ... }
 }
 ```
+
+`event_id`는 durable terminal Run 이벤트에만 서버가 넣는 안정 ID다. 이는 additive field이므로 구 daemon은 이 필드를 생략할 수 있고, 수신자는 ID 없는 envelope을 정상 수신해야 한다. 새 daemon은 `job.run_succeeded`, `job.run_failed`, `job.run_timed_out`, `job.run_cancelled`의 terminal frame에 항상 같은 ID를 보낸다.
+
+terminal 이벤트는 SQLite outbox에서 연결된 외부 transport 중 하나가 실제 write에 성공할 때까지 재시도하는 at-least-once 전달이다. 연결 전 전체 history나 소비자별 exactly-once를 제공하지 않으며, write 성공 뒤 acknowledgement 전 daemon crash가 나면 같은 `event_id`가 재전송될 수 있다. CLI와 desktop renderer는 세션 메모리의 bounded ID cache로 이를 중복 제거한다. 이 cache는 재시작 뒤에는 비어 있으므로 영구 exactly-once를 주장하지 않는다.
 
 이벤트 타입:
 
@@ -351,14 +406,16 @@
 
 ### 3.2 /api/v1/processes/{name}/logs
 
-접속 시 실시간 로그 라인을 스트리밍. 포맷은 REST `/logs`의 `lines` 요소와 동일.
+접속 시 서버는 먼저 cursor snapshot을 보내고, 그 snapshot의 `high_watermark`보다 큰 실시간 로그만 이어서 전송한다. 포맷은 REST `/logs`의 `lines` 요소와 동일이다.
 
-- **Rate limit**: 초당 라인 상한 초과 시 `{ "type": "log.dropped", "payload": { "count": N } }` 제어 프레임을 삽입 (DD-012).
+- **Rate limit**: 초당 라인 상한 초과 시 `{ "type": "log.dropped", "payload": { "count": N, "after_sequence": S } }` 제어 프레임을 삽입한다. 클라이언트는 `after_sequence=S`로 REST gap을 채운 뒤 재구독한다 (DD-012).
 - 연결 종료: 클라이언트가 close, 또는 프로세스 등록 해제 시 서버가 close frame + `code` 전송.
 
 ### 3.3 /api/v1/jobs/{name}/runs/{run_id}/logs
 
-해당 Run 의 stdout/stderr 라인을 실시간 스트리밍. 포맷·rate limit·drop 규칙은 §3.2 와 동일. Run 종료 시 서버가 close frame 으로 종료(정상·실패 여부는 `/events` 의 `job.run_*` 메시지 참조).
+해당 Run 의 stdout/stderr 라인을 실시간 스트리밍한다. REST와 WebSocket 모두 `tail`, `since`, `after_sequence`를 journal 조회 전에 적용하므로, Run도 process와 동일하게 디스크 backfill 뒤 limit을 적용한다. 포맷·rate limit·drop 규칙은 §3.2 와 동일하다. Run 종료 시 서버가 close frame 으로 종료한다(정상·실패 여부는 `/events` 의 `job.run_*` 메시지 참조). CLI `--follow`는 REST backfill, WebSocket 연결·읽기, 재시도 대기 중 일시적 장애를 제한된 지수 backoff로 재시도하며 Ctrl-C에는 정상 종료한다.
+
+구 legacy 로그는 source sequence/timestamp interleave를 정확히 복원할 수 없다. legacy 파일은 `since`와 cursor 정확성 보장 대상이 아니며, 새 journal 구간에서만 무유실·무중복 재연결을 보장한다. 특히 기존 detached `direct-<sanitized>.stdout.log`/`stderr.log` 쌍은 등록된 전체 이름에서 충돌하지 않을 때에만 cursor 없는 일회성 tail로 읽는다. 충돌한 이름은 어느 process에도 노출하지 않으며, 새 detached spawn은 `msv-log-proxy`가 한 `direct-<hex>.jsonl` journal에 stdout/stderr 순서와 sequence를 함께 기록한다.
 
 ### 3.4 공통 사항
 
@@ -378,7 +435,7 @@ interface ProcessStatus {
   name: string;
   state: ProcessState;
   management_mode: ManagementMode;
-  pid: number | null;              // Direct 모드에서만 값 존재
+  pid: number | null;              // 실행 중이면 Direct/SystemRegistered 모두 값 존재
   unit_name: string | null;        // SystemRegistered 모드에서만 값 존재
   restart_count: number;
   started_at: string | null;       // RFC3339
@@ -485,9 +542,12 @@ type JobRunState =
   | "running"
   | "succeeded"
   | "failed"
+  | "timed_out"
   | "cancelled"
   | "skipped";
 ```
+
+`log_retention.max_runs`와 `max_age_days`는 1 이상의 값만 허용한다. 둘 다 설정하면 둘 중 하나라도 한도를 넘은 완료 기록과 해당 로그 파일을 삭제한다. 정리는 실행 종료 직후, 관리 프로그램 시작 시, 실행 중 매시간 수행한다. 실행 중이거나 대기 중인 기록은 삭제하지 않는다.
 
 ---
 
@@ -519,7 +579,9 @@ type JobRunState =
 | `queued` | 409 | `on_overlap = "queue"` 상태에서 trigger 가 큐에 삽입됨 (응답 바디에 순번) |
 | `not_running` | 409 | 실행 중이 아니라 동작 거부 |
 | `crash_loop_detected` | 409 | 자동 재시작 중단 상태. 사용자 `restart` 호출로 해제 |
-| `has_dependents` | 409 | Job 삭제 시 downstream 의존 존재. `?force=true` 로 의존 해제 후 삭제 |
+| `has_dependents` | 409 | Job 삭제 시 downstream 의존 존재. `force`는 의존 그래프를 변경하지 않음 |
+| `job_has_active_runs` | 409 | `force=false` Job 삭제 시 대기 또는 실행 Run 존재 |
+| `job_deletion_recovery_required` | 409 | force Job 삭제가 비가역 취소 경계 뒤에 있어 durable deletion journal로 forward recovery 중 |
 | `run_already_finished` | 409 | 이미 종료된 Run 에 대한 cancel 시도 |
 | `cycle_detected` | 422 | `JobConfig.trigger.type = "depends_on"` 이 순환을 형성 |
 | `unit_name_conflict` | 409 | Direct → SystemRegistered 전환 시 지정된 `unit_name` 이 다른 곳에 이미 존재 |
@@ -546,6 +608,5 @@ type JobRunState =
 
 - 페이지네이션: `GET /api/v1/processes`·`GET /api/v1/jobs` 가 많은 엔티티에서 페이징이 필요한지 (MVP 목표 1000 프로세스 기준)
 - 대량 로그 조회의 응답 상한 정책 (현재 `tail <= 10000` 가정)
-- WebSocket 이벤트의 시퀀스/id 부여 여부 (재연결 시 유실 판정용)
-- `GET /api/v1/jobs/{name}/runs` 의 이력 보존 한도 (현재 Job 별 `log_retention` 설정에 위임; 서버측 글로벌 상한 필요 여부는 PoC·MVP 중 확정)
+- 모든 Job에 강제로 적용할 전역 이력 보존 상한 도입 여부. 현재는 Job별 `log_retention` 설정을 적용한다.
 - 인증 도입 시점·형태 (현재는 로컬 전용, 원격 지원은 Post-Production)

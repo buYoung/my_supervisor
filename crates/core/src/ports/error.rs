@@ -30,6 +30,18 @@ pub enum RunnerError {
     Launch(String),
     #[error("runner error: {0}")]
     Backend(String),
+    #[error("job child could not be reaped: {0}")]
+    Unreaped(String),
+}
+
+/// Durable log-journal failure.  A failed append must not be announced to
+/// subscribers because consumers use the source sequence as their cursor.
+#[derive(Debug, Error)]
+pub enum LogError {
+    #[error("log source is sealed: {0}")]
+    Sealed(String),
+    #[error("log storage error: {0}")]
+    Storage(String),
 }
 
 /// Config load / validation failure.

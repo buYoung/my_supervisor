@@ -9,6 +9,8 @@
  */
 
 import {
+  createEventDeduper,
+  type FollowEventsHandlers,
   type FollowLogsHandlers,
   type JobRunsResult,
   OperationsError,
@@ -17,6 +19,7 @@ import {
 } from "./operations-client";
 import {
   mapDaemonStatus,
+  mapEventEnvelope,
   mapJobRun,
   mapJobStatus,
   mapLogLine,
@@ -24,6 +27,7 @@ import {
 } from "./wire-mapping";
 import type {
   DaemonStatusDto,
+  EventEnvelopeDto,
   JobConfigDto,
   JobStatusDto,
   ListJobsDto,
@@ -37,7 +41,7 @@ import type {
 } from "./wire-types";
 
 type InvokeFn = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
-type ListenFn = (
+export type ListenFn = (
   event: string,
   handler: (event: { payload: unknown }) => void,
 ) => Promise<() => void>;
@@ -95,7 +99,9 @@ async function invokeCommand<T>(command: string, args?: Record<string, unknown>)
   }
 }
 
-export function createInvokeClient(): OperationsClient {
+export function createInvokeClient(
+  loadListenAdapter: () => Promise<ListenFn> = loadListen,
+): OperationsClient {
   return {
     transport: "invoke",
 
@@ -160,7 +166,7 @@ export function createInvokeClient(): OperationsClient {
       // Listen on the per-process Tauri event channel `process-log:{name}`, THEN
       // ask the host to start forwarding the broadcast to that channel. Order
       // matters: register the listener first so no early lines are missed.
-      void loadListen()
+      void loadListenAdapter()
         .then((listen) => listen(`process-log:${name}`, (event) => {
           const payload = event.payload as LogLineDto;
           handlers.onLine(mapLogLine(payload, name, counter));
@@ -181,6 +187,45 @@ export function createInvokeClient(): OperationsClient {
 
       return () => {
         cancelled = true;
+        unlisten?.();
+      };
+    },
+
+    followEvents(handlers: FollowEventsHandlers) {
+      const shouldEmit = createEventDeduper();
+      let unlisten: (() => void) | null = null;
+      let isCancelled = false;
+
+      // The host owns one global forwarder for its lifetime, so listener
+      // disposal releases renderer resources without spawning orphan tasks.
+      void loadListenAdapter()
+        .then((listen) => listen("global-event", (event) => {
+          const payload = event.payload;
+          if (!payload || typeof payload !== "object") {
+            return;
+          }
+          const dto = payload as EventEnvelopeDto;
+          if (typeof dto.type !== "string" || typeof dto.timestamp !== "string" || !("payload" in dto)) {
+            return;
+          }
+          const mapped = mapEventEnvelope(dto);
+          if (shouldEmit(mapped.eventId)) {
+            handlers.onEvent(mapped);
+          }
+        }))
+        .then((dispose) => {
+          if (isCancelled) {
+            dispose();
+            return;
+          }
+          unlisten = dispose;
+        })
+        .catch((cause) => {
+          handlers.onError?.(toOperationsError(cause));
+        });
+
+      return () => {
+        isCancelled = true;
         unlisten?.();
       };
     },

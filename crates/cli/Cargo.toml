@@ -14,9 +14,21 @@ my-supervisor-shared = { workspace = true }
 serde = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal"] }
 serde_json = { workspace = true }
 toml = { workspace = true }
 chrono = { workspace = true }
 comfy-table = "7"
 anyhow = { workspace = true }
+futures-util = { workspace = true }
+tokio-tungstenite = "0.26"
+
+[dev-dependencies]
+axum = { workspace = true }
+my-supervisor-application = { workspace = true }
+my-supervisor-infra-http = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+libc = "0.2"

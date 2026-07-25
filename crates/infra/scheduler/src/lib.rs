@@ -15,7 +15,9 @@ use tokio::task::JoinHandle;
 
 use my_supervisor_core::domain::JobTrigger;
 use my_supervisor_core::ports::error::SchedulerError;
-use my_supervisor_core::ports::scheduler::{ScheduleEvent, Scheduler};
+use my_supervisor_core::ports::scheduler::{
+    ScheduleEvent, ScheduledJob, Scheduler, SchedulerSnapshot,
+};
 
 const EVENT_CAPACITY: usize = 256;
 /// Cap a single sleep so far-future one-shots stay responsive to unregister.
@@ -24,6 +26,7 @@ const MAX_SLEEP: StdDuration = StdDuration::from_secs(3600);
 pub struct TokioScheduler {
     tx: broadcast::Sender<ScheduleEvent>,
     timers: Mutex<HashMap<String, JoinHandle<()>>>,
+    triggers: Mutex<HashMap<String, JobTrigger>>,
 }
 
 impl Default for TokioScheduler {
@@ -38,6 +41,7 @@ impl TokioScheduler {
         TokioScheduler {
             tx,
             timers: Mutex::new(HashMap::new()),
+            triggers: Mutex::new(HashMap::new()),
         }
     }
 
@@ -93,6 +97,10 @@ impl Scheduler for TokioScheduler {
             parse_cron(expr)?;
         }
         self.abort(job_name);
+        self.triggers
+            .lock()
+            .unwrap()
+            .insert(job_name.to_string(), trigger.clone());
 
         if matches!(trigger, JobTrigger::DependsOn(_)) {
             return Ok(());
@@ -122,6 +130,33 @@ impl Scheduler for TokioScheduler {
 
     async fn unregister(&self, job_name: &str) -> Result<(), SchedulerError> {
         self.abort(job_name);
+        self.triggers.lock().unwrap().remove(job_name);
+        Ok(())
+    }
+
+    async fn snapshot(&self) -> Result<SchedulerSnapshot, SchedulerError> {
+        let mut entries: Vec<ScheduledJob> = self
+            .triggers
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, trigger)| ScheduledJob {
+                name: name.clone(),
+                trigger: trigger.clone(),
+            })
+            .collect();
+        entries.sort_by(|left, right| left.name.cmp(&right.name));
+        Ok(SchedulerSnapshot { entries })
+    }
+
+    async fn restore(&self, snapshot: &SchedulerSnapshot) -> Result<(), SchedulerError> {
+        let current: Vec<String> = self.triggers.lock().unwrap().keys().cloned().collect();
+        for name in current {
+            self.unregister(&name).await?;
+        }
+        for entry in &snapshot.entries {
+            self.register(&entry.name, &entry.trigger).await?;
+        }
         Ok(())
     }
 

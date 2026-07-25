@@ -13,13 +13,14 @@ pub mod shutdown;
 
 pub use clock::{RealClock, SystemClock};
 pub use config_source::ConfigSource;
-pub use error::{ConfigError, RegistrarError, RepoError, RunnerError, SchedulerError};
-pub use job_runner::JobRunner;
+pub use error::{ConfigError, LogError, RegistrarError, RepoError, RunnerError, SchedulerError};
+pub use job_runner::{JobRunner, RunExecutionControl};
 pub use lifecycle::{
-    Aliveness, LifecycleController, ProbeError, ReapError, SpawnError, TransientOutcome,
+    Aliveness, CleanupTicket, LifecycleController, ProbeError, ReapError, SpawnError,
+    TransientCleanupStage, TransientCompletion, TransientOutcome,
 };
 pub use log_sink::{LogSink, LogTail};
 pub use registrar::ProcessServiceRegistrar;
-pub use repository::{JobRepository, StateRepository};
-pub use scheduler::{ScheduleEvent, Scheduler};
+pub use repository::{JobRepository, StateRepository, TransientTerminalEvent};
+pub use scheduler::{ScheduleEvent, ScheduledJob, Scheduler, SchedulerSnapshot};
 pub use shutdown::{ShutdownSignaler, SignalError};

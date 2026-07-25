@@ -7,10 +7,13 @@ use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+use chrono::{DateTime, Utc};
 use my_supervisor_shared::api::{
-    ConvertRequestDto, DaemonStatusDto, JobConfigDto, JobListDto, JobRunListDto, JobStatusDto,
-    LogsResponseDto, ProcessConfigDto, ProcessListDto, ProcessStatusDto, RestartNoopDto,
+    ConfigApplyResultDto, ConvertRequestDto, DaemonStatusDto, JobListDto, JobRunListDto,
+    JobStatusDto, LogsResponseDto, ProcessListDto,
+    ProcessStatusDto, RecoveryDiagnosticsDto, RestartNoopDto,
 };
+use my_supervisor_shared::config::ConfigApplyRequestDto;
 use my_supervisor_shared::error::ErrorBody;
 
 /// Error carrying the process exit code the CLI should terminate with.
@@ -203,20 +206,6 @@ impl Client {
         .map(|_| ())
     }
 
-    pub async fn add_process(&self, dto: &ProcessConfigDto) -> Result<(), CliError> {
-        let body = serde_json::to_value(dto).map_err(|e| CliError::Failed(e.to_string()))?;
-        self.send(Method::POST, "/api/v1/processes", Some(body))
-            .await
-            .map(|_| ())
-    }
-
-    pub async fn add_job(&self, dto: &JobConfigDto) -> Result<(), CliError> {
-        let body = serde_json::to_value(dto).map_err(|e| CliError::Failed(e.to_string()))?;
-        self.send(Method::POST, "/api/v1/jobs", Some(body))
-            .await
-            .map(|_| ())
-    }
-
     pub async fn remove_job(&self, name: &str, force: bool) -> Result<(), CliError> {
         let name = Self::encode_path_segment(name);
         let query = if force { "?force=true" } else { "" };
@@ -225,16 +214,70 @@ impl Client {
             .map(|_| ())
     }
 
-    pub async fn process_logs(&self, name: &str, tail: usize) -> Result<LogsResponseDto, CliError> {
+    pub async fn process_logs(
+        &self,
+        name: &str,
+        tail: usize,
+        since: Option<DateTime<Utc>>,
+        after_sequence: Option<u64>,
+    ) -> Result<LogsResponseDto, CliError> {
         let name = Self::encode_path_segment(name);
-        self.get_json(&format!("/api/v1/processes/{name}/logs?tail={tail}"))
+        self.get_json(&log_path(
+            &format!("/api/v1/processes/{name}/logs"),
+            tail,
+            since,
+            after_sequence,
+        ))
             .await
+    }
+
+    pub fn process_log_websocket_url(
+        &self,
+        name: &str,
+        after_sequence: u64,
+    ) -> Result<String, CliError> {
+        let name = Self::encode_path_segment(name);
+        self.websocket_url(&log_path(
+            &format!("/api/v1/processes/{name}/logs"),
+            10_000,
+            None,
+            Some(after_sequence),
+        ))
     }
 
     pub async fn reload(&self) -> Result<(), CliError> {
         self.send(Method::POST, "/api/v1/daemon/reload", None)
             .await
             .map(|_| ())
+    }
+
+    pub async fn validate_config(
+        &self,
+        request: &ConfigApplyRequestDto,
+    ) -> Result<ConfigApplyResultDto, CliError> {
+        self.config_request("validate", request).await
+    }
+
+    pub async fn apply_config(
+        &self,
+        request: &ConfigApplyRequestDto,
+    ) -> Result<ConfigApplyResultDto, CliError> {
+        self.config_request("apply", request).await
+    }
+
+    async fn config_request(
+        &self,
+        action: &str,
+        request: &ConfigApplyRequestDto,
+    ) -> Result<ConfigApplyResultDto, CliError> {
+        let body = serde_json::to_value(request).map_err(|error| CliError::Failed(error.to_string()))?;
+        let response = self
+            .send(Method::POST, &format!("/api/v1/daemon/config/{action}"), Some(body))
+            .await?;
+        response
+            .json::<ConfigApplyResultDto>()
+            .await
+            .map_err(|error| CliError::Failed(format!("decoding response: {error}")))
     }
 
     pub async fn shutdown(&self) -> Result<(), CliError> {
@@ -245,6 +288,10 @@ impl Client {
 
     pub async fn daemon_status(&self) -> Result<DaemonStatusDto, CliError> {
         self.get_json("/api/v1/daemon/status").await
+    }
+
+    pub async fn recovery_diagnostics(&self) -> Result<RecoveryDiagnosticsDto, CliError> {
+        self.get_json("/api/v1/daemon/recovery").await
     }
 
     pub async fn list_jobs(&self) -> Result<JobListDto, CliError> {
@@ -279,6 +326,72 @@ impl Client {
             .await
     }
 
+    pub async fn run_logs(
+        &self,
+        name: &str,
+        run_id: &str,
+        tail: usize,
+        since: Option<DateTime<Utc>>,
+        after_sequence: Option<u64>,
+    ) -> Result<LogsResponseDto, CliError> {
+        let name = Self::encode_path_segment(name);
+        let run_id = Self::encode_path_segment(run_id);
+        self.get_json(&log_path(
+            &format!("/api/v1/jobs/{name}/runs/{run_id}/logs"),
+            tail,
+            since,
+            after_sequence,
+        )).await
+    }
+
+    pub fn run_log_websocket_url(
+        &self,
+        name: &str,
+        run_id: &str,
+        after_sequence: u64,
+    ) -> Result<String, CliError> {
+        let name = Self::encode_path_segment(name);
+        let run_id = Self::encode_path_segment(run_id);
+        self.websocket_url(&log_path(
+            &format!("/api/v1/jobs/{name}/runs/{run_id}/logs"),
+            10_000,
+            None,
+            Some(after_sequence),
+        ))
+    }
+
+    /// Global event transport URL. The event stream is intentionally separate
+    /// from the REST API because terminal events are delivered live and may be
+    /// replayed with the same stable `event_id` after a transport failure.
+    pub fn events_websocket_url(&self) -> Result<String, CliError> {
+        self.websocket_url("/api/v1/events")
+    }
+
+    pub async fn cancel_run(&self, name: &str, run_id: &str) -> Result<(), CliError> {
+        let name = Self::encode_path_segment(name);
+        let run_id = Self::encode_path_segment(run_id);
+        self.send(
+            Method::POST,
+            &format!("/api/v1/jobs/{name}/runs/{run_id}/cancel"),
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    fn websocket_url(&self, path: &str) -> Result<String, CliError> {
+        let mut url = reqwest::Url::parse(&format!("{}{path}", self.base))
+            .map_err(|error| CliError::Failed(format!("building WebSocket URL: {error}")))?;
+        let scheme = match url.scheme() {
+            "http" => "ws",
+            "https" => "wss",
+            _ => return Err(CliError::Failed("unsupported WebSocket URL scheme".into())),
+        };
+        url.set_scheme(scheme)
+            .map_err(|_| CliError::Failed("building WebSocket URL".into()))?;
+        Ok(url.to_string())
+    }
+
     pub async fn convert_process(
         &self,
         name: &str,
@@ -299,4 +412,20 @@ impl Client {
             .map_err(|error| CliError::Failed(format!("decoding response: {error}")))
     }
 
+}
+
+fn log_path(
+    path: &str,
+    tail: usize,
+    since: Option<DateTime<Utc>>,
+    after_sequence: Option<u64>,
+) -> String {
+    let mut query = vec![format!("tail={tail}")];
+    if let Some(since) = since {
+        query.push(format!("since={}", since.to_rfc3339()));
+    }
+    if let Some(after_sequence) = after_sequence {
+        query.push(format!("after_sequence={after_sequence}"));
+    }
+    format!("{path}?{}", query.join("&"))
 }

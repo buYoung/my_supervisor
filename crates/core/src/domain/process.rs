@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// How a managed process is controlled.
@@ -12,7 +13,7 @@ use uuid::Uuid;
 /// `Direct` — the daemon spawns / supervises / restarts the child itself.
 /// `SystemRegistered` — the OS service manager owns the lifecycle; control and
 /// status flow through `ProcessServiceRegistrar` keyed on `unit_name`.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ManagementMode {
     #[default]
     Direct,
@@ -23,7 +24,7 @@ pub enum ManagementMode {
 
 /// Tied children die with the daemon; detached children outlive it.
 /// Only meaningful in `Direct` mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum LifecycleMode {
     #[default]
     Tied,
@@ -31,7 +32,7 @@ pub enum LifecycleMode {
 }
 
 /// Observable runtime state of a process.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProcessState {
     Starting,
     Running,
@@ -41,7 +42,7 @@ pub enum ProcessState {
 }
 
 /// Signal used to ask a child to stop before escalating to a hard kill.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ShutdownSignal {
     #[default]
     Term,
@@ -51,7 +52,7 @@ pub enum ShutdownSignal {
 
 /// Restart behavior. Direct-mode delays are produced by the application's
 /// backoff library. System-registered mode delegates restarting to the OS.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestartPolicy {
     pub enabled: bool,
     pub max_retries: Option<u32>,
@@ -77,7 +78,7 @@ impl Default for RestartPolicy {
 }
 
 /// Graceful-shutdown policy applied before a force kill.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ShutdownPolicy {
     pub signal: ShutdownSignal,
     pub grace_period: Duration,
@@ -93,7 +94,7 @@ impl Default for ShutdownPolicy {
 }
 
 /// A managed-process definition. Mirrors a single `[[process]]` config block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessSpec {
     pub name: String,
     pub command: String,
@@ -133,7 +134,25 @@ impl ProcessSpec {
 pub struct ChildHandle {
     pub process_id: Uuid,
     pub pid: u32,
+    /// Dedicated process group created by the platform adapter.  Missing values
+    /// represent handles written by an older daemon and are never signalable.
+    pub pgid: Option<u32>,
+    /// Platform-provided process creation token.  It protects against PID reuse
+    /// after a daemon restart; older persisted handles deliberately omit it.
+    pub generation: Option<String>,
     pub started_at: DateTime<Utc>,
+}
+
+/// A deferred durable-handle removal after the operating system has already
+/// confirmed the child exited.  The process identity is retained so a retry
+/// can never clear a newer handle written for the same process name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeHandleCleanup {
+    pub name: String,
+    pub process_id: Uuid,
+    pub generation: Option<String>,
+    pub attempts: u32,
+    pub last_error: Option<String>,
 }
 
 /// A point-in-time status snapshot for the API/UI.
@@ -146,6 +165,13 @@ pub struct ProcessStatus {
     pub unit_name: Option<String>,
     pub restart_count: u32,
     pub started_at: Option<DateTime<Utc>>,
+    pub cpu_percent: f32,
+    pub memory_bytes: u64,
+}
+
+/// CPU and resident-memory usage sampled from the operating system.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ProcessResourceUsage {
     pub cpu_percent: f32,
     pub memory_bytes: u64,
 }

@@ -3,20 +3,27 @@
 
 mod client;
 
-use std::collections::HashMap;
+use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use chrono::{DateTime, Utc};
 use comfy_table::Table;
+use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
+use tokio_tungstenite::tungstenite::Message;
 
 use client::{CliError, Client};
 use my_supervisor_app_daemon::DEFAULT_BASE_URL;
 use my_supervisor_shared::api::{
-    ConvertRequestDto, ConvertTargetDto, JobRunStateDto, LogLineDto, ProcessStateDto,
+    ConfigApplyModeDto, ConvertRequestDto, ConvertTargetDto, JobRunStateDto, LogLineDto,
+    ProcessStateDto,
 };
-use my_supervisor_shared::config::FileConfig;
+use my_supervisor_shared::config::{ConfigApplyRequestDto, FileConfig};
+use my_supervisor_shared::events::EventEnvelope;
+
+const EVENT_DEDUP_CACHE_CAPACITY: usize = 1_024;
 
 #[derive(Parser)]
 #[command(name = "msv", version, about = "my-supervisor operations CLI")]
@@ -41,6 +48,12 @@ enum OutputFormat {
 enum ConvertMode {
     Direct,
     SystemRegistered,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ConfigMode {
+    Merge,
+    Replace,
 }
 
 #[derive(Subcommand)]
@@ -76,6 +89,8 @@ enum Command {
         follow: bool,
         #[arg(long, default_value_t = 100)]
         tail: usize,
+        #[arg(long)]
+        since: Option<DateTime<Utc>>,
     },
     /// Register processes/jobs from a TOML config file.
     Add {
@@ -90,6 +105,11 @@ enum Command {
     },
     /// Reload the daemon's config file.
     Reload,
+    /// Validate or atomically apply a TOML configuration file.
+    Config {
+        #[command(subcommand)]
+        sub: ConfigCmd,
+    },
     /// Daemon controls.
     Daemon {
         #[command(subcommand)]
@@ -105,9 +125,64 @@ enum Command {
 #[derive(Subcommand)]
 enum DaemonCmd {
     /// Show daemon status.
-    Status,
+    Status {
+        /// Include bounded pending durable recovery diagnostics.
+        #[arg(long)]
+        recovery: bool,
+    },
+    /// Follow global events. Terminal events are de-duplicated by stable event_id.
+    Events,
     /// Stop the daemon gracefully.
     Shutdown,
+}
+
+/// Session-scoped terminal event de-duplication. Durability remains server-side
+/// in the SQLite outbox; this bounded cache deliberately does not survive a
+/// CLI process restart, so it never claims cross-session exactly-once delivery.
+#[derive(Default)]
+struct EventDeduper {
+    event_ids: HashSet<String>,
+    insertion_order: VecDeque<String>,
+}
+
+impl EventDeduper {
+    fn should_emit(&mut self, event_id: Option<&str>) -> bool {
+        let Some(event_id) = event_id else {
+            // Older daemons did not send an ID. Preserve compatibility without
+            // incorrectly treating a payload match as an exactly-once key.
+            return true;
+        };
+        if !self.event_ids.insert(event_id.to_owned()) {
+            return false;
+        }
+        self.insertion_order.push_back(event_id.to_owned());
+        if self.insertion_order.len() > EVENT_DEDUP_CACHE_CAPACITY {
+            if let Some(expired_event_id) = self.insertion_order.pop_front() {
+                self.event_ids.remove(&expired_event_id);
+            }
+        }
+        true
+    }
+}
+
+#[derive(Subcommand)]
+enum ConfigCmd {
+    /// Validate a configuration file without changing daemon state.
+    Validate {
+        #[arg(short = 'f', long)]
+        file: PathBuf,
+        #[arg(long, value_enum, default_value_t = ConfigMode::Merge)]
+        mode: ConfigMode,
+    },
+    /// Atomically apply a configuration file.
+    Apply {
+        #[arg(short = 'f', long)]
+        file: PathBuf,
+        #[arg(long, value_enum, default_value_t = ConfigMode::Merge)]
+        mode: ConfigMode,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -124,11 +199,24 @@ enum JobCmd {
     },
     /// Trigger a job immediately.
     Trigger { name: String },
+    /// Request cancellation of a pending or running job run.
+    Cancel { name: String, run_id: String },
     /// Show a job's run history.
     Runs {
         name: String,
         #[arg(long, default_value_t = 20)]
         limit: usize,
+    },
+    /// Show a job run's captured logs.
+    Logs {
+        name: String,
+        run_id: String,
+        #[arg(short = 'f', long)]
+        follow: bool,
+        #[arg(long, default_value_t = 100)]
+        tail: usize,
+        #[arg(long)]
+        since: Option<DateTime<Utc>>,
     },
 }
 
@@ -178,6 +266,24 @@ fn print_log_line(line: &LogLineDto, json: bool) -> Result<(), CliError> {
     Ok(())
 }
 
+fn print_event(event: &EventEnvelope, json: bool) -> Result<(), CliError> {
+    if json {
+        // Event follow is JSON Lines: exactly one JSON object for every
+        // accepted frame, never a pretty-printed multi-line document.
+        let output = serde_json::to_string(event)
+            .map_err(|error| CliError::Failed(format!("serializing event: {error}")))?;
+        println!("{output}");
+    } else {
+        println!(
+            "{} {} {}",
+            event.timestamp.to_rfc3339(),
+            event.event_type,
+            event.payload
+        );
+    }
+    Ok(())
+}
+
 fn process_state_label(state: ProcessStateDto) -> &'static str {
     match state {
         ProcessStateDto::Starting => "starting",
@@ -194,8 +300,21 @@ fn run_state_label(state: JobRunStateDto) -> &'static str {
         JobRunStateDto::Running => "running",
         JobRunStateDto::Succeeded => "succeeded",
         JobRunStateDto::Failed => "failed",
+        JobRunStateDto::TimedOut => "timed_out",
         JobRunStateDto::Cancelled => "cancelled",
         JobRunStateDto::Skipped => "skipped",
+    }
+}
+
+fn format_memory(bytes: u64) -> String {
+    const KIB: u64 = 1024;
+    const MIB: u64 = KIB * 1024;
+    if bytes >= MIB {
+        format!("{:.1} MiB", bytes as f64 / MIB as f64)
+    } else if bytes >= KIB {
+        format!("{:.1} KiB", bytes as f64 / KIB as f64)
+    } else {
+        format!("{bytes} B")
     }
 }
 
@@ -208,12 +327,16 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 print_json(&list)?;
             } else {
                 let mut table = Table::new();
-                table.set_header(vec!["NAME", "STATE", "PID", "RESTARTS", "STARTED"]);
+                table.set_header(vec![
+                    "NAME", "STATE", "PID", "CPU", "MEMORY", "RESTARTS", "STARTED",
+                ]);
                 for p in &list.processes {
                     table.add_row(vec![
                         p.name.clone(),
                         process_state_label(p.state).to_string(),
                         p.pid.map(|v| v.to_string()).unwrap_or_else(|| "-".into()),
+                        format!("{:.1}%", p.cpu_percent),
+                        format_memory(p.memory_bytes),
                         p.restart_count.to_string(),
                         p.started_at
                             .map(|t| t.to_rfc3339())
@@ -234,6 +357,8 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 println!("restarts:  {}", process.restart_count);
                 println!("mode:      {:?}", process.management_mode);
                 println!("started:   {}", process.started_at.map_or_else(|| "-".into(), |time| time.to_rfc3339()));
+                println!("cpu:       {:.1}%", process.cpu_percent);
+                println!("memory:    {}", format_memory(process.memory_bytes));
             }
         }
         Command::Start { name } => {
@@ -287,9 +412,9 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 println!("converted {name} to {:?}", process.management_mode);
             }
         }
-        Command::Logs { name, follow, tail } => {
-            let page = client.process_logs(name, *tail).await?;
-            if json && !follow {
+        Command::Logs { name, follow, tail, since } => {
+            let page = client.process_logs(name, *tail, *since, None).await?;
+            if json && !*follow {
                 print_json(&page)?;
             } else {
                 for line in &page.lines {
@@ -297,7 +422,7 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 }
             }
             if *follow {
-                follow_logs(client, name, json).await?;
+                follow_process_logs(client, name, json, page.high_watermark).await?;
             }
         }
         Command::Add { config } => {
@@ -319,8 +444,42 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 println!("reload requested");
             }
         }
+        Command::Config { sub } => match sub {
+            ConfigCmd::Validate { file, mode } => {
+                let request = config_request(file, *mode, false)?;
+                let result = client.validate_config(&request).await?;
+                print_config_result(&result, json)?;
+            }
+            ConfigCmd::Apply { file, mode, dry_run } => {
+                let request = config_request(file, *mode, *dry_run)?;
+                let result = client.apply_config(&request).await?;
+                print_config_result(&result, json)?;
+            }
+        },
         Command::Daemon { sub } => match sub {
-            DaemonCmd::Status => {
+            DaemonCmd::Status { recovery } => {
+                if *recovery {
+                    let diagnostics = client.recovery_diagnostics().await?;
+                    if json {
+                        print_json(&diagnostics)?;
+                    } else if diagnostics.records.is_empty() {
+                        println!("pending recovery: none");
+                    } else {
+                        let mut table = Table::new();
+                        table.set_header(vec!["KIND", "RESOURCE", "STAGE", "ATTEMPTS", "LAST ERROR"]);
+                        for record in diagnostics.records {
+                            table.add_row(vec![
+                                record.kind,
+                                record.resource,
+                                record.stage,
+                                record.attempts.to_string(),
+                                record.last_error.unwrap_or_else(|| "-".into()),
+                            ]);
+                        }
+                        println!("{table}");
+                    }
+                    return Ok(());
+                }
                 let status = client.daemon_status().await?;
                 if json {
                     print_json(&status)?;
@@ -333,6 +492,7 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     println!("log_dir:    {}", status.log_dir);
                 }
             }
+            DaemonCmd::Events => follow_events(client, json).await?,
             DaemonCmd::Shutdown => {
                 client.shutdown().await?;
                 if json {
@@ -392,6 +552,14 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     println!("triggered {name} (run {run_id})");
                 }
             }
+            JobCmd::Cancel { name, run_id } => {
+                client.cancel_run(name, run_id).await?;
+                if json {
+                    print_json(&serde_json::json!({ "name": name, "run_id": run_id, "cancel_requested": true }))?;
+                } else {
+                    println!("cancel requested for {name} run {run_id}");
+                }
+            }
             JobCmd::Runs { name, limit } => {
                 let list = client.list_runs(name, *limit).await?;
                 if json {
@@ -415,65 +583,255 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     println!("{table}");
                 }
             }
+            JobCmd::Logs { name, run_id, follow, tail, since } => {
+                let page = client.run_logs(name, run_id, *tail, *since, None).await?;
+                if json && !*follow {
+                    print_json(&page)?;
+                } else {
+                    for line in &page.lines {
+                        print_log_line(line, json)?;
+                    }
+                }
+                if *follow {
+                    follow_run_logs(client, name, run_id, json, page.high_watermark).await?;
+                }
+            }
         },
     }
     Ok(())
 }
 
-/// Follow a process's logs over WS until interrupted.
-async fn follow_logs(client: &Client, name: &str, json: bool) -> Result<(), CliError> {
-    const FOLLOW_WINDOW: usize = 10_000;
-    let initial = client.process_logs(name, FOLLOW_WINDOW).await?;
-    let mut seen_counts = HashMap::<(String, String), usize>::new();
-    for line in initial.lines {
-        *seen_counts
-            .entry((format!("{:?}", line.stream), line.line))
-            .or_default() += 1;
-    }
+async fn follow_events(client: &Client, json: bool) -> Result<(), CliError> {
+    let url = client.events_websocket_url()?;
+    let mut backoff_ms = 100_u64;
+    let mut deduper = EventDeduper::default();
     loop {
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        let page = client.process_logs(name, FOLLOW_WINDOW).await?;
-        let mut observed_counts = HashMap::<(String, String), usize>::new();
-        for line in page.lines {
-            let key = (format!("{:?}", line.stream), line.line.clone());
-            let observed = observed_counts.entry(key.clone()).or_default();
-            *observed += 1;
-            if *observed > seen_counts.get(&key).copied().unwrap_or(0) {
+        let connection = tokio::select! {
+            signal = tokio::signal::ctrl_c() => {
+                signal.map_err(|error| CliError::Failed(format!("waiting for Ctrl-C: {error}")))?;
+                return Ok(());
+            }
+            result = tokio_tungstenite::connect_async(&url) => result,
+        };
+        match connection {
+            Ok((mut socket, _)) => {
+                backoff_ms = 100;
+                loop {
+                    tokio::select! {
+                        signal = tokio::signal::ctrl_c() => {
+                            signal.map_err(|error| CliError::Failed(format!("waiting for Ctrl-C: {error}")))?;
+                            let _ = socket.send(Message::Close(None)).await;
+                            return Ok(());
+                        }
+                        message = socket.next() => match message {
+                            Some(Ok(Message::Text(text))) => {
+                                let Ok(event) = serde_json::from_str::<EventEnvelope>(&text) else {
+                                    continue;
+                                };
+                                if deduper.should_emit(event.event_id.as_deref()) {
+                                    print_event(&event, json)?;
+                                }
+                            }
+                            Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+        if !wait_for_follow_retry(backoff_ms).await? {
+            return Ok(());
+        }
+        backoff_ms = (backoff_ms * 2).min(2_000);
+    }
+}
+
+async fn follow_process_logs(
+    client: &Client,
+    name: &str,
+    json: bool,
+    initial_sequence: u64,
+) -> Result<(), CliError> {
+    follow_logs(client, FollowSource::Process(name), json, initial_sequence).await
+}
+
+async fn follow_run_logs(
+    client: &Client,
+    name: &str,
+    run_id: &str,
+    json: bool,
+    initial_sequence: u64,
+) -> Result<(), CliError> {
+    follow_logs(client, FollowSource::Run { name, run_id }, json, initial_sequence).await
+}
+
+enum FollowSource<'a> {
+    Process(&'a str),
+    Run { name: &'a str, run_id: &'a str },
+}
+
+async fn follow_logs(
+    client: &Client,
+    source: FollowSource<'_>,
+    json: bool,
+    mut last_sequence: u64,
+) -> Result<(), CliError> {
+    let mut backoff_ms = 100_u64;
+    loop {
+        let gap = tokio::select! {
+            signal = tokio::signal::ctrl_c() => {
+                signal.map_err(|error| CliError::Failed(format!("waiting for Ctrl-C: {error}")))?;
+                return Ok(());
+            }
+            result = async {
+                match &source {
+                    FollowSource::Process(name) => client.process_logs(name, 10_000, None, Some(last_sequence)).await,
+                    FollowSource::Run { name, run_id } => client.run_logs(name, run_id, 10_000, None, Some(last_sequence)).await,
+                }
+            } => result,
+        };
+        let gap = match gap {
+            Ok(gap) => gap,
+            Err(_) => {
+                if !wait_for_follow_retry(backoff_ms).await? {
+                    return Ok(());
+                }
+                backoff_ms = (backoff_ms * 2).min(2_000);
+                continue;
+            }
+        };
+        for line in gap.lines {
+            if line.sequence == 0 || line.sequence > last_sequence {
                 print_log_line(&line, json)?;
+                last_sequence = last_sequence.max(line.sequence);
             }
         }
-        seen_counts = observed_counts;
+
+        let url = match &source {
+            FollowSource::Process(name) => client.process_log_websocket_url(name, last_sequence)?,
+            FollowSource::Run { name, run_id } => client.run_log_websocket_url(name, run_id, last_sequence)?,
+        };
+        let connection = tokio::select! {
+            signal = tokio::signal::ctrl_c() => {
+                signal.map_err(|error| CliError::Failed(format!("waiting for Ctrl-C: {error}")))?;
+                return Ok(());
+            }
+            result = tokio_tungstenite::connect_async(url) => result,
+        };
+        match connection {
+            Ok((mut socket, _)) => {
+                backoff_ms = 100;
+                loop {
+                    tokio::select! {
+                        signal = tokio::signal::ctrl_c() => {
+                            signal.map_err(|error| CliError::Failed(format!("waiting for Ctrl-C: {error}")))?;
+                            let _ = socket.send(Message::Close(None)).await;
+                            return Ok(());
+                        }
+                        message = socket.next() => match message {
+                            Some(Ok(Message::Text(text))) => {
+                                let value: serde_json::Value = match serde_json::from_str(&text) {
+                                    Ok(value) => value,
+                                    Err(_) => continue,
+                                };
+                                if value.get("type").and_then(|value| value.as_str()) == Some("log.dropped") {
+                                    break;
+                                }
+                                if let Ok(line) = serde_json::from_value::<LogLineDto>(value) {
+                                    if line.sequence == 0 || line.sequence > last_sequence {
+                                        print_log_line(&line, json)?;
+                                        last_sequence = last_sequence.max(line.sequence);
+                                    }
+                                }
+                            }
+                            Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+        if !wait_for_follow_retry(backoff_ms).await? {
+            return Ok(());
+        }
+        backoff_ms = (backoff_ms * 2).min(2_000);
+    }
+}
+
+/// Sleeps between every failed follow phase while allowing Ctrl-C to end the
+/// command successfully even when the daemon is unavailable.
+async fn wait_for_follow_retry(backoff_ms: u64) -> Result<bool, CliError> {
+    tokio::select! {
+        signal = tokio::signal::ctrl_c() => {
+            signal.map_err(|error| CliError::Failed(format!("waiting for Ctrl-C: {error}")))?;
+            Ok(false)
+        }
+        () = tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)) => Ok(true),
     }
 }
 
 /// Read a TOML config file and register each `[[process]]` / `[[job]]` entry.
 async fn add_from_config(client: &Client, path: &PathBuf, json: bool) -> Result<(), CliError> {
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| CliError::Failed(format!("reading {}: {e}", path.display())))?;
-    let file: FileConfig =
-        toml::from_str(&contents).map_err(|e| CliError::Failed(format!("parsing config: {e}")))?;
+    let file = read_config(path)?;
     if file.processes.is_empty() && file.jobs.is_empty() {
         return Err(CliError::Failed(
             "config has no [[process]] or [[job]] entries".into(),
         ));
     }
-    for process in &file.processes {
-        client.add_process(process).await?;
-        if !json {
-            println!("added process {}", process.name);
-        }
-    }
-    for job in &file.jobs {
-        client.add_job(job).await?;
-        if !json {
-            println!("added job {}", job.name);
-        }
-    }
-    if json {
-        print_json(&serde_json::json!({
-            "processes": file.processes.iter().map(|process| &process.name).collect::<Vec<_>>(),
-            "jobs": file.jobs.iter().map(|job| &job.name).collect::<Vec<_>>(),
-        }))?;
-    }
+    let result = client.apply_config(&ConfigApplyRequestDto {
+        mode: ConfigApplyModeDto::Merge,
+        dry_run: false,
+        config: file,
+    }).await?;
+    print_config_result(&result, json)?;
     Ok(())
+}
+
+fn read_config(path: &PathBuf) -> Result<FileConfig, CliError> {
+    let contents = std::fs::read_to_string(path)
+        .map_err(|error| CliError::Failed(format!("reading {}: {error}", path.display())))?;
+    toml::from_str(&contents).map_err(|error| CliError::Failed(format!("parsing config: {error}")))
+}
+
+fn config_request(path: &PathBuf, mode: ConfigMode, dry_run: bool) -> Result<ConfigApplyRequestDto, CliError> {
+    Ok(ConfigApplyRequestDto {
+        mode: match mode {
+            ConfigMode::Merge => ConfigApplyModeDto::Merge,
+            ConfigMode::Replace => ConfigApplyModeDto::Replace,
+        },
+        dry_run,
+        config: read_config(path)?,
+    })
+}
+
+fn print_config_result(
+    result: &my_supervisor_shared::api::ConfigApplyResultDto,
+    json: bool,
+) -> Result<(), CliError> {
+    if json {
+        return print_json(result);
+    }
+    let diff = &result.diff;
+    println!("config {} ({:?})", if result.dry_run { "validated" } else { "applied" }, result.mode);
+    println!("processes: +{} ~{} -{}", diff.added_processes.len(), diff.updated_processes.len(), diff.removed_processes.len());
+    println!("jobs:      +{} ~{} -{}", diff.added_jobs.len(), diff.updated_jobs.len(), diff.removed_jobs.len());
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EventDeduper;
+
+    #[test]
+    fn terminal_event_deduper_preserves_first_seen_order_and_accepts_legacy_frames() {
+        let mut deduper = EventDeduper::default();
+        let accepted = [Some("A"), Some("A"), Some("B"), None, None]
+            .into_iter()
+            .filter(|event_id| deduper.should_emit(*event_id))
+            .collect::<Vec<_>>();
+
+        assert_eq!(accepted, vec![Some("A"), Some("B"), None, None]);
+    }
 }

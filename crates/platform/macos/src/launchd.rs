@@ -4,6 +4,8 @@
 //! Writes only the user domain (`gui/$(id -u)`) — never the system domain.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -16,6 +18,25 @@ pub struct LaunchdAgentProcess {
     agents_dir: PathBuf,
     log_dir: PathBuf,
     uid: u32,
+    test_controls: Option<Arc<LaunchdTestControls>>,
+}
+
+/// Explicit test-only behavior injected by an integration fixture.  Production
+/// assembly uses [`LaunchdAgentProcess::new`] and has no input path to these
+/// controls, so ProcessSpec fields and daemon configuration cannot enable it.
+#[derive(Default)]
+pub struct LaunchdTestControls {
+    fail_next_start: AtomicBool,
+}
+
+impl LaunchdTestControls {
+    pub fn fail_next_start(&self) {
+        self.fail_next_start.store(true, Ordering::SeqCst);
+    }
+
+    fn take_start_failure(&self) -> bool {
+        self.fail_next_start.swap(false, Ordering::SeqCst)
+    }
 }
 
 impl LaunchdAgentProcess {
@@ -27,11 +48,26 @@ impl LaunchdAgentProcess {
             agents_dir: PathBuf::from(home).join("Library").join("LaunchAgents"),
             log_dir,
             uid,
+            test_controls: None,
         }
+    }
+
+    /// Creates a registrar whose failure behavior is controlled exclusively by
+    /// the supplied fixture object.  This is intentionally separate from the
+    /// production constructor.
+    pub fn with_test_controls(log_dir: PathBuf, test_controls: Arc<LaunchdTestControls>) -> Self {
+        let mut registrar = Self::new(log_dir);
+        registrar.test_controls = Some(test_controls);
+        registrar
     }
 
     fn plist_path(&self, unit_name: &str) -> PathBuf {
         self.agents_dir.join(format!("{unit_name}.plist"))
+    }
+
+    fn candidate_plist_path(&self, unit_name: &str) -> PathBuf {
+        self.agents_dir
+            .join(format!(".{unit_name}.{}.tmp", uuid::Uuid::new_v4()))
     }
 
     fn domain(&self) -> String {
@@ -157,6 +193,20 @@ fn xml(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+fn parse_launchctl_pid(output: &str) -> Option<u32> {
+    output.lines().find_map(|line| {
+        if !line.contains("\"PID\"") {
+            return None;
+        }
+        line.split_once('=')?
+            .1
+            .trim()
+            .trim_end_matches(';')
+            .parse()
+            .ok()
+    })
+}
+
 #[async_trait]
 impl ProcessServiceRegistrar for LaunchdAgentProcess {
     async fn register(&self, unit_name: &str, spec: &ProcessSpec) -> Result<(), RegistrarError> {
@@ -172,15 +222,20 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
             .map_err(|e| RegistrarError::RegistrationFailed(e.to_string()))?;
         tokio::fs::create_dir_all(&self.log_dir).await.ok();
 
+        let candidate_path = self.candidate_plist_path(unit_name);
         let plist = self.build_plist(unit_name, spec);
-        tokio::fs::write(&plist_path, plist)
+        tokio::fs::write(&candidate_path, plist)
             .await
             .map_err(|e| RegistrarError::RegistrationFailed(e.to_string()))?;
+        if let Err(error) = tokio::fs::rename(&candidate_path, &plist_path).await {
+            let _ = tokio::fs::remove_file(&candidate_path).await;
+            return Err(RegistrarError::RegistrationFailed(error.to_string()));
+        }
 
-        // Registration only prepares the unit. Starting is a separate action
-        // so callers can honor autostart/auto_start explicitly.
-        let target = self.service_target(unit_name);
-        self.launchctl(&["bootout", &target]).await.ok();
+        // Registration is a reversible filesystem-only prepare step. In
+        // particular, do not boot out an already-running same-label unit here:
+        // later target preparation may still fail and compensation must retain
+        // the old live service and PID.
         Ok(())
     }
 
@@ -194,18 +249,20 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
     }
 
     async fn start(&self, unit_name: &str) -> Result<(), RegistrarError> {
-        if !self.is_registered(unit_name).await {
-            self.bootstrap(unit_name).await?;
-            return Ok(());
+        if self
+            .test_controls
+            .as_ref()
+            .is_some_and(|controls| controls.take_start_failure())
+        {
+            return Err(RegistrarError::RegistrationFailed(
+                "injected launchd start failure".to_string(),
+            ));
         }
-        if matches!(self.query_status(unit_name).await, Ok(ProcessState::Running)) {
-            return Ok(());
-        }
+        // `start` is the live replacement boundary. The application persists
+        // ForwardRecovery before it calls this for a changed same-label spec.
         let target = self.service_target(unit_name);
-        let output = self.launchctl(&["kickstart", "-k", &target]).await?;
-        if !output.status.success() {
-            return Err(RegistrarError::NotFound(unit_name.to_string()));
-        }
+        self.launchctl(&["bootout", &target]).await.ok();
+        self.bootstrap(unit_name).await?;
         Ok(())
     }
 
@@ -229,11 +286,19 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
         }
         let text = String::from_utf8_lossy(&output.stdout);
         // launchctl prints a `"PID" = <n>;` line only while the job is running.
-        Ok(if text.contains("\"PID\"") {
+        Ok(if parse_launchctl_pid(&text).is_some() {
             ProcessState::Running
         } else {
             ProcessState::Stopped
         })
+    }
+
+    async fn query_pid(&self, unit_name: &str) -> Result<Option<u32>, RegistrarError> {
+        let output = self.launchctl(&["list", unit_name]).await?;
+        if !output.status.success() {
+            return Err(RegistrarError::NotFound(unit_name.to_string()));
+        }
+        Ok(parse_launchctl_pid(&String::from_utf8_lossy(&output.stdout)))
     }
 
     async fn tail_logs(
@@ -262,17 +327,51 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
         let timestamp = Utc::now();
         let collected = stdout_lines[stdout_start..]
             .iter()
-            .map(|line| LogLine {
+            .enumerate()
+            .map(|(offset, line)| LogLine {
+                sequence: (offset + 1) as u64,
                 timestamp,
                 stream: LogStream::Stdout,
                 line: (*line).to_string(),
             })
-            .chain(stderr_lines[stderr_start..].iter().map(|line| LogLine {
+            .chain(stderr_lines[stderr_start..].iter().enumerate().map(|(offset, line)| LogLine {
+                sequence: (stdout_lines.len() - stdout_start + offset + 1) as u64,
                 timestamp,
                 stream: LogStream::Stderr,
                 line: (*line).to_string(),
             }))
             .collect();
         Ok(collected)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_launchctl_pid, LaunchdAgentProcess};
+    use my_supervisor_core::domain::ProcessSpec;
+    use std::path::PathBuf;
+
+    #[test]
+    fn parses_running_pid_and_rejects_stopped_output() {
+        assert_eq!(parse_launchctl_pid("{\n  \"PID\" = 4321;\n}"), Some(4321));
+        assert_eq!(parse_launchctl_pid("{\n  \"LastExitStatus\" = 0;\n}"), None);
+    }
+
+    #[test]
+    fn generated_plist_preserves_working_directory_and_escapes_values() {
+        let registrar = LaunchdAgentProcess {
+            agents_dir: PathBuf::from("/tmp/agents"),
+            log_dir: PathBuf::from("/tmp/logs"),
+            uid: 501,
+            test_controls: None,
+        };
+        let mut spec = ProcessSpec::new("service", "/bin/echo");
+        spec.args = vec!["a&b".to_string()];
+        spec.cwd = Some(PathBuf::from("/tmp/work dir"));
+        spec.autostart = true;
+        let plist = registrar.build_plist("com.example.service", &spec);
+        assert!(plist.contains("<string>a&amp;b</string>"));
+        assert!(plist.contains("<key>WorkingDirectory</key><string>/tmp/work dir</string>"));
+        assert!(plist.contains("<key>RunAtLoad</key><true/>"));
     }
 }

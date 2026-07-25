@@ -21,7 +21,7 @@ use my_supervisor_infra_http::mapping::{
     daemon_info_to_dto, job_config_to_job, job_run_to_dto, job_view_to_dto, log_line_to_dto,
     log_page_to_dto, process_config_to_spec, process_status_to_dto,
 };
-use my_supervisor_infra_http::Assembled;
+use my_supervisor_infra_http::{event_to_wire, Assembled};
 use my_supervisor_shared::api::{
     ConvertTargetDto, DaemonStatusDto, JobConfigDto, JobListDto, JobRunListDto, LogsResponseDto,
     ProcessConfigDto, ProcessListDto, ProcessStatusDto,
@@ -191,6 +191,20 @@ async fn cmd_follow_logs(app: AppHandle, facade: Facade<'_>, name: String) -> Cm
     Ok(())
 }
 
+/// Forward global events through Tauri's renderer transport. A durable terminal
+/// event is acknowledged only after Tauri accepts this external emit; the
+/// renderer still de-duplicates repeated stable IDs in session memory.
+fn start_event_forwarder(app: AppHandle, facade: Arc<OperationsFacade>) {
+    let mut events = facade.subscribe_events();
+    tauri::async_runtime::spawn(async move {
+        while let Ok(event) = events.recv().await {
+            if app.emit("global-event", event_to_wire(&event)).is_ok() {
+                event.complete_delivery();
+            }
+        }
+    });
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -212,6 +226,7 @@ fn main() {
             });
             tauri::async_runtime::spawn(facade.clone().run_scheduler_loop());
             tauri::async_runtime::spawn(facade.clone().run_process_supervisor_loop());
+            start_event_forwarder(app.handle().clone(), facade.clone());
 
             let data_dir = data_dir();
             let port = std::env::var("MSV_DEVBRIDGE_PORT")

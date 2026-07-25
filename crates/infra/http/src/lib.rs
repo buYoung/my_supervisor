@@ -18,6 +18,7 @@ use tower_http::cors::CorsLayer;
 use my_supervisor_application::{AppDeps, OperationsFacade};
 
 pub use error::HttpError;
+pub use ws::event_to_wire;
 
 /// The assembled host artifacts: the unbound Router and the facade. Each host
 /// owns the bind address/port (daemon `127.0.0.1:9876`; the Tauri devBridge its
@@ -79,10 +80,23 @@ pub fn build_router(facade: Arc<OperationsFacade>) -> Router {
         .route("/api/v1/jobs/{name}/trigger", post(handlers::trigger_job))
         .route("/api/v1/jobs/{name}/runs", get(handlers::list_runs))
         .route("/api/v1/jobs/{name}/runs/{run_id}", get(handlers::get_run))
+        .route(
+            "/api/v1/jobs/{name}/runs/{run_id}/cancel",
+            post(handlers::cancel_run),
+        )
         .route("/api/v1/jobs/{name}/runs/{run_id}/logs", get(ws::run_logs))
         // Daemon
         .route("/api/v1/daemon/status", get(handlers::daemon_status))
+        .route("/api/v1/daemon/recovery", get(handlers::recovery_diagnostics))
         .route("/api/v1/daemon/reload", post(handlers::reload))
+        .route(
+            "/api/v1/daemon/config/validate",
+            post(handlers::validate_config),
+        )
+        .route(
+            "/api/v1/daemon/config/apply",
+            post(handlers::apply_config),
+        )
         .route("/api/v1/daemon/shutdown", post(handlers::shutdown))
         // Events
         .route("/api/v1/events", get(ws::events))

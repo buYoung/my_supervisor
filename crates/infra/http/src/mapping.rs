@@ -6,18 +6,22 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use my_supervisor_application::views::{DaemonInfo, JobView, LogPage};
+use my_supervisor_application::views::{DaemonInfo, JobView, LogPage, RecoveryDiagnostics};
 use my_supervisor_core::domain::{
-    DependencyFailurePolicy, Job, JobId, JobRun, JobRunState, JobTrigger, LifecycleMode, LogLine,
+    ApplyMode, ConfigApplyResult, DependencyFailurePolicy, Job, JobId, JobRun, JobRunState,
+    JobTrigger, LifecycleMode, LoadedConfig, LogLine,
     LogRetention, LogStream, ManagementMode, OverlapPolicy, ProcessSpec, ProcessState,
     ProcessStatus, RestartPolicy, ShutdownPolicy, ShutdownSignal, TriggeredBy,
 };
 use my_supervisor_shared::api::{
-    DaemonStatusDto, JobConfigDto, JobDependenciesDto, JobRunDto, JobRunStateDto, JobRunSummaryDto,
-    JobStatusDto, JobTriggerDto, LifecycleModeDto, LogLineDto, LogStreamDto, LogsResponseDto,
+    ConfigApplyModeDto, ConfigApplyResultDto, ConfigDiffDto, DaemonStatusDto, JobConfigDto,
+    JobDependenciesDto, JobRunDto, JobRunStateDto, JobRunSummaryDto, JobStatusDto, JobTriggerDto,
+    LifecycleModeDto, LogLineDto, LogStreamDto, LogsResponseDto,
     ManagementModeDto, OnDependencyFailureDto, OnOverlapDto, ProcessConfigDto, ProcessStateDto,
-    ProcessStatusDto, RestartPolicyDto, ShutdownPolicyDto, ShutdownSignalDto, TriggeredByDto,
+    ProcessStatusDto, RecoveryDiagnosticDto, RecoveryDiagnosticsDto, RestartPolicyDto,
+    ShutdownPolicyDto, ShutdownSignalDto, TriggeredByDto,
 };
+use my_supervisor_shared::config::FileConfig;
 
 // --- domain -> DTO ----------------------------------------------------------
 
@@ -79,6 +83,7 @@ pub fn run_state_to_dto(s: JobRunState) -> JobRunStateDto {
         JobRunState::Running => JobRunStateDto::Running,
         JobRunState::Succeeded => JobRunStateDto::Succeeded,
         JobRunState::Failed => JobRunStateDto::Failed,
+        JobRunState::TimedOut => JobRunStateDto::TimedOut,
         JobRunState::Cancelled => JobRunStateDto::Cancelled,
         JobRunState::Skipped => JobRunStateDto::Skipped,
     }
@@ -145,6 +150,7 @@ pub fn log_stream_to_dto(s: LogStream) -> LogStreamDto {
 
 pub fn log_line_to_dto(line: &LogLine) -> LogLineDto {
     LogLineDto {
+        sequence: line.sequence,
         timestamp: line.timestamp,
         stream: log_stream_to_dto(line.stream),
         line: line.line.clone(),
@@ -156,6 +162,42 @@ pub fn log_page_to_dto(page: LogPage) -> LogsResponseDto {
         lines: page.lines.iter().map(log_line_to_dto).collect(),
         truncated: page.truncated,
         dropped_count: page.dropped_count,
+        high_watermark: page.high_watermark,
+        next_sequence: page.next_sequence,
+    }
+}
+
+pub fn config_apply_mode_to_domain(mode: ConfigApplyModeDto) -> ApplyMode {
+    match mode {
+        ConfigApplyModeDto::Merge => ApplyMode::Merge,
+        ConfigApplyModeDto::Replace => ApplyMode::Replace,
+    }
+}
+
+pub fn config_apply_result_to_dto(result: ConfigApplyResult) -> ConfigApplyResultDto {
+    let diff = result.diff;
+    ConfigApplyResultDto {
+        apply_id: result.apply_id.map(|value| value.to_string()),
+        mode: match result.mode {
+            ApplyMode::Merge => ConfigApplyModeDto::Merge,
+            ApplyMode::Replace => ConfigApplyModeDto::Replace,
+        },
+        diff: ConfigDiffDto {
+            added_processes: diff.added_processes,
+            updated_processes: diff.updated_processes,
+            removed_processes: diff.removed_processes,
+            added_jobs: diff.added_jobs,
+            updated_jobs: diff.updated_jobs,
+            removed_jobs: diff.removed_jobs,
+        },
+        dry_run: result.dry_run,
+    }
+}
+
+pub fn file_config_to_loaded(config: FileConfig) -> LoadedConfig {
+    LoadedConfig {
+        processes: config.processes.into_iter().map(process_config_to_spec).collect(),
+        jobs: config.jobs.into_iter().map(job_config_to_job).collect(),
     }
 }
 
@@ -167,6 +209,23 @@ pub fn daemon_info_to_dto(info: DaemonInfo) -> DaemonStatusDto {
         process_count: info.process_count,
         config_path: info.config_path,
         log_dir: info.log_dir,
+    }
+}
+
+pub fn recovery_diagnostics_to_dto(diagnostics: RecoveryDiagnostics) -> RecoveryDiagnosticsDto {
+    RecoveryDiagnosticsDto {
+        records: diagnostics
+            .records
+            .into_iter()
+            .map(|record| RecoveryDiagnosticDto {
+                kind: record.kind,
+                id: record.id,
+                resource: record.resource,
+                stage: record.stage,
+                attempts: record.attempts,
+                last_error: record.last_error,
+            })
+            .collect(),
     }
 }
 

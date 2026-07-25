@@ -21,6 +21,7 @@ import type {
 } from "../shared/types";
 import type {
   DaemonStatusDto,
+  EventEnvelopeDto,
   JobRunDto,
   JobStatusDto,
   LogLineDto,
@@ -28,6 +29,7 @@ import type {
   ProcessStatusDto,
   TriggeredByDto,
 } from "./wire-types";
+import type { EventEnvelope } from "./operations-client";
 
 /** Derive a compact human uptime string from an RFC3339 start timestamp. "-" when null. */
 export function formatUptime(startedAt: string | null, nowMs: number = Date.now()): string {
@@ -127,6 +129,15 @@ export function mapDaemonStatus(dto: DaemonStatusDto): DaemonStatus {
     processCount: dto.process_count,
     configPath: dto.config_path,
     logDir: dto.log_dir,
+  };
+}
+
+export function mapEventEnvelope(dto: EventEnvelopeDto): EventEnvelope {
+  return {
+    eventType: dto.type,
+    eventId: dto.event_id,
+    timestamp: dto.timestamp,
+    payload: dto.payload,
   };
 }
 

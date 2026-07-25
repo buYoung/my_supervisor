@@ -26,6 +26,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": [
+      "binaries/msv-log-proxy",
+      "binaries/msv-group-reaper"
+    ],
     "icon": ["icons/icon.png"]
   }
 }

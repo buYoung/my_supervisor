@@ -24,5 +24,12 @@ dirs = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }
 
+[dev-dependencies]
+uuid = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+libc = "0.2"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 my-supervisor-platform-macos = { workspace = true }
