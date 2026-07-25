@@ -208,13 +208,11 @@ impl ConfigSource for EmptyConfig {
 struct ControlledScheduler {
     fail_next_register: AtomicBool,
     entries: std::sync::Mutex<HashMap<String, my_supervisor_core::domain::JobTrigger>>,
-    events: broadcast::Sender<ScheduleEvent>,
 }
 
 impl ControlledScheduler {
     fn new() -> Self {
-        let (events, _) = broadcast::channel(8);
-        Self { fail_next_register: AtomicBool::new(false), entries: std::sync::Mutex::new(HashMap::new()), events }
+        Self { fail_next_register: AtomicBool::new(false), entries: std::sync::Mutex::new(HashMap::new()) }
     }
 }
 
@@ -236,7 +234,7 @@ impl Scheduler for ControlledScheduler {
         Ok(())
     }
     fn next_run(&self, _trigger: &my_supervisor_core::domain::JobTrigger, _after: chrono::DateTime<Utc>) -> Option<chrono::DateTime<Utc>> { None }
-    fn subscribe(&self) -> broadcast::Receiver<ScheduleEvent> { self.events.subscribe() }
+    async fn next_event(&self) -> Option<ScheduleEvent> { std::future::pending().await }
 }
 
 fn config(name: &str) -> LoadedConfig {

@@ -53,16 +53,33 @@ function App() {
   const [themePreference, setThemePreference] = useState<ThemePreference>("auto");
 
   const fetchDaemonStatus = useCallback(() => client.daemonStatus(), [client]);
-  const { data: daemonStatus, errorMessage: daemonError } = usePolledResource(
+  const {
+    data: daemonStatus,
+    errorMessage: daemonError,
+    refresh: refreshDaemonStatus,
+  } = usePolledResource(
     fetchDaemonStatus,
     DAEMON_STATUS_POLL_INTERVAL_MS,
   );
   const fetchProcesses = useCallback(() => client.listProcesses(), [client]);
-  const { data: processes } = usePolledResource(fetchProcesses, DAEMON_STATUS_POLL_INTERVAL_MS);
+  const { data: processes, refresh: refreshProcesses } = usePolledResource(
+    fetchProcesses,
+    DAEMON_STATUS_POLL_INTERVAL_MS,
+  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const isDaemonConnected = daemonStatus !== null && daemonError === null;
   const processList = processes ?? [];
   const runningProcessCount = processList.filter((process) => process.state === "running").length;
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refreshDaemonStatus(), refreshProcesses()]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshDaemonStatus, refreshProcesses]);
 
   useEffect(() => {
     const rootElement = document.documentElement;
@@ -173,13 +190,23 @@ function App() {
                   <ListTree aria-hidden="true" size={15} />
                   {runningProcessCount}/{processList.length} 실행 중
                 </div>
-                <button className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-panel px-3 text-sm text-muted transition-colors duration-200 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                  <RefreshCw aria-hidden="true" size={16} />
+                <button
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-panel px-3 text-sm text-muted transition-colors duration-200 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isRefreshing}
+                  onClick={() => void handleRefresh()}
+                  type="button"
+                >
+                  <RefreshCw aria-hidden="true" className={isRefreshing ? "animate-spin" : undefined} size={16} />
                   새로고침
                 </button>
-                <button className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-panel px-3 text-sm text-muted transition-colors duration-200 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <button
+                  className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md border border-border bg-panel px-3 text-sm text-muted opacity-60"
+                  disabled
+                  title="이벤트 알림 UI는 아직 지원하지 않습니다."
+                  type="button"
+                >
                   <Bell aria-hidden="true" size={16} />
-                  이벤트 3개
+                  이벤트 미지원
                 </button>
                 <label className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-panel px-2 text-sm text-muted">
                   {themePreference === "dark" ? (

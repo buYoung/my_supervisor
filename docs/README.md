@@ -1,39 +1,39 @@
 # my-supervisor
 
-> 크로스 플랫폼 운영 + macOS 자동화 콘솔. **프로세스·배치 운영**과 **이벤트 기반 자동화**를 한 GUI 에서.
+> macOS 로컬 프로세스·배치 운영 콘솔.
+
+> **현재 지원 범위:** macOS 로컬 전용입니다. `Process`·`Job`·로그·CLI·Desktop의 구현된 운영 기능만 지원합니다. Linux/Windows, Rules 자동화, 원격 운영은 설계 목표이며 현재 지원하지 않습니다.
 
 ## 개요
 
-`my-supervisor` (CLI 명령어 `msv`) 는 개인 개발자와 소규모 운영 환경을 위한 도구로, **두 기둥을 동등하게** 지원합니다.
+`my-supervisor` (CLI 명령어 `msv`) 는 개인 개발자의 macOS 로컬 환경에서 프로세스와 배치 Job을 관리하는 도구입니다.
 
 - **운영 (Operations)** — PM2 처럼 장시간 실행 프로세스를 감시·재시작하고, cron 처럼 예약·주기·의존성 기반 배치 Job 을 관리합니다.
-- **자동화 (Automation)** — Hammerspoon 처럼 OS 이벤트(파일·폴더 변경, 시스템 이벤트, 글로벌 핫키)에 반응해 액션을 실행하고, macOS 윈도우를 제어합니다. **단, 복잡한 스크립팅 없이 GUI 로.**
+- **자동화 (Automation)** — Rules 기반 이벤트 자동화는 목표 설계에 포함되지만 현재 구현·지원하지 않습니다.
 
-도메인으로는 **운영 = {`Process`, `Job`}**, **자동화 = {`Rule`}** 로 매핑됩니다.
+현재 도메인 지원 범위는 **운영 = {`Process`, `Job`}** 입니다. `Rule`은 아직 공개 계약에 포함되지 않습니다.
 
-두 기둥 모두 **GUI 우선**으로 설계되어 설정과 운영이 쉽고, 서버 환경에서는 운영 기능을 **CLI 와 WebUI** 로 동일하게 제공합니다.
+구현된 기능은 Desktop과 CLI에서 제공하며, HTTP API는 인증 없는 loopback 전용입니다.
 
 ### 플랫폼 범위 (한눈에)
 
 | 기둥 | 기능 | 플랫폼 |
 |---|---|---|
-| 운영 | 프로세스 관리, 배치 Job | **크로스 플랫폼** (Windows / macOS / Linux) |
-| 자동화 | 이벤트 트리거 (파일·폴더 watch, 타이머) | **크로스 플랫폼** |
-| 자동화 | 윈도우 관리, 글로벌 핫키, 깊은 시스템 이벤트 | **macOS 전용** |
+| 운영 | 프로세스 관리, 배치 Job | **macOS 지원** |
+| 자동화 | Rules와 이벤트 트리거 | **미지원·설계 초안** |
+| 다른 OS | Windows / Linux | **미지원** |
 
 > 윈도우 관리·글로벌 핫키는 OS 마다 모델이 근본적으로 다르기 때문에(macOS Accessibility · X11/Wayland · Windows 가 서로 다른 패러다임) 여러 OS 구현을 강제하는 크로스 플랫폼 추상화를 만들지 않고, 구현자가 `platform/macos` 하나뿐인 **단일 구현 seam**(빈 stub 없음)으로 둡니다. 근거: [DESIGN_DECISIONS.md](./DESIGN_DECISIONS.md) DD-027.
 
-### 핵심 가치
+### 현재 핵심 가치
 
-- **운영 + 자동화 동등 이원**: 어느 한쪽이 부가 기능이 아닙니다. 프로세스·배치 운영과 이벤트 기반 자동화를 같은 콘솔에서 1 급으로 다룹니다.
-- **GUI 우선**: Tauri 기반 네이티브 데스크톱 앱. 설정·모니터링·로그 확인이 전부 클릭 단위.
-- **Process · Job · Rule 삼원 모델**: 장시간 실행 프로세스(`Process`), cron/interval/one-shot/의존성 배치(`Job`), 이벤트→액션 자동화(`Rule`) 를 **하나의 GUI** 에서 관리. Job 스케줄링과 Rule 이벤트 처리는 OS 도구에 위임하지 않고 데몬이 자체 실행.
-- **이벤트 기반 자동화 (macOS)**: 파일 변경·시스템 이벤트·핫키를 트리거로, 프로세스 제어·Job 실행·명령 실행·윈도우 배치를 액션으로. Hammerspoon 의 강력함을 스크립팅 없이.
+- **macOS 로컬 운영**: 지원 범위를 한정해 프로세스·배치 실행과 복구 동작을 우선 완성합니다.
+- **GUI 우선**: Tauri 기반 네이티브 데스크톱 앱에서 구현된 상태·프로세스·Job·로그 기능을 제공합니다.
+- **Process · Job 이원 모델**: 장시간 실행 프로세스(`Process`)와 cron/interval/one-shot/의존성 배치(`Job`)를 구분해 관리합니다.
 - **프로세스 관리 모드 이원화**: 각 Process 를 **Direct** (데몬이 직접 관리) 또는 **SystemRegistered** (OS 서비스 매니저에 등록) 중 선택. 런타임에 양방향 전환 가능.
 - **테마 동등 지원**: 다크/라이트 모드를 1 급 지원 (shadcn/ui CSS 변수 기반).
-- **자동화는 "견고하거나 없거나"**: 오작동하는 핫키나 사용자와 싸우는 윈도우 매니저는 일상 사용에 파괴적입니다. 자동화 기능은 어설프게 얕게 내지 않고, 견고하게 내거나 아예 내지 않습니다.
-- **서버 친화**: 헤드리스 환경에서도 운영 기능을 CLI + WebUI 로 동일하게 제어 (자동화의 GUI 의존 기능 제외).
-- **시스템 통합**: systemd / launchd / Windows Service 와 opt-in 연동 (데몬 자체의 자동 시작).
+- **지원 여부의 명시성**: 연결되지 않은 기능은 성공하는 것처럼 표시하지 않고 미지원 상태로 구분합니다.
+- **시스템 통합**: macOS `launchd`를 통한 `SystemRegistered` 프로세스 관리를 제공합니다.
 
 ## 아키텍처 한눈에
 
@@ -52,12 +52,12 @@
         │ 브라우저·msv │                      │ 브라우저·msv │
         └────────────┘                      └────────────┘
 
-  core 가 관리하는 대상:
-   • Process(자식 프로세스) · Job(배치)        ─ 운영 (크로스 플랫폼)
-   • Rule = OS 이벤트 → 액션 (윈도우·핫키)      ─ 자동화 (윈도우/핫키는 데스크톱 macOS 전용)
+  현재 core가 관리하는 대상:
+   • Process(자식 프로세스) · Job(배치)        ─ macOS 로컬 운영
+   • Rule                                        ─ 미지원·설계 초안
 ```
 
-`core`/`application` 은 도메인·유스케이스 라이브러리이고, **`daemon`은 이를 실제 adapter와 조립하는 공통 런타임** 입니다. 데스크톱(`desktop`)은 이 런타임을 인프로세스로 재사용하고, 서버 배포는 같은 런타임을 `msv-daemon` launcher로 실행합니다. 데스크톱에서 창을 닫아도 Tauri 가 tray 로 상주하여 자식 프로세스·등록된 Rule 이 유지됩니다 — **별도 데몬 프로세스를 spawn 하지 않습니다.**
+`core`/`application` 은 도메인·유스케이스 라이브러리이고, **`daemon`은 이를 실제 adapter와 조립하는 공통 런타임** 입니다. 데스크톱(`desktop`)은 이 런타임을 인프로세스로 재사용하고, macOS headless 실행은 같은 런타임을 `msv-daemon` launcher로 실행합니다. 데스크톱에서 창을 닫아도 Tauri 가 tray 로 상주하여 관리 중인 프로세스가 유지됩니다 — **별도 데몬 프로세스를 spawn 하지 않습니다.**
 
 내부 모듈은 Hexagonal (Ports & Adapters) 로 분리되어 있습니다. 도메인 로직은 OS·DB·HTTP 세부를 모르고, 플랫폼·인프라 adapter crate 가 port trait 를 구현합니다. **단, 윈도우·핫키처럼 OS 마다 개념 자체가 다른 자동화 기능은 여러 OS 구현을 강제하지 않고, 구현자가 `platform/macos` 하나뿐인 단일 구현 seam 으로 둡니다** (DD-027). `application` 은 `Option<&dyn …>` 로만 소비하므로 `#[cfg]`·`platform/*` 의존이 침투하지 않습니다.
 
@@ -78,9 +78,9 @@
 
 | 배포 | 타깃 | 구성 | 자동화 |
 |---|---|---|---|
-| Desktop (macOS) | 개인 개발자, 로컬 작업 | Tauri 앱(코어 임베드) + CLI | 윈도우·핫키 포함 전체 |
-| Desktop (Win/Linux) | 개인 개발자, 로컬 작업 | Tauri 앱(코어 임베드) + CLI | 크로스 플랫폼 트리거만 |
-| Server | 서버, WSL, CI, 컨테이너 | 헤드리스 데몬(코어 임베드) + CLI | 크로스 플랫폼 트리거만 |
+| Desktop (macOS) | 개인 개발자, 로컬 작업 | Tauri 앱(코어 임베드) + CLI | Rules 미지원 |
+| Headless (macOS) | 로컬 작업 | `msv-daemon` + CLI | Rules 미지원 |
+| Windows / Linux / 원격 서버 | 향후 범위 | 현재 배포 불가 | 미지원 |
 
 ## 기술 스택
 
@@ -88,13 +88,11 @@
 - **UI 셸**: Tauri v2
 - **데몬**: tokio + axum
 - **프론트엔드**: React + Vite + Tailwind + shadcn/ui (`crates/desktop/ui`, feature 단위 모듈 — DD-020). 다크/라이트 양립.
-- **상위 IA (동등 이원)**:
+- **현재 상위 IA**:
   - **운영**: Processes · Jobs · Logs
-  - **자동화**: Rules (이벤트→액션, 윈도우·핫키 포함)
   - **공통**: Daemon · Settings
-- **영속화**: TOML (설정) + SQLite (런타임 상태 · JobRun 이력 · Rule 실행 이력)
+- **영속화**: TOML (설정) + SQLite (런타임 상태 · JobRun 이력)
 - **배치 스케줄러**: 데몬 내장 (`infra/scheduler`, `tokio-cron-scheduler` 기반). cron 5-field + interval + one-shot + 의존성.
-- **자동화 엔진**: 데몬 내장. 이벤트 소스는 크로스 플랫폼(`notify` 파일 watch, 타이머)과 macOS 전용(Accessibility API 윈도우 제어, event tap 글로벌 핫키, NSWorkspace/IOKit 시스템 이벤트)으로 구성.
 - **모듈 구조**: Hexagonal Cargo workspace — `core` / `application` / `shared`·`config` / `infra/*` / `platform/*` / `daemon`·`cli`·`desktop`. 데스크톱 UI는 `desktop/ui`에 포함한다. Cargo 패키지 prefix `my-supervisor-`, 바이너리는 `msv` · `msv-daemon`.
 
 ## 문서
@@ -107,7 +105,7 @@
 
 ## 현재 상태
 
-설계 단계. 범위는 **운영 + 자동화 동등 이원**으로 확정. 구현은 **macOS 우선**(구조는 크로스 플랫폼 유지)으로, 버리는 프로토타입(PoC) 없이 실제 crate 구조 위에서 walking skeleton 부터 착수 예정. 품질 기준은 **일상 개인 사용에 견고한 수준** (자동화는 "견고하거나 없거나").
+현재 구현 범위는 **macOS 로컬 운영 MVP**입니다. 프로세스·Job·로그·설정 복구의 기반과 CLI/Desktop 일부가 구현되어 있습니다. Rules 자동화, Linux/Windows 런타임, 원격 운영은 지원하지 않습니다. 설계 문서의 향후 구조와 현재 지원 기능을 구분해 해석해야 합니다.
 
 ## 라이선스
 

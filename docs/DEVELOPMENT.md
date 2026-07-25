@@ -101,7 +101,7 @@ cargo build --workspace
 # 레이어별 개별 빌드 예시
 cargo build -p my-supervisor-core
 cargo build -p my-supervisor-application
-cargo build -p my-supervisor-platform-linux     # 타겟 OS 에 해당하는 것만
+cargo build -p my-supervisor-platform-macos     # 현재 지원 플랫폼
 cargo build -p my-supervisor-infra-sqlite
 cargo build -p my-supervisor-infra-scheduler    # cron/interval/one-shot/의존성 스케줄러
 
@@ -113,7 +113,7 @@ cargo build -p my-supervisor-app-cli            # → bin `msv`
 cargo test -p my-supervisor-application
 
 # 플랫폼 adapter 테스트 (해당 OS 에서만 실행됨)
-cargo test -p my-supervisor-platform-linux
+cargo test -p my-supervisor-platform-macos
 
 # 전체 테스트
 cargo test --workspace
@@ -125,6 +125,8 @@ cargo msv-release
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
 ```
+
+SQLite schema migration은 하나의 transaction으로 실행되며 foreign-key 검증을 통과한 뒤에만 commit됩니다. 기존 `job_runs` 호환성 migration은 `cargo test -p my-supervisor-infra-sqlite`의 migration 시나리오로 검증합니다.
 
 ### 프론트엔드 (React + Vite)
 

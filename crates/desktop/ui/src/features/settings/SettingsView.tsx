@@ -53,20 +53,20 @@ export function SettingsView({
           <fieldset className="grid gap-3 rounded-lg border border-border p-4">
             <legend className="px-1 text-sm font-semibold text-foreground">데스크톱</legend>
             <label className="flex items-start gap-3 text-sm text-foreground">
-              <input className="mt-1" defaultChecked type="checkbox" />
+              <input className="mt-1" disabled type="checkbox" />
               <span>
                 로그인 시 데몬 자동 시작
                 <span className="mt-1 block text-xs text-muted">
-                  Tauri 자동 시작 플러그인과 OS 사용자 레벨 등록을 위한 자리입니다.
+                  아직 지원하지 않아 변경할 수 없습니다.
                 </span>
               </span>
             </label>
             <label className="flex items-start gap-3 text-sm text-foreground">
-              <input className="mt-1" type="checkbox" />
+              <input className="mt-1" disabled type="checkbox" />
               <span>
                 충돌 감지 시 네이티브 알림 표시
                 <span className="mt-1 block text-xs text-muted">
-                  Production 단계의 알림 기능과 연결됩니다.
+                  아직 지원하지 않아 변경할 수 없습니다.
                 </span>
               </span>
             </label>
@@ -76,14 +76,14 @@ export function SettingsView({
 
       <aside className="grid content-start gap-5">
         <Panel>
-          <PanelHeader title="변경 사항" description="현재는 저장 동작이 없는 목업입니다." />
+          <PanelHeader title="변경 사항" description="테마는 즉시 적용되며 데몬 설정 저장은 아직 지원하지 않습니다." />
           <div className="grid gap-3 p-4">
-            <Button variant="primary">
+            <Button disabled variant="primary">
               <Save aria-hidden="true" size={16} />
-              설정 저장
+              데몬 설정 저장 미지원
             </Button>
             <p className="text-xs text-muted">
-              실제 구현 단계에서는 TOML 설정 파일과 데몬 리로드 API를 연결합니다.
+              지원되지 않는 설정은 성공한 것처럼 표시하지 않습니다.
             </p>
           </div>
         </Panel>

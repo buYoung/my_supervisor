@@ -2,7 +2,7 @@
 
 **호스트**(데스크톱 `desktop` Tauri 앱 또는 헤드리스 `msv-daemon` launcher)가 제공하는 HTTP / WebSocket API 를 정리합니다. 두 경로 모두 `daemon` 런타임 조립을 공유하므로 API 는 동일합니다(DD-002). 클라이언트는 호스트의 WebView · 외부 브라우저 · `msv` CLI · 스크립트입니다. 내부적으로는 `crates/infra/http` adapter 가 `core::ports::HttpServer` 를 구현하여 이 엔드포인트를 호스팅합니다.
 
-> **현재 문서 상태**: **설계 레벨 스펙 초안**. 리포지토리는 아직 PoC 단계 이전이며, 본 문서는 `ARCHITECTURE.md` §5를 기반으로 엔드포인트·오류 포맷·타입을 선정의한 것입니다. request/response 세부 필드는 PoC·MVP 구현 시 확정되며, 구현 이후 Phase 3 §J에서 최종화합니다.
+> **현재 문서 상태:** macOS 로컬 운영 MVP의 구현된 `/api/v1` route와 `crates/shared` DTO가 현재 계약입니다. Rules와 별도로 미지원이라고 표시된 필드는 설계 초안이며 실제 route/DTO 계약이 아닙니다.
 
 관련 문서: [아키텍처](./ARCHITECTURE.md) · [설계 결정](./DESIGN_DECISIONS.md) · [로드맵](./ROADMAP.md)
 
@@ -11,7 +11,7 @@
 ## 1. 원칙
 
 - **바인딩**: `127.0.0.1:<port>` (기본 9876). `0.0.0.0` 바인딩은 코드 레벨에서 금지 (DD-011).
-- **인증**: 없음 (단일 유저·로컬 전용 전제). 원격 필요 시 Post-Production에서 인증 레이어 추가.
+- **인증**: 없음 (단일 유저·로컬 전용 전제). 같은 사용자 세션의 다른 프로세스가 API를 호출하는 것은 차단하지 않으므로 이를 신뢰할 수 없는 환경에서는 사용하지 않습니다.
 - **Prefix**: 모든 REST 엔드포인트는 `/api/v1/` 하위. breaking change는 `/api/v2/` 신설로 처리.
 - **Content-Type**: 요청·응답 모두 `application/json` (UTF-8).
 - **타입 출처**: `crates/shared` (패키지 `my-supervisor-shared`) 의 Rust 타입 (`serde` 직렬화) 과 1:1 대응. 구체 경로는 `crates/shared/src/api.rs` (REST), `crates/shared/src/events.rs` (WS 이벤트), `crates/shared/src/config.rs` (TOML 스키마). 본 문서의 스키마는 그 서브셋을 기술적 설명용으로 재표기한 것.
@@ -348,6 +348,8 @@
 
 ### 2.4 Rules 리소스 (자동화)
 
+> **미지원·설계 초안:** 현재 구현에는 Rules domain/DTO/route가 없습니다. 아래 인터페이스는 향후 설계이며 `/api/v1/rules`를 호출할 수 있다는 의미가 아닙니다.
+
 `ARCHITECTURE.md §13` (Rules) 의 wire 인터페이스. 이벤트→액션 자동화의 CRUD + 수동 발화 + 발화 이력 + macOS 권한 조회.
 
 | Method | Path | 설명 |
@@ -475,8 +477,8 @@ interface ProcessConfig {
   autostart?: boolean;
   restart?: RestartPolicy;             // SystemRegistered 시 OS unit 의 Restart= 로 변환
   shutdown?: ShutdownPolicy;
-  health_check?: HealthCheck;
-  logging?: LoggingPolicy;
+  health_check?: HealthCheck;         // 미지원·설계 초안
+  logging?: LoggingPolicy;            // 미지원·설계 초안
 }
 ```
 
@@ -552,6 +554,8 @@ type JobRunState =
 ---
 
 ### 4.5 RuleConfig · RuleStatus · RuleFire
+
+> **미지원·설계 초안:** 현재 `crates/shared`에는 아래 Rule wire type이 없습니다.
 
 `ARCHITECTURE.md §13` (Rules) 및 §16 설정 예시의 `[[rule]]` 블록과 대응.
 

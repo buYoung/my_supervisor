@@ -2255,7 +2255,6 @@ impl OperationsFacade {
 
     /// Drive scheduled runs. Hosts spawn this once after assembly.
     pub async fn run_scheduler_loop(self: Arc<Self>) {
-        let mut schedule_events = self.deps.scheduler.subscribe();
         let mut domain_events = self.internal_events.subscribe();
         let mut retention_cleanup = tokio::time::interval(LOG_RETENTION_CLEANUP_INTERVAL);
         retention_cleanup.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -2275,10 +2274,9 @@ impl OperationsFacade {
                 _ = runtime_handle_cleanup.tick() => self.reconcile_runtime_handle_cleanup().await,
                 _ = transient_cleanup.tick() => self.reconcile_transient_cleanup().await,
                 _ = job_deletion_recovery.tick() => self.reconcile_job_deletions().await,
-                result = schedule_events.recv() => match result {
-                    Ok(event) => self.on_schedule_tick(&event.job_name).await,
-                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                    Err(broadcast::error::RecvError::Closed) => break,
+                event = self.deps.scheduler.next_event() => match event {
+                    Some(event) => self.on_schedule_tick(&event.job_name).await,
+                    None => break,
                 },
                 result = domain_events.recv() => match result {
                     Ok(PublishedEvent { event: DomainEvent::JobRunSucceeded { name, run_id, .. }, .. }) => {
@@ -2291,7 +2289,10 @@ impl OperationsFacade {
                     | Ok(PublishedEvent { event: DomainEvent::JobRunCancelled { name, run_id }, .. }) => {
                         self.on_dependency_completion(&name, run_id).await;
                     }
-                    Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        self.reconcile_dependency_completions().await;
+                    }
+                    Ok(_) => continue,
                     Err(broadcast::error::RecvError::Closed) => break,
                 },
                 _ = retention_cleanup.tick() => self.prune_all_job_logs().await,
@@ -2772,6 +2773,36 @@ impl OperationsFacade {
             } else {
                 self.record_skipped_run(&job.name, triggered_by, run_id, "dependency_failure")
                     .await;
+            }
+        }
+    }
+
+    async fn reconcile_dependency_completions(&self) {
+        let jobs = match self.deps.job_repo.list_jobs().await {
+            Ok(jobs) => jobs,
+            Err(error) => {
+                tracing::warn!(%error, "dependency completion reconciliation could not list jobs");
+                return;
+            }
+        };
+        let upstream_names = jobs
+            .iter()
+            .filter_map(|job| match &job.trigger {
+                JobTrigger::DependsOn(names) => Some(names),
+                _ => None,
+            })
+            .flatten()
+            .collect::<HashSet<_>>();
+        for upstream_name in upstream_names {
+            let latest_run = self
+                .deps
+                .job_repo
+                .list_runs(upstream_name, 1)
+                .await
+                .ok()
+                .and_then(|runs| runs.into_iter().next());
+            if let Some(run) = latest_run.filter(|run| run.state.is_terminal()) {
+                self.on_dependency_completion(upstream_name, run.run_id).await;
             }
         }
     }

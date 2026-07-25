@@ -4,8 +4,6 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use tokio::sync::broadcast;
-
 use crate::domain::JobTrigger;
 use crate::ports::error::SchedulerError;
 
@@ -39,6 +37,7 @@ pub trait Scheduler: Send + Sync {
     async fn restore(&self, snapshot: &SchedulerSnapshot) -> Result<(), SchedulerError>;
     /// Pure computation of the next fire time after `after` (None for `DependsOn`).
     fn next_run(&self, trigger: &JobTrigger, after: DateTime<Utc>) -> Option<DateTime<Utc>>;
-    /// Subscribe to fire events.
-    fn subscribe(&self) -> broadcast::Receiver<ScheduleEvent>;
+    /// Wait for the next fire event. The scheduler retains every event until
+    /// the single application consumer receives it.
+    async fn next_event(&self) -> Option<ScheduleEvent>;
 }

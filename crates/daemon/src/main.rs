@@ -1,5 +1,6 @@
 //! `msv-daemon` — a thin launcher around the shared daemon runtime.
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -43,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     let scheduler = tokio::spawn(facade.clone().run_scheduler_loop());
     let supervisor = tokio::spawn(facade.clone().run_process_supervisor_loop());
 
-    let listener = TcpListener::bind(&launch.bind_addr)
+    let listener = TcpListener::bind(launch.bind_addr)
         .await
         .with_context(|| format!("binding {}", launch.bind_addr))?;
     info!(address = %launch.bind_addr, "msv-daemon listening");
@@ -62,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 struct LaunchOptions {
-    bind_addr: String,
+    bind_addr: SocketAddr,
     test_root: Option<PathBuf>,
     test_config_path: Option<PathBuf>,
     control_socket: Option<PathBuf>,
@@ -78,8 +79,10 @@ impl LaunchOptions {
             if (test_config_path.is_some() || control_socket.is_some()) && test_root.is_none() {
                 anyhow::bail!("MSV_DAEMON_TEST_* controls require MSV_DAEMON_TEST_DATA_DIR");
             }
-            let bind_addr = std::env::var("MSV_DAEMON_TEST_BIND_ADDR")
-                .unwrap_or_else(|_| DEFAULT_BIND_ADDR.to_string());
+            let bind_addr = parse_loopback_bind_addr(
+                &std::env::var("MSV_DAEMON_TEST_BIND_ADDR")
+                    .unwrap_or_else(|_| DEFAULT_BIND_ADDR.to_string()),
+            )?;
             return Ok(Self { bind_addr, test_root, test_config_path, control_socket });
         }
         #[cfg(not(debug_assertions))]
@@ -88,13 +91,23 @@ impl LaunchOptions {
                 anyhow::bail!("MSV_DAEMON_TEST_* controls are unavailable outside debug builds");
             }
             Ok(Self {
-                bind_addr: DEFAULT_BIND_ADDR.to_string(),
+                bind_addr: parse_loopback_bind_addr(DEFAULT_BIND_ADDR)?,
                 test_root: None,
                 test_config_path: None,
                 control_socket: None,
             })
         }
     }
+}
+
+fn parse_loopback_bind_addr(value: &str) -> anyhow::Result<SocketAddr> {
+    let bind_addr = value
+        .parse::<SocketAddr>()
+        .with_context(|| format!("parsing daemon bind address {value}"))?;
+    if !bind_addr.ip().is_loopback() {
+        anyhow::bail!("daemon bind address must be loopback, got {bind_addr}");
+    }
+    Ok(bind_addr)
 }
 
 async fn serve_test_controls(socket_path: PathBuf, controls: DaemonTestControls) {

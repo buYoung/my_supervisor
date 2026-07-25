@@ -132,9 +132,13 @@ async fn build_deps_with_helpers_and_store(
     #[cfg(target_os = "macos")] detached_helpers: Option<my_supervisor_platform_macos::DetachedHelperPaths>,
     #[cfg(not(target_os = "macos"))] _detached_helpers: Option<()>,
 ) -> anyhow::Result<(AppDeps, Arc<SqliteStore>)> {
-    tokio::fs::create_dir_all(&base).await.ok();
+    tokio::fs::create_dir_all(&base)
+        .await
+        .with_context(|| format!("creating daemon data directory {}", base.display()))?;
     let log_dir = base.join("logs");
-    tokio::fs::create_dir_all(&log_dir).await.ok();
+    tokio::fs::create_dir_all(&log_dir)
+        .await
+        .with_context(|| format!("creating daemon log directory {}", log_dir.display()))?;
     let db_path = base.join("state.db");
 
     let log_sink: Arc<dyn LogSink> = Arc::new(InMemoryLogSink::with_log_dir(log_dir.clone()));
@@ -143,7 +147,7 @@ async fn build_deps_with_helpers_and_store(
         log_dir.clone(),
         #[cfg(target_os = "macos")]
         detached_helpers,
-    );
+    )?;
     let registrar = process_service_registrar(log_dir.clone());
 
     let store = Arc::new(
@@ -172,24 +176,24 @@ fn platform_adapters(
     log_sink: Arc<dyn LogSink>,
     log_dir: PathBuf,
     detached_helpers: Option<my_supervisor_platform_macos::DetachedHelperPaths>,
-) -> (Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>) {
+) -> anyhow::Result<(Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>)> {
     use my_supervisor_platform_macos::{MacLifecycle, UnixShutdown};
     let lifecycle = match detached_helpers {
         Some(detached_helpers) => MacLifecycle::with_detached_helpers(log_sink, log_dir, detached_helpers),
         None => MacLifecycle::new(log_sink, log_dir),
     };
-    (
+    Ok((
         Arc::new(lifecycle),
         Arc::new(UnixShutdown::new()),
-    )
+    ))
 }
 
 #[cfg(not(target_os = "macos"))]
 fn platform_adapters(
     _log_sink: Arc<dyn LogSink>,
     _log_dir: PathBuf,
-) -> (Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>) {
-    unimplemented!("daemon runtime currently supports macOS only (Linux/Windows deferred)")
+) -> anyhow::Result<(Arc<dyn LifecycleController>, Arc<dyn ShutdownSignaler>)> {
+    anyhow::bail!("daemon runtime supports macOS only")
 }
 
 #[cfg(target_os = "macos")]

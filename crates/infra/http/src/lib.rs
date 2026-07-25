@@ -11,9 +11,10 @@ mod ws;
 
 use std::sync::Arc;
 
+use axum::http::{header, HeaderValue, Method};
 use axum::routing::{get, post};
 use axum::Router;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use my_supervisor_application::{AppDeps, OperationsFacade};
 
@@ -100,10 +101,21 @@ pub fn build_router(facade: Arc<OperationsFacade>) -> Router {
         .route("/api/v1/daemon/shutdown", post(handlers::shutdown))
         // Events
         .route("/api/v1/events", get(ws::events))
-        // Permissive CORS is safe here: the surface is loopback-only, single-user,
-        // no-auth (DD-011). It lets the standalone browser UI (a different origin,
-        // e.g. the Vite dev server) reach the daemon; the Tauri invoke path and the
-        // CLI never need it.
-        .layer(CorsLayer::permissive())
+        .layer(loopback_cors())
         .with_state(facade)
+}
+
+fn loopback_cors() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+            let Ok(origin) = origin.to_str() else {
+                return false;
+            };
+            origin == "http://localhost"
+                || origin == "http://127.0.0.1"
+                || origin.starts_with("http://localhost:")
+                || origin.starts_with("http://127.0.0.1:")
+        }))
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
+        .allow_headers([header::CONTENT_TYPE])
 }

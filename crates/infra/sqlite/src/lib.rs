@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Row, SqlitePool};
+use sqlx::{Row, Sqlite, SqlitePool, Transaction};
 
 use my_supervisor_core::domain::{
     ConfigApplyJournal, ConfigApplyStage, ConfigSnapshot, ConfigTargetDirectStart, DependencySignature, Job, JobDeletionJournal,
@@ -205,6 +205,7 @@ impl SqliteStore {
     }
 
     async fn migrate(&self) -> Result<(), RepoError> {
+        let mut transaction = self.pool.begin().await.map_err(backend)?;
         let ddl = r#"
             CREATE TABLE IF NOT EXISTS process_specs (
                 name          TEXT PRIMARY KEY,
@@ -252,58 +253,63 @@ impl SqliteStore {
                 continue;
             }
             sqlx::query(trimmed)
-                .execute(&self.pool)
+                .execute(&mut *transaction)
                 .await
                 .map_err(backend)?;
         }
-        self.ensure_process_spec_column("restart_enabled", "INTEGER NOT NULL DEFAULT 1")
+        self.ensure_process_spec_column(&mut transaction, "restart_enabled", "INTEGER NOT NULL DEFAULT 1")
             .await?;
-        self.ensure_process_spec_column("restart_max_retries", "INTEGER")
+        self.ensure_process_spec_column(&mut transaction, "restart_max_retries", "INTEGER")
             .await?;
         self.ensure_process_spec_column(
+            &mut transaction,
             "restart_backoff_initial_ms",
             "INTEGER NOT NULL DEFAULT 1000",
         )
         .await?;
         self.ensure_process_spec_column(
+            &mut transaction,
             "restart_backoff_max_ms",
             "INTEGER NOT NULL DEFAULT 60000",
         )
         .await?;
         self.ensure_process_spec_column(
+            &mut transaction,
             "restart_backoff_multiplier",
             "INTEGER NOT NULL DEFAULT 2",
         )
         .await?;
-        self.ensure_process_spec_column("restart_jitter", "INTEGER NOT NULL DEFAULT 1")
+        self.ensure_process_spec_column(&mut transaction, "restart_jitter", "INTEGER NOT NULL DEFAULT 1")
             .await?;
         self.ensure_process_spec_column(
+            &mut transaction,
             "restart_reset_after_ms",
             "INTEGER NOT NULL DEFAULT 60000",
         )
         .await?;
-        self.ensure_process_spec_column("runtime_process_id", "TEXT")
+        self.ensure_process_spec_column(&mut transaction, "runtime_process_id", "TEXT")
             .await?;
-        self.ensure_process_spec_column("runtime_pid", "INTEGER")
+        self.ensure_process_spec_column(&mut transaction, "runtime_pid", "INTEGER")
             .await?;
-        self.ensure_process_spec_column("runtime_pgid", "INTEGER")
+        self.ensure_process_spec_column(&mut transaction, "runtime_pgid", "INTEGER")
             .await?;
-        self.ensure_process_spec_column("runtime_generation", "TEXT")
+        self.ensure_process_spec_column(&mut transaction, "runtime_generation", "TEXT")
             .await?;
-        self.ensure_process_spec_column("runtime_started_at", "TEXT")
+        self.ensure_process_spec_column(&mut transaction, "runtime_started_at", "TEXT")
             .await?;
-        self.ensure_process_spec_column("shutdown_signal", "TEXT NOT NULL DEFAULT 'term'")
+        self.ensure_process_spec_column(&mut transaction, "shutdown_signal", "TEXT NOT NULL DEFAULT 'term'")
             .await?;
         self.ensure_process_spec_column(
+            &mut transaction,
             "shutdown_grace_period_ms",
             "INTEGER NOT NULL DEFAULT 10000",
         )
         .await?;
-        self.ensure_table_column("jobs", "log_retention_max_runs", "INTEGER")
+        self.ensure_table_column(&mut transaction, "jobs", "log_retention_max_runs", "INTEGER")
             .await?;
-        self.ensure_table_column("jobs", "log_retention_max_age_days", "INTEGER")
+        self.ensure_table_column(&mut transaction, "jobs", "log_retention_max_age_days", "INTEGER")
             .await?;
-        self.migrate_job_runs_to_job_identity().await?;
+        self.migrate_job_runs_to_job_identity(&mut transaction).await?;
         for statement in [
             "CREATE TABLE IF NOT EXISTS config_apply_journal (apply_id TEXT PRIMARY KEY, previous_snapshot TEXT NOT NULL, target_snapshot TEXT NOT NULL, diff TEXT NOT NULL, stage TEXT NOT NULL, compensation_error TEXT, target_direct_starts TEXT NOT NULL DEFAULT '[]')",
             "CREATE TABLE IF NOT EXISTS dependency_signatures (job_name TEXT PRIMARY KEY, signature TEXT NOT NULL)",
@@ -313,23 +319,24 @@ impl SqliteStore {
             "CREATE TABLE IF NOT EXISTS transient_terminal_outbox (cleanup_id TEXT PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, occurred_at TEXT NOT NULL, job_name TEXT NOT NULL, run_id TEXT NOT NULL, state TEXT NOT NULL, exit_code INTEGER)",
             "CREATE TABLE IF NOT EXISTS job_deletion_journal (job_name TEXT PRIMARY KEY, deletion_id TEXT NOT NULL UNIQUE, job_snapshot TEXT NOT NULL, stage TEXT NOT NULL, run_ids TEXT NOT NULL DEFAULT '[]', last_error TEXT)",
         ] {
-            sqlx::query(statement).execute(&self.pool).await.map_err(backend)?;
+            sqlx::query(statement).execute(&mut *transaction).await.map_err(backend)?;
         }
         self.ensure_table_column(
+            &mut transaction,
             "config_apply_journal",
             "target_direct_starts",
             "TEXT NOT NULL DEFAULT '[]'",
         )
         .await?;
-        self.ensure_table_column("transient_cleanup", "outcome_started_at", "TEXT").await?;
-        self.ensure_table_column("transient_cleanup", "outcome_ended_at", "TEXT").await?;
-        self.ensure_table_column("transient_cleanup", "outcome_exit_code", "INTEGER").await?;
-        self.ensure_table_column("transient_terminal_outbox", "event_id", "TEXT").await?;
-        self.ensure_table_column("transient_terminal_outbox", "occurred_at", "TEXT").await?;
+        self.ensure_table_column(&mut transaction, "transient_cleanup", "outcome_started_at", "TEXT").await?;
+        self.ensure_table_column(&mut transaction, "transient_cleanup", "outcome_ended_at", "TEXT").await?;
+        self.ensure_table_column(&mut transaction, "transient_cleanup", "outcome_exit_code", "INTEGER").await?;
+        self.ensure_table_column(&mut transaction, "transient_terminal_outbox", "event_id", "TEXT").await?;
+        self.ensure_table_column(&mut transaction, "transient_terminal_outbox", "occurred_at", "TEXT").await?;
         // Existing rows predate durable event identity.  Their cleanup ID was
         // already stable, so it is a safe idempotency key for every replay.
         sqlx::query("UPDATE transient_terminal_outbox SET event_id = cleanup_id WHERE event_id IS NULL OR event_id = ''")
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await
             .map_err(backend)?;
         let migration_time = dt_to_str(&Utc::now());
@@ -337,13 +344,21 @@ impl SqliteStore {
             "UPDATE transient_terminal_outbox SET occurred_at = COALESCE((SELECT ended_at FROM job_runs WHERE job_runs.run_id = transient_terminal_outbox.run_id), ?) WHERE occurred_at IS NULL OR occurred_at = ''",
         )
         .bind(migration_time)
-        .execute(&self.pool)
+        .execute(&mut *transaction)
         .await
         .map_err(backend)?;
         sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS transient_terminal_outbox_event_id_idx ON transient_terminal_outbox(event_id)")
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await
             .map_err(backend)?;
+        let foreign_key_violations = sqlx::query("PRAGMA foreign_key_check")
+            .fetch_all(&mut *transaction)
+            .await
+            .map_err(backend)?;
+        if !foreign_key_violations.is_empty() {
+            return Err(RepoError::Backend("schema migration left foreign-key violations".into()));
+        }
+        transaction.commit().await.map_err(backend)?;
         Ok(())
     }
 
@@ -458,17 +473,20 @@ impl SqliteStore {
 
     /// Rebuild the historic name-only run table atomically.  Invalid historic
     /// rows are not discarded: they remain inspectable in `orphan_job_runs`.
-    async fn migrate_job_runs_to_job_identity(&self) -> Result<(), RepoError> {
+    async fn migrate_job_runs_to_job_identity(
+        &self,
+        transaction: &mut Transaction<'_, Sqlite>,
+    ) -> Result<(), RepoError> {
         sqlx::query("CREATE TABLE IF NOT EXISTS schema_versions (name TEXT PRIMARY KEY, version INTEGER NOT NULL)")
-            .execute(&self.pool)
+            .execute(&mut **transaction)
             .await
             .map_err(backend)?;
         sqlx::query("CREATE TABLE IF NOT EXISTS orphan_job_runs (run_id TEXT PRIMARY KEY, payload TEXT NOT NULL, migration_reason TEXT NOT NULL)")
-            .execute(&self.pool)
+            .execute(&mut **transaction)
             .await
             .map_err(backend)?;
         let columns = sqlx::query("PRAGMA table_info(job_runs)")
-            .fetch_all(&self.pool)
+            .fetch_all(&mut **transaction)
             .await
             .map_err(backend)?;
         let has_job_id = columns.iter().any(|row| {
@@ -476,19 +494,18 @@ impl SqliteStore {
                 .map(|name| name == "job_id")
                 .unwrap_or(false)
         });
-        let has_parent_identity_index = self.has_jobs_identity_index().await?;
-        let has_run_identity_foreign_key = self.has_job_runs_identity_foreign_key().await?;
+        let has_parent_identity_index = self.has_jobs_identity_index(transaction).await?;
+        let has_run_identity_foreign_key = self.has_job_runs_identity_foreign_key(transaction).await?;
         if has_job_id && has_parent_identity_index && has_run_identity_foreign_key {
             sqlx::query("INSERT INTO schema_versions(name, version) VALUES('job_runs_job_identity', 1) ON CONFLICT(name) DO UPDATE SET version = excluded.version")
-                .execute(&self.pool)
+                .execute(&mut **transaction)
                 .await
                 .map_err(backend)?;
             return Ok(());
         }
 
-        let mut transaction = self.pool.begin().await.map_err(backend)?;
         sqlx::query("CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_name_id ON jobs(name, id)")
-            .execute(&mut *transaction)
+            .execute(&mut **transaction)
             .await
             .map_err(backend)?;
         sqlx::query(
@@ -505,7 +522,7 @@ impl SqliteStore {
                 FOREIGN KEY(job_name, job_id) REFERENCES jobs(name, id) ON DELETE CASCADE\
             )",
         )
-        .execute(&mut *transaction)
+        .execute(&mut **transaction)
         .await
         .map_err(backend)?;
         let orphan_query = if has_job_id {
@@ -518,7 +535,7 @@ impl SqliteStore {
              FROM job_runs r LEFT JOIN jobs j ON j.name = r.job_name WHERE j.name IS NULL"
         };
         sqlx::query(orphan_query)
-        .execute(&mut *transaction)
+        .execute(&mut **transaction)
         .await
         .map_err(backend)?;
         let copy_query = if has_job_id {
@@ -531,28 +548,27 @@ impl SqliteStore {
              FROM job_runs r JOIN jobs j ON j.name = r.job_name"
         };
         sqlx::query(copy_query)
-        .execute(&mut *transaction)
+        .execute(&mut **transaction)
         .await
         .map_err(backend)?;
         sqlx::query("DROP TABLE job_runs")
-            .execute(&mut *transaction)
+            .execute(&mut **transaction)
             .await
             .map_err(backend)?;
         sqlx::query("ALTER TABLE job_runs_rebuilt RENAME TO job_runs")
-            .execute(&mut *transaction)
+            .execute(&mut **transaction)
             .await
             .map_err(backend)?;
         sqlx::query("CREATE INDEX idx_job_runs_job ON job_runs(job_name, scheduled_at DESC)")
-            .execute(&mut *transaction)
+            .execute(&mut **transaction)
             .await
             .map_err(backend)?;
         sqlx::query("INSERT INTO schema_versions(name, version) VALUES('job_runs_job_identity', 1) ON CONFLICT(name) DO UPDATE SET version = excluded.version")
-            .execute(&mut *transaction)
+            .execute(&mut **transaction)
             .await
             .map_err(backend)?;
-        transaction.commit().await.map_err(backend)?;
         let foreign_key_violations = sqlx::query("PRAGMA foreign_key_check")
-            .fetch_all(&self.pool)
+            .fetch_all(&mut **transaction)
             .await
             .map_err(backend)?;
         if foreign_key_violations.is_empty() {
@@ -562,9 +578,12 @@ impl SqliteStore {
         }
     }
 
-    async fn has_jobs_identity_index(&self) -> Result<bool, RepoError> {
+    async fn has_jobs_identity_index(
+        &self,
+        transaction: &mut Transaction<'_, Sqlite>,
+    ) -> Result<bool, RepoError> {
         let indexes = sqlx::query("PRAGMA index_list(jobs)")
-            .fetch_all(&self.pool)
+            .fetch_all(&mut **transaction)
             .await
             .map_err(backend)?;
         for index in indexes {
@@ -574,7 +593,7 @@ impl SqliteStore {
             }
             let index_name: String = index.try_get("name").map_err(backend)?;
             let columns = sqlx::query(&format!("PRAGMA index_info({index_name})"))
-                .fetch_all(&self.pool)
+                .fetch_all(&mut **transaction)
                 .await
                 .map_err(backend)?;
             let column_names = columns
@@ -589,9 +608,12 @@ impl SqliteStore {
         Ok(false)
     }
 
-    async fn has_job_runs_identity_foreign_key(&self) -> Result<bool, RepoError> {
+    async fn has_job_runs_identity_foreign_key(
+        &self,
+        transaction: &mut Transaction<'_, Sqlite>,
+    ) -> Result<bool, RepoError> {
         let foreign_keys = sqlx::query("PRAGMA foreign_key_list(job_runs)")
-            .fetch_all(&self.pool)
+            .fetch_all(&mut **transaction)
             .await
             .map_err(backend)?;
         let mut expected_columns = std::collections::BTreeMap::new();
@@ -613,21 +635,23 @@ impl SqliteStore {
 
     async fn ensure_process_spec_column(
         &self,
+        transaction: &mut Transaction<'_, Sqlite>,
         column_name: &str,
         definition: &str,
     ) -> Result<(), RepoError> {
-        self.ensure_table_column("process_specs", column_name, definition)
+        self.ensure_table_column(transaction, "process_specs", column_name, definition)
             .await
     }
 
     async fn ensure_table_column(
         &self,
+        transaction: &mut Transaction<'_, Sqlite>,
         table_name: &str,
         column_name: &str,
         definition: &str,
     ) -> Result<(), RepoError> {
         let columns = sqlx::query(&format!("PRAGMA table_info({table_name})"))
-            .fetch_all(&self.pool)
+            .fetch_all(&mut **transaction)
             .await
             .map_err(backend)?;
         let exists = columns.iter().any(|row| {
@@ -640,7 +664,7 @@ impl SqliteStore {
                 "ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
             );
             sqlx::query(&statement)
-                .execute(&self.pool)
+                .execute(&mut **transaction)
                 .await
                 .map_err(backend)?;
         }

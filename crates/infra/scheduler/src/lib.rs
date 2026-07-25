@@ -1,16 +1,16 @@
 //! `my-supervisor-infra-scheduler` — evaluates cron / interval / one-shot
-//! triggers with `tokio::time` timers and broadcasts fire events. `DependsOn`
+//! triggers with `tokio::time` timers and queues fire events. `DependsOn`
 //! triggers are not timed here; they are propagated by run-completion observers
 //! (DD-028).
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::Mutex as StdMutex;
 use std::time::Duration as StdDuration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use croner::Cron;
-use tokio::sync::broadcast;
+use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 
 use my_supervisor_core::domain::JobTrigger;
@@ -19,14 +19,14 @@ use my_supervisor_core::ports::scheduler::{
     ScheduleEvent, ScheduledJob, Scheduler, SchedulerSnapshot,
 };
 
-const EVENT_CAPACITY: usize = 256;
 /// Cap a single sleep so far-future one-shots stay responsive to unregister.
 const MAX_SLEEP: StdDuration = StdDuration::from_secs(3600);
 
 pub struct TokioScheduler {
-    tx: broadcast::Sender<ScheduleEvent>,
-    timers: Mutex<HashMap<String, JoinHandle<()>>>,
-    triggers: Mutex<HashMap<String, JobTrigger>>,
+    event_sender: mpsc::UnboundedSender<ScheduleEvent>,
+    event_receiver: Mutex<mpsc::UnboundedReceiver<ScheduleEvent>>,
+    timers: StdMutex<HashMap<String, JoinHandle<()>>>,
+    triggers: StdMutex<HashMap<String, JobTrigger>>,
 }
 
 impl Default for TokioScheduler {
@@ -37,11 +37,12 @@ impl Default for TokioScheduler {
 
 impl TokioScheduler {
     pub fn new() -> Self {
-        let (tx, _) = broadcast::channel(EVENT_CAPACITY);
+        let (event_sender, event_receiver) = mpsc::unbounded_channel();
         TokioScheduler {
-            tx,
-            timers: Mutex::new(HashMap::new()),
-            triggers: Mutex::new(HashMap::new()),
+            event_sender,
+            event_receiver: Mutex::new(event_receiver),
+            timers: StdMutex::new(HashMap::new()),
+            triggers: StdMutex::new(HashMap::new()),
         }
     }
 
@@ -106,16 +107,21 @@ impl Scheduler for TokioScheduler {
             return Ok(());
         }
 
-        let tx = self.tx.clone();
+        let event_sender = self.event_sender.clone();
         let name = job_name.to_string();
         let trigger = trigger.clone();
         let handle = tokio::spawn(async move {
             while let Some(next) = next_for(&trigger, Utc::now()) {
                 sleep_until(next).await;
-                let _ = tx.send(ScheduleEvent {
+                if event_sender
+                    .send(ScheduleEvent {
                     job_name: name.clone(),
                     scheduled_at: next,
-                });
+                    })
+                    .is_err()
+                {
+                    break;
+                }
                 if matches!(trigger, JobTrigger::OneShot(_)) {
                     break;
                 }
@@ -164,7 +170,7 @@ impl Scheduler for TokioScheduler {
         next_for(trigger, after)
     }
 
-    fn subscribe(&self) -> broadcast::Receiver<ScheduleEvent> {
-        self.tx.subscribe()
+    async fn next_event(&self) -> Option<ScheduleEvent> {
+        self.event_receiver.lock().await.recv().await
     }
 }

@@ -2,6 +2,8 @@
 
 본 문서는 `my-supervisor` 프로젝트의 전체 아키텍처, 컴포넌트 설계, 플랫폼별 구현 전략을 정리합니다.
 
+> **현재 구현 기준선:** 실행 가능한 제품 범위는 macOS 로컬 운영 MVP입니다. Linux/Windows adapter, Rules 자동화, 원격 운영은 이 문서의 목표 설계이며 현재 지원 기능이 아닙니다. 아래 플랫폼별 설명은 별도 표기가 없으면 구현 완료가 아니라 목표 구조를 뜻합니다.
+
 ## 1. 설계 원칙
 
 1. **GUI 호스트와 헤드리스 launcher** — `core`/`application` 과 adapter 조립을 `daemon` 런타임 라이브러리로 모으고, **GUI 가 있는 my-supervisor**(`desktop`, Tauri)는 이를 인프로세스로 재사용한다. **GUI 가 없는 my-supervisor**는 같은 런타임을 `msv-daemon` launcher로 실행한다. Tauri 는 별도 데몬 프로세스를 spawn 하지 않는다(DD-002). 데스크톱에서 창을 닫아도 tray 로 상주해 관리 중인 프로세스는 유지된다.
@@ -14,15 +16,15 @@
 8. **프로세스 관리 모드 이원화** — 각 Process 는 **Direct** (데몬이 직접 spawn·감시·재시작) 또는 **SystemRegistered** (OS 서비스 매니저 — systemd user unit / launchd agent / Windows Service — 에 등록 후 OS 가 감시, 데몬은 제어·조회·로그 집계) 중 하나를 프로세스별로 선택한다. 두 모드는 port 레벨에서 분리되며 재시작 엔진 충돌은 설계 시점에 차단한다. 근거: DD-025.
 9. **테마 동등 지원** — 다크 모드와 라이트 모드를 동등하게 지원한다. 토큰은 shadcn/ui CSS 변수를 단일 출처로 쓰고, 디자인 시안 승인 시 두 모드 스크린샷을 동시 확인한다. 근거: DD-021.
 
-### 지원 OS 최소 버전
+### 목표 OS 최소 버전
 
 PoC부터 다음 환경을 기준선으로 가정한다. 더 오래된 OS 지원은 수요가 확인되면 Post-Production에서 검토.
 
 | OS | 최소 버전 | 비고 |
 |---|---|---|
-| Windows | Windows 10 1809 (2018-10) 이상 | WebView2 런타임 설치 필요, Windows 11 권장 |
-| macOS | macOS 12 Monterey 이상 | WKWebView / launchd 기반 |
-| Linux | Ubuntu 20.04 / Debian 11 / 동등 커널 5.4+ | WebKitGTK 2.36+, systemd 가정 |
+| Windows | Windows 10 1809 (2018-10) 이상 | 목표 기준, 현재 미지원 |
+| macOS | macOS 12 Monterey 이상 | 현재 구현 기준, WKWebView / launchd 기반 |
+| Linux | Ubuntu 20.04 / Debian 11 / 동등 커널 5.4+ | 목표 기준, 현재 미지원 |
 
 PoC의 교차 검증 환경은 이 기준선에서 선정한다.
 
@@ -893,16 +895,16 @@ pub trait ProcessServiceRegistrar: Send + Sync {
 
 ### 12.2 Ports
 
-- **`Scheduler`** — cron/interval/one-shot 평가 + 타이머 관리. 트리거 시점에 application 에 이벤트 발행
+- **`Scheduler`** — cron/interval/one-shot 평가 + 타이머 관리. 트리거는 단일 application 소비자가 받을 때까지 대기열에 보존한다.
 - **`JobRepository`** — Job 정의 + JobRun 이력 영속. **등록 시 순환 감지** 수행하고 감지 시 `cycle_detected`
 - **`JobRunner`** — Job 을 transient 프로세스로 spawn. 내부적으로 `LifecycleController::spawn_detached` 재사용하고, stdout/stderr 는 `LogSink::for_job_run(run_id)` 로 수집. exit 대기 후 `JobRepository` 에 결과 확정
 
 ### 12.3 흐름
 
 1. 사용자가 Job 등록 → `RegisterJob` use case → `JobRepository::save` (순환 감지 포함) → `Scheduler::register` (trigger 타입에 따라 cron 등록 / 타이머 등록 / 의존성 구독)
-2. 트리거 발화 → `Scheduler` 이벤트 → `ScheduleTick` use case → `on_overlap` 에 따라 skip/queue/parallel 결정 → `JobRunner::run`
+2. 트리거 발화 → `Scheduler`의 손실 없는 단일 소비자 대기열 → `ScheduleTick` use case → `on_overlap` 에 따라 skip/queue/parallel 결정 → `JobRunner::run`
 3. `JobRunner` 가 `JobRun` 생성 → `LifecycleController::spawn_detached` → 로그 수집 → exit 확보 → `JobRepository::save_finished`
-4. `ObserveJobRunCompleted` use case 가 `DependsOn(…)` 에 이 Job 이 포함된 downstream Job 들을 순회하여 의존 조건 충족 여부 검사. 충족 시 `JobRunner::run` 호출
+4. `ObserveJobRunCompleted` use case 가 `DependsOn(…)` 에 이 Job 이 포함된 downstream Job 들을 순회하여 의존 조건 충족 여부 검사. 내부 완료 이벤트가 lag되면 저장된 최신 terminal Run 조합을 다시 읽고 `DependencySignature`로 중복 실행을 차단하며 재조정한다.
 
 ### 12.4 신뢰성 특성
 
