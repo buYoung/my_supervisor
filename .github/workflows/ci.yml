@@ -156,11 +156,19 @@ jobs:
         run: scripts/release/capture-source-provenance.sh verify target/package-security/source-manifest.tsv
 
       - name: Verify unsigned arm64 package inventory and negative self-checks
-        run: >-
-          CARGO_TARGET_DIR=target/package-security
-          CARGO_BUILD_TARGET=aarch64-apple-darwin
-          MSV_PACKAGE_NEGATIVE_SELF_CHECK=1
-          scripts/release/verify-macos-package.sh
-          target/package-security/aarch64-apple-darwin/release/bundle/macos/my-supervisor.app
-          target/package-security/aarch64-apple-darwin/release/bundle/dmg/my-supervisor_0.1.0_aarch64.dmg
-          target/package-security/source-manifest.tsv
+        run: |
+          if ! verification_output="$(
+            CARGO_TARGET_DIR=target/package-security \
+            CARGO_BUILD_TARGET=aarch64-apple-darwin \
+            MSV_PACKAGE_NEGATIVE_SELF_CHECK=1 \
+            scripts/release/verify-macos-package.sh \
+            target/package-security/aarch64-apple-darwin/release/bundle/macos/my-supervisor.app \
+            target/package-security/aarch64-apple-darwin/release/bundle/dmg/my-supervisor_0.1.0_aarch64.dmg \
+            target/package-security/source-manifest.tsv 2>&1
+          )"; then
+            printf '%s\n' "${verification_output}"
+            verification_error="$(printf '%s\n' "${verification_output}" | tail -n 1)"
+            printf '::error::%s\n' "${verification_error}"
+            exit 1
+          fi
+          printf '%s\n' "${verification_output}"
