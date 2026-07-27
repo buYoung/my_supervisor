@@ -158,6 +158,7 @@ fn file_sha256(path: &Path) -> String {
 /// Cargo output writes or compiling a mismatched helper profile.
 fn prepare_release_sidecars() {
     println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
+    println!("cargo:rerun-if-env-changed=CARGO_BUILD_TARGET");
     println!("cargo:rerun-if-env-changed=HOST");
     println!("cargo:rerun-if-env-changed=TARGET");
     println!("cargo:rerun-if-env-changed=PROFILE");
@@ -243,10 +244,10 @@ fn cargo_artifact_dir(target: &str, host: &str, profile: &str) -> PathBuf {
         .and_then(Path::parent)
         .expect("desktop crate is nested under the workspace root");
     let target_dir = cargo_target_dir(workspace_root, &manifest_dir);
-    let target_dir = if target == host {
-        target_dir
-    } else {
+    let target_dir = if env::var_os("CARGO_BUILD_TARGET").is_some() || target != host {
         target_dir.join(target)
+    } else {
+        target_dir
     };
     target_dir.join(profile)
 }

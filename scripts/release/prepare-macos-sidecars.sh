@@ -2,12 +2,13 @@
 set -euo pipefail
 
 workspace_root="$(cd "$(dirname "$0")/../.." && pwd)"
-target_triple="${CARGO_BUILD_TARGET:-$(rustc -vV | sed -n 's/^host: //p')}"
 target_root="${CARGO_TARGET_DIR:-${workspace_root}/target}"
-if [[ "${target_triple}" == "$(rustc -vV | sed -n 's/^host: //p')" ]]; then
-  artifact_dir="${target_root}/release"
-else
+if [[ -n "${CARGO_BUILD_TARGET:-}" ]]; then
+  target_triple="${CARGO_BUILD_TARGET}"
   artifact_dir="${target_root}/${target_triple}/release"
+else
+  target_triple="$(rustc -vV | sed -n 's/^host: //p')"
+  artifact_dir="${target_root}/release"
 fi
 sidecar_dir="${workspace_root}/crates/desktop/binaries"
 mkdir -p "${sidecar_dir}"

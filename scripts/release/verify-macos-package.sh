@@ -16,11 +16,7 @@ else
   target_triple="${host_triple}"
   desktop_artifact_dir="${target_root}/release"
 fi
-if [[ "${target_triple}" == "${host_triple}" ]]; then
-  sidecar_artifact_dir="${target_root}/release"
-else
-  sidecar_artifact_dir="${target_root}/${target_triple}/release"
-fi
+sidecar_artifact_dir="${desktop_artifact_dir}"
 app_path="${1:-${desktop_artifact_dir}/bundle/macos/my-supervisor.app}"
 dmg_path="${2:-}"
 source_manifest_path="${3:-}"
@@ -411,9 +407,10 @@ verify_dmg() {
 }
 
 run_negative_self_checks() (
-  local temporary_root copied_app canary_path marker_copy different_dmg_root different_dmg
+  local temporary_root credential_temporary_root copied_app canary_path marker_copy
+  local different_dmg_root different_dmg
   local tampered_dmg_root tampered_dmg symlink_dmg_root symlink_dmg parser_failure_log
-  temporary_root="$(create_verifier_temporary_directory "${workspace_root}/scripts/release")"
+  temporary_root="$(create_verifier_temporary_directory "${target_root}")"
   trap 'rm -rf -- "${temporary_root}"' EXIT
 
   copied_app="${temporary_root}/my-supervisor.app"
@@ -431,11 +428,14 @@ run_negative_self_checks() (
   fi
 
   canary_name='APPLE_API_KEY'
-  canary_path="$(create_verifier_temporary_file "${temporary_root}")"
+  credential_temporary_root="$(create_verifier_temporary_directory "${workspace_root}/scripts/release")"
+  canary_path="$(create_verifier_temporary_file "${credential_temporary_root}")"
   printf '%s=canary\n' "${canary_name}" >"${canary_path}"
   if (scan_credential_inputs) 2>/dev/null; then
     fail "negative self-check accepted an untracked credential canary"
   fi
+  rm -f -- "${canary_path}"
+  rmdir "${credential_temporary_root}"
 
   if (require_arm64_architecture 'x86_64') 2>/dev/null; then
     fail "negative self-check accepted x86_64"
