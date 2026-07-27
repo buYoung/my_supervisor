@@ -52,12 +52,14 @@ try {
   await http.startProcess("worker");
   await http.stopProcess("worker", true);
   await http.restartProcess("worker");
+  await http.removeProcess("worker", false);
   await http.removeProcess("worker", true);
   const httpJob = await http.addJob(config);
 
   await invoke.startProcess("worker");
   await invoke.stopProcess("worker", true);
   await invoke.restartProcess("worker");
+  await invoke.removeProcess("worker", false);
   await invoke.removeProcess("worker", true);
   const invokeJob = await invoke.addJob(config);
 
@@ -67,6 +69,7 @@ try {
       ["/api/v1/processes/worker/start", "POST"],
       ["/api/v1/processes/worker/stop?force=true", "POST"],
       ["/api/v1/processes/worker/restart", "POST"],
+      ["/api/v1/processes/worker", "DELETE"],
       ["/api/v1/processes/worker?force=true", "DELETE"],
       ["/api/v1/jobs", "POST"],
     ],
@@ -78,6 +81,7 @@ try {
       { command: "cmd_start_process", args: { name: "worker" } },
       { command: "cmd_stop_process", args: { name: "worker", force: true } },
       { command: "cmd_restart_process", args: { name: "worker" } },
+      { command: "cmd_remove_process", args: { name: "worker", force: false } },
       { command: "cmd_remove_process", args: { name: "worker", force: true } },
       { command: "cmd_add_job", args: { config } },
     ],
@@ -90,9 +94,11 @@ try {
 
   const restartCalls = [];
   const rollingRestartCalls = [];
+  const removeCalls = [];
   const processActionsClient = {
     restartProcess: async (name) => { restartCalls.push(name); },
     rollingRestartProcess: async (name) => { rollingRestartCalls.push(name); },
+    removeProcess: async (name, force) => { removeCalls.push([name, force]); },
   };
   const actionMarkup = renderToStaticMarkup(createElement(ProcessLifecycleActions, {
     client: processActionsClient,
@@ -111,11 +117,52 @@ try {
     runAction: () => {},
   }));
   assert.match(actionMarkup, /aria-label="재시작"/, "ProcessesView renders the normal restart control");
+  assert.match(actionMarkup, /aria-label="삭제"/, "ProcessesView renders the protected default delete control");
+  assert.match(actionMarkup, /aria-label="강제 삭제"/, "ProcessesView renders a separate explicit force-delete control");
   assert.doesNotMatch(actionMarkup, /롤링 재시작/, "ProcessesView hides rolling restart until policy support is available to the UI");
   await restartProcess(processActionsClient, "direct");
   await restartProcess(processActionsClient, "system-registered");
   assert.deepEqual(restartCalls, ["direct", "system-registered"], "ProcessesView uses normal restart for Direct and SystemRegistered processes");
   assert.deepEqual(rollingRestartCalls, [], "ProcessesView does not silently issue a rolling restart");
+
+  let lastAction = null;
+  const lifecycleActions = ProcessLifecycleActions({
+    client: processActionsClient,
+    process: {
+      name: "direct",
+      state: "running",
+      managementMode: { type: "direct" },
+      pid: 1000,
+      restartCount: 0,
+      startedAt: null,
+      cpuPercent: 0,
+      memoryBytes: 0,
+      uptime: "-",
+    },
+    pending: false,
+    runAction: (name, action) => { lastAction = { name, action }; },
+  });
+  const actionButtons = lifecycleActions.props.children;
+  const defaultDelete = actionButtons.find((button) => button.props.label === "삭제");
+  const forceDelete = actionButtons.find((button) => button.props.label === "강제 삭제");
+  const clickEvent = { stopPropagation() {} };
+
+  defaultDelete.props.onClick(clickEvent);
+  assert.equal(lastAction.name, "direct", "default delete routes through ProcessLifecycleActions");
+  await lastAction.action();
+  assert.deepEqual(removeCalls, [["direct", false]], "default delete preserves the running-process non-force conflict protection");
+
+  window.confirm = () => true;
+  forceDelete.props.onClick(clickEvent);
+  assert.equal(lastAction.name, "direct", "confirmed force delete routes through ProcessLifecycleActions");
+  await lastAction.action();
+  assert.deepEqual(removeCalls, [["direct", false], ["direct", true]], "confirmed force delete preserves force=true");
+
+  lastAction = null;
+  window.confirm = () => false;
+  forceDelete.props.onClick(clickEvent);
+  assert.equal(lastAction, null, "cancelled force delete does not dispatch an action");
+  assert.deepEqual(removeCalls, [["direct", false], ["direct", true]], "cancelled force delete does not call the client");
   console.log("desktop process/job HTTP-Tauri parity passed");
 } finally {
   await vite.close();

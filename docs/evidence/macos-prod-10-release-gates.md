@@ -1,6 +1,6 @@
-# macOS release gates — Wave 10 v2 evidence
+# macOS release gates — Wave 10 역사적 evidence
 
-- 실행 ID: `20260726-macos-prod-release-readiness-02`
+- 원 실행 ID: `20260726-macos-prod-release-readiness-02`
 - 관찰일: `2026-07-26`
 - 제품 결정: 실제 프로세스를 관리하는 core engine이 신뢰 경계이며 CLI와 GUI는 동등한 관리 화면이다. 최초 artifact는 `arm64` 전용이다.
 - source HEAD: `2ede9d6470200ae6877b9f830ca36a66d7a02f89`; 작업 트리 변경은 HEAD만으로 재현할 수 없으므로 content-addressed manifest가 후보 신원의 필수 요소다.
@@ -49,7 +49,7 @@
 
 public `/api/v1` route, DTO key/shape, CLI command 및 기존 exit 의미는 바뀌지 않았다. CLI와 GUI는 별도 lifecycle rule을 추가하지 않고 같은 facade 결과를 전달한다.
 
-## 패키지·보안 관측과 현재성
+## 패키지·보안 역사적 관측과 현재성
 
 현재 unsigned arm64 후보의 실제 build/package 입력 142개 manifest SHA-256은 `d21420b31706d3fceb0cc9fffd21eb29a0f5cd2444d4f5fb70b745477d441760`이다. 문서·evidence·orchestration 기록은 artifact input이 아니므로 후보 byte 신원에서 제외한다. 같은 manifest에서 `RUSTFLAGS='-D warnings'` sidecar와 app/DMG를 빌드했고 build 전후 provenance verify가 모두 exit `0`이었다.
 
@@ -58,6 +58,16 @@ app은 `target/package-security/aarch64-apple-darwin/release/bundle/macos/my-sup
 다섯 executable은 source/app/readonly-mounted DMG에서 byte-for-byte 동일하고 exact `arm64`였다: `my-supervisor` `50d424c9e25ea443d9a6eefa26abe08ae50fc8a39640d0111e77d9eb23ec51c4`, `msv-daemon` `59789e2d93f3f190e97ab1e0543c45f7d3c97b54502b58607778adc4433a3979`, `msv` `2fdc394b19827bbdc53124f9b5e2b083c3c68910ea1cce8a5412c657fb729b1d`, `msv-log-proxy` `e7c199058cdc23f830c4732a905792f3d9b12a3e46bdba0cb0c5bbe1f125d100`, `msv-group-reaper` `3b9dee3746dd809adcaf743016a5f247b09bf1e8cdfc0320d9ba29e08371c7cb`.
 
 candidate 내부 `MSV_SECURITY_CONTRACT_V1` marker, credential scan 0, unsigned codesign 관찰 `embedded-entitlements=unsigned-empty-output`이 통과했다. 이 unsigned 관찰은 signed hardened-runtime enforcement를 주장하지 않는다. desktop executable replacement, marker corruption, untracked credential canary, x86_64 input의 네 negative self-check는 각각 거부됐고 outer verifier는 exit `0`이었다. credential 값은 출력하지 않았다. logging 수정 전 manifest `1021749781dace176e28f0231974e45bde9b4bbbe94b7cc35e97994119511807` 및 DMG SHA-256 `37879935e697c86f94ac1019414039cdc2f9989327c2cccc4974aa3ff26e3993`은 역사적 관측으로만 유지한다.
+
+`20260726-macos-prod-release-readiness-03`의 v3 manifest `d313503774c70c639efec75b92413c5324468daaf7bad4f87c33fdf6830b2ec1`, DMG `5b7e038bd9c5ec9bd83039ed74f84d722e27457c4f76862c4bf0d282e199215f`, desktop `ee3523415ab4a311bba2e1e6077a2720d521ed75090567bb5f132a8d633a23dc`도 `20260726-macos-prod-release-readiness-04`의 GUI 삭제 및 package verifier build-input 변경으로 stale이며 현재 후보나 release gate 통과로 사용하지 않는다.
+
+## v4 현재 unsigned arm64 후보
+
+- source HEAD: `5cc9bebedcac37c98e9e7e311531607031369a44`; fresh `target/package-security/source-manifest.tsv`는 142 inputs, provenance digest `6debd1a35f97367d5ef99ac0422bcb651a39565f49f6d087ad25c29875b4f805`, manifest-file SHA-256 `48ef39621ace75c177e070b20906f3bc12d8232358dfa6653e8309c6fa54e320`을 기록한다. create 직후, app/DMG build 후, negative matrix 후 `verify`가 모두 exit `0`이었다.
+- warning-free `aarch64-apple-darwin` sidecars와 unsigned app/DMG가 fresh build됐다. app은 `target/package-security/aarch64-apple-darwin/release/bundle/macos/my-supervisor.app`, DMG는 `target/package-security/aarch64-apple-darwin/release/bundle/dmg/my-supervisor_0.1.0_aarch64.dmg`(SHA-256 `4cc244b42b42e9087d7a0f4ad6a73c9d4a3a4f4bb7d14c5ebd6fb3bbf4f88f47`), desktop executable은 `target/package-security/aarch64-apple-darwin/release/my-supervisor`(SHA-256 `dddc1f1270402e31314ca8277621ae909fec25a75ba462706782771cf2fc8dcf`)이다.
+- normal verifier는 supplied app과 read-only DMG의 다섯 executable이 대응 release artifact와 byte-equal이고 exact `arm64`임을 확인했다: `my-supervisor` `dddc1f1270402e31314ca8277621ae909fec25a75ba462706782771cf2fc8dcf`, `msv-daemon` `59789e2d93f3f190e97ab1e0543c45f7d3c97b54502b58607778adc4433a3979`, `msv` `2fdc394b19827bbdc53124f9b5e2b083c3c68910ea1cce8a5412c657fb729b1d`, `msv-log-proxy` `e7c199058cdc23f830c4732a905792f3d9b12a3e46bdba0cb0c5bbe1f125d100`, `msv-group-reaper` `3b9dee3746dd809adcaf743016a5f247b09bf1e8cdfc0320d9ba29e08371c7cb`. `hdiutil verify`는 VALID, credential scan은 0, unsigned codesign 관찰은 `embedded-entitlements=unsigned-empty-output`이었다.
+- independent read-only comparison도 source/app/mounted-DMG의 같은 다섯 binary byte equality, exact `arm64`, 위 SHA-256을 재확인했다. normal/negative verifier와 independent comparison은 생성한 exact device만 detach하고 mount directory removal을 관찰했다. post-negative `hdiutil info`에는 `my-supervisor`, `package-security`, 독립 mount 항목이 없었다.
+- expanded negative matrix는 replaced desktop, marker corruption, untracked credential canary, x86_64 input, checksum-valid arbitrary-root DMG, changed main/sidecar DMG, top-level `my-supervisor.app` external symlink, attach 후 parser-failure injection을 모두 거부했고 `negative-self-checks=passed`로 종료했다.
 
 ## logging 경합 수정 증거
 
@@ -85,4 +95,4 @@ recovery E2E는 세 scenario의 exact temporary root와 별도 UUID marker를 `-
 
 ## 출시 결정
 
-core process engine과 대표 CLI/GUI 운영 계약의 로컬 source gate는 통과했다. current-source artifact, hosted CI, signing/notarization 및 clean-user 설치 증거가 없으므로 production deployment는 준비되지 않았다. publish, upload, signing, notarization, stapling 또는 deployment를 수행했다는 주장은 하지 않는다.
+core process engine과 대표 CLI/GUI 운영 계약의 역사적 로컬 source gate 및 현재 v4 unsigned arm64 후보의 P01–P03 로컬 자동 게이트는 통과했다. 그러나 hosted CI, Developer ID signing/notarization/stapling 및 clean-user/VM 설치·login/reboot·uninstall 증거는 준비되지 않았으므로 production deployment는 준비되지 않았다. publish, upload, signing, notarization, stapling 또는 deployment를 수행했다는 주장은 하지 않는다.

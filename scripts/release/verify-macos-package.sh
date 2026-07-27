@@ -33,6 +33,8 @@ approved_entitlement_sha256="97704a8960b4facceef54397a08fb5d0a456247c3627359215a
 approved_csp_hex="$(printf '%s' "${approved_csp}" | xxd -p -c 1000)"
 dmg_mount_point=""
 mounted_device=""
+dmg_attached=0
+canonical_dmg_mount_root=""
 
 fail() {
   printf 'macOS package verification failed: %s\n' "$1" >&2
@@ -40,17 +42,28 @@ fail() {
 }
 
 cleanup_mounted_dmg() {
-  local cleanup_status=0
-  if [[ -n "${mounted_device}" ]]; then
-    if hdiutil detach "${mounted_device}" >/dev/null 2>&1; then
+  local cleanup_status=0 detach_target="" detached_target=""
+  if [[ "${dmg_attached}" == '1' ]]; then
+    if [[ -n "${mounted_device}" ]]; then
+      detach_target="${mounted_device}"
+    elif [[ -n "${dmg_mount_point}" ]]; then
+      detach_target="${dmg_mount_point}"
+    fi
+    if [[ -n "${detach_target}" ]] && hdiutil detach "${detach_target}" >/dev/null 2>&1; then
       mounted_device=""
+      dmg_attached=0
+      detached_target="${detach_target}"
     else
       cleanup_status=1
     fi
   fi
-  if [[ -z "${mounted_device}" && -n "${dmg_mount_point}" ]]; then
+  if [[ "${dmg_attached}" == '0' && -n "${dmg_mount_point}" ]]; then
     if rmdir "${dmg_mount_point}" >/dev/null 2>&1; then
+      if [[ -n "${detached_target}" ]]; then
+        printf 'cleanup|detach-target=%s|mount-directory=removed\n' "${detached_target}"
+      fi
       dmg_mount_point=""
+      canonical_dmg_mount_root=""
     else
       cleanup_status=1
     fi
@@ -90,7 +103,7 @@ require_arm64_architecture() {
 
 find_mounted_device_for_mount_point() {
   local attach_plist="$1" requested_mount_point="$2" entity_index=0 entity_plist
-  local entity_mount_point entity_device
+  local entity_mount_point entity_device canonical_entity_mount_point
   while true; do
     if ! entity_plist="$(printf '%s' "${attach_plist}" \
       | plutil -extract "system-entities.${entity_index}" xml1 -o - - 2>/dev/null)"; then
@@ -98,7 +111,8 @@ find_mounted_device_for_mount_point() {
     fi
     entity_mount_point="$(printf '%s' "${entity_plist}" \
       | plutil -extract mount-point raw -o - - 2>/dev/null || true)"
-    if [[ "${entity_mount_point}" == "${requested_mount_point}" ]]; then
+    canonical_entity_mount_point="$(canonicalize_existing_path "${entity_mount_point}" 2>/dev/null || true)"
+    if [[ "${canonical_entity_mount_point}" == "${requested_mount_point}" ]]; then
       entity_device="$(printf '%s' "${entity_plist}" \
         | plutil -extract dev-entry raw -o - - 2>/dev/null || true)"
       [[ "${entity_device}" =~ ^/dev/disk[0-9]+(s[0-9]+)?$ ]] || return 2
@@ -110,9 +124,23 @@ find_mounted_device_for_mount_point() {
   return 1
 }
 
+canonicalize_existing_path() {
+  perl -MCwd=abs_path -e 'my $path = abs_path($ARGV[0]) // exit 1; print "$path\n";' "$1"
+}
+
+require_dmg_mount_containment() {
+  local checked_path="$1" checked_label="$2" canonical_checked_path
+  [[ -n "${canonical_dmg_mount_root}" ]] || return 0
+  canonical_checked_path="$(canonicalize_existing_path "${checked_path}")" \
+    || fail "could not canonicalize DMG ${checked_label}"
+  [[ "${canonical_checked_path}" == "${canonical_dmg_mount_root}"/* ]] \
+    || fail "DMG ${checked_label} escapes the verifier-created mount"
+}
+
 verify_security_contract() {
   local desktop_binary="$1" candidate_marker marker_found=0
   local expected_marker
+  require_dmg_mount_containment "${desktop_binary}" 'desktop executable'
   expected_marker="MSV_SECURITY_CONTRACT_V1|csp_hex=${approved_csp_hex}|hardened_runtime=true|entitlement_path=entitlements.plist|entitlement_sha256=${approved_entitlement_sha256}|entitlement_hex=${approved_entitlement_hex}|source_provenance_sha256=${source_manifest_digest}"
   while IFS= read -r candidate_marker; do
     if [[ "${candidate_marker}" == "${expected_marker}" ]]; then
@@ -126,6 +154,7 @@ verify_security_contract() {
 
 verify_embedded_entitlements() {
   local desktop_binary="$1" entitlement_output entitlement_error signature_details
+  require_dmg_mount_containment "${desktop_binary}" 'desktop executable'
   entitlement_output="$(mktemp "${target_root}/.embedded-entitlements.XXXXXX")"
   entitlement_error="$(mktemp "${target_root}/.embedded-entitlements-error.XXXXXX")"
   trap 'rm -f "${entitlement_output}" "${entitlement_error}"' RETURN
@@ -204,11 +233,18 @@ verify_bundle_identity_and_layout() {
   local bundle_path="$1" bundle_label="$2" bundle_info_plist bundle_macos_dir
   local bundle_identifier bundle_version bundle_executable actual_binary_count
   [[ -d "${bundle_path}" ]] || fail "${bundle_label} app bundle is missing at ${bundle_path}"
+  if [[ "${bundle_label}" == 'DMG' ]]; then
+    [[ ! -L "${bundle_path}" ]] || fail "DMG my-supervisor.app entry must not be a symlink"
+    require_dmg_mount_containment "${bundle_path}" 'app bundle'
+  fi
   bundle_info_plist="${bundle_path}/Contents/Info.plist"
   bundle_macos_dir="${bundle_path}/Contents/MacOS"
   [[ -f "${bundle_info_plist}" ]] || fail "${bundle_label} Info.plist is missing"
   [[ -d "${bundle_macos_dir}" ]] || fail "${bundle_label} Contents/MacOS is missing"
   [[ -d "${bundle_path}/Contents/Resources" ]] || fail "${bundle_label} Contents/Resources is missing"
+  require_dmg_mount_containment "${bundle_info_plist}" 'Info.plist'
+  require_dmg_mount_containment "${bundle_macos_dir}" 'Contents/MacOS'
+  require_dmg_mount_containment "${bundle_path}/Contents/Resources" 'Contents/Resources'
 
   bundle_identifier="$(plutil -extract CFBundleIdentifier raw "${bundle_info_plist}")"
   bundle_version="$(plutil -extract CFBundleShortVersionString raw "${bundle_info_plist}")"
@@ -233,6 +269,7 @@ verify_bundle_executables() {
     bundled_binary="${bundle_macos_dir}/${binary_name}"
     [[ -f "${bundled_binary}" ]] || fail "missing ${bundle_label} executable ${binary_name}"
     [[ -x "${bundled_binary}" ]] || fail "${bundle_label} ${binary_name} is not executable"
+    require_dmg_mount_containment "${bundled_binary}" "${binary_name} executable"
     file_output="$(file "${bundled_binary}")"
     [[ "${file_output}" == *"Mach-O 64-bit executable"* ]] \
       || fail "${bundle_label} ${binary_name} is not a 64-bit Mach-O executable"
@@ -269,12 +306,14 @@ verify_dmg_root_layout() {
     root_entry_count=$((root_entry_count + 1))
     case "${root_entry_name}" in
       .VolumeIcon.icns)
-        [[ -f "${root_entry}" ]] || fail "DMG .VolumeIcon.icns is not a regular file"
+        [[ -f "${root_entry}" && ! -L "${root_entry}" ]] || fail "DMG .VolumeIcon.icns is not a regular file"
+        require_dmg_mount_containment "${root_entry}" '.VolumeIcon.icns'
         has_volume_icon=1
         ;;
       .DS_Store)
         [[ -f "${root_entry}" && ! -L "${root_entry}" && ! -x "${root_entry}" ]] \
           || fail "DMG .DS_Store is not a regular non-executable file"
+        require_dmg_mount_containment "${root_entry}" '.DS_Store'
         has_finder_layout=1
         ;;
       Applications)
@@ -283,7 +322,8 @@ verify_dmg_root_layout() {
         has_applications_link=1
         ;;
       my-supervisor.app)
-        [[ -d "${root_entry}" ]] || fail "DMG my-supervisor.app entry is not a directory"
+        [[ -d "${root_entry}" && ! -L "${root_entry}" ]] || fail "DMG my-supervisor.app entry is not a real directory"
+        require_dmg_mount_containment "${root_entry}" 'app bundle'
         has_app_bundle=1
         ;;
       *)
@@ -301,8 +341,16 @@ verify_dmg() {
   [[ -f "${dmg_path}" ]] || fail "DMG is missing at ${dmg_path}"
   hdiutil verify "${dmg_path}" >/dev/null || fail "DMG checksum verification failed"
   dmg_mount_point="$(mktemp -d "${target_root}/.package-dmg-mount.XXXXXX")"
+  dmg_mount_point="$(canonicalize_existing_path "${dmg_mount_point}")" \
+    || fail "could not canonicalize the verifier-created DMG mount point"
   if ! attach_plist="$(hdiutil attach -readonly -nobrowse -noverify -plist -mountpoint "${dmg_mount_point}" "${dmg_path}")"; then
     fail "DMG could not be mounted read-only"
+  fi
+  dmg_attached=1
+  canonical_dmg_mount_root="$(canonicalize_existing_path "${dmg_mount_point}")" \
+    || fail "could not canonicalize the mounted DMG root"
+  if [[ "${MSV_PACKAGE_INJECT_ATTACH_PARSER_FAILURE:-0}" == '1' ]]; then
+    fail "injected attach parser failure"
   fi
   if ! mounted_device="$(find_mounted_device_for_mount_point "${attach_plist}" "${dmg_mount_point}")"; then
     fail "DMG mount did not report the verifier-created mount point and device"
@@ -323,7 +371,7 @@ verify_dmg() {
 
 run_negative_self_checks() (
   local temporary_root copied_app canary_path marker_copy different_dmg_root different_dmg
-  local tampered_dmg_root tampered_dmg
+  local tampered_dmg_root tampered_dmg symlink_dmg_root symlink_dmg parser_failure_log
   temporary_root="$(mktemp -d "${target_root}/.package-negative.XXXXXX")"
   canary_path="${workspace_root}/scripts/release/.package-security-credential-canary"
   trap 'rm -f "${canary_path}"; rm -rf "${temporary_root}"' EXIT
@@ -382,6 +430,27 @@ run_negative_self_checks() (
   if (MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 "$0" "${app_path}" "${tampered_dmg}" "${source_manifest_path}") >/dev/null 2>&1; then
     fail "negative self-check accepted a DMG with changed internal main and sidecar executables"
   fi
+
+  symlink_dmg_root="${temporary_root}/symlink-app-dmg-root"
+  mkdir "${symlink_dmg_root}"
+  ln -s "${app_path}" "${symlink_dmg_root}/my-supervisor.app"
+  ln -s /Applications "${symlink_dmg_root}/Applications"
+  : >"${symlink_dmg_root}/.VolumeIcon.icns"
+  : >"${symlink_dmg_root}/.DS_Store"
+  symlink_dmg="${temporary_root}/symlink-app.dmg"
+  hdiutil create -volname 'my-supervisor' -srcfolder "${symlink_dmg_root}" -fs HFS+ \
+    -format UDZO -ov "${symlink_dmg}" >/dev/null
+  if (MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 "$0" "${app_path}" "${symlink_dmg}" "${source_manifest_path}") >/dev/null 2>&1; then
+    fail "negative self-check accepted a my-supervisor.app symlink to an external app"
+  fi
+
+  parser_failure_log="${temporary_root}/attach-parser-failure.log"
+  if MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 MSV_PACKAGE_INJECT_ATTACH_PARSER_FAILURE=1 \
+    "$0" "${app_path}" "${dmg_path}" "${source_manifest_path}" >"${parser_failure_log}" 2>&1; then
+    fail "negative self-check accepted an injected attach parser failure"
+  fi
+  grep -Eq '^cleanup\|detach-target=.*/\.package-dmg-mount\.[[:alnum:]]+\|mount-directory=removed$' "${parser_failure_log}" \
+    || fail "negative self-check did not observe exact mount-point detach and mount-directory removal after parser failure"
 )
 
 [[ -d "${app_path}" ]] || fail "app bundle is missing at ${app_path}"

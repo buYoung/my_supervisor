@@ -18,6 +18,10 @@ export function restartProcess(client: Pick<OperationsClient, "restartProcess">,
   return client.restartProcess(name);
 }
 
+export function confirmForceProcessRemoval(name: string): boolean {
+  return window.confirm(`실행 중인 프로세스 \"${name}\"를 강제 종료하고 삭제합니다. 계속할까요?`);
+}
+
 export function ProcessLifecycleActions({
   client,
   process,
@@ -30,7 +34,7 @@ export function ProcessLifecycleActions({
   runAction: ProcessActionRunner;
 }) {
   const stopPropagation = (event: MouseEvent) => event.stopPropagation();
-  return <div className="flex gap-2"><IconButton label="시작" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.startProcess(process.name)); }}><Play aria-hidden="true" size={15} /></IconButton><IconButton label="중지" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.stopProcess(process.name)); }}><Pause aria-hidden="true" size={15} /></IconButton><IconButton label="재시작" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => restartProcess(client, process.name)); }}><RotateCcw aria-hidden="true" size={15} /></IconButton><IconButton label="관리 모드 전환" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.convertProcess(process.name, process.managementMode.type === "direct" ? "system_registered" : "direct", { autoStart: process.managementMode.type === "direct" })); }}><ArrowRightLeft aria-hidden="true" size={15} /></IconButton><IconButton label="삭제" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.removeProcess(process.name, true)); }}><Trash2 aria-hidden="true" size={15} /></IconButton></div>;
+  return <div className="flex gap-2"><IconButton label="시작" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.startProcess(process.name)); }}><Play aria-hidden="true" size={15} /></IconButton><IconButton label="중지" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.stopProcess(process.name)); }}><Pause aria-hidden="true" size={15} /></IconButton><IconButton label="재시작" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => restartProcess(client, process.name)); }}><RotateCcw aria-hidden="true" size={15} /></IconButton><IconButton label="관리 모드 전환" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.convertProcess(process.name, process.managementMode.type === "direct" ? "system_registered" : "direct", { autoStart: process.managementMode.type === "direct" })); }}><ArrowRightLeft aria-hidden="true" size={15} /></IconButton><IconButton label="삭제" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.removeProcess(process.name, false)); }}><Trash2 aria-hidden="true" size={15} /></IconButton><IconButton label="강제 삭제" disabled={pending} onClick={(event) => { stopPropagation(event); if (!confirmForceProcessRemoval(process.name)) return; runAction(process.name, () => client.removeProcess(process.name, true)); }}><Trash2 aria-hidden="true" size={15} /></IconButton></div>;
 }
 
 export function ProcessesView() {
