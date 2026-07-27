@@ -128,6 +128,47 @@ canonicalize_existing_path() {
   perl -MCwd=abs_path -e 'my $path = abs_path($ARGV[0]) // exit 1; print "$path\n";' "$1"
 }
 
+require_verifier_owned_temporary_path() {
+  local candidate_path="$1" expected_parent="$2" expected_mode="$3" path_label="$4"
+  local canonical_candidate_path canonical_expected_parent path_owner path_mode
+  [[ -e "${candidate_path}" && ! -L "${candidate_path}" ]] \
+    || fail "verifier-created ${path_label} is missing or is a symlink"
+  canonical_candidate_path="$(canonicalize_existing_path "${candidate_path}")" \
+    || fail "could not canonicalize verifier-created ${path_label}"
+  canonical_expected_parent="$(canonicalize_existing_path "${expected_parent}")" \
+    || fail "could not canonicalize expected ${path_label} parent"
+  [[ "${canonical_candidate_path}" == "${canonical_expected_parent}"/* ]] \
+    || fail "verifier-created ${path_label} escapes its expected parent"
+  path_owner="$(stat -f '%u' "${candidate_path}")"
+  [[ "${path_owner}" == "$(id -u)" ]] \
+    || fail "verifier-created ${path_label} is not owned by the verifier"
+  path_mode="$(stat -f '%OLp' "${candidate_path}")"
+  [[ "${path_mode}" == "${expected_mode}" ]] \
+    || fail "verifier-created ${path_label} has unexpected mode ${path_mode}"
+}
+
+create_verifier_temporary_directory() {
+  local expected_parent="$1" temporary_directory
+  temporary_directory="$(mktemp -d "${expected_parent}/.package-negative.XXXXXX")" \
+    || fail "could not create verifier-owned negative self-check directory"
+  [[ -d "${temporary_directory}" ]] \
+    || fail "verifier-created negative self-check path is not a directory"
+  require_verifier_owned_temporary_path "${temporary_directory}" "${expected_parent}" '700' \
+    'negative self-check directory'
+  printf '%s\n' "${temporary_directory}"
+}
+
+create_verifier_temporary_file() {
+  local temporary_directory="$1" temporary_file
+  temporary_file="$(mktemp "${temporary_directory}/credential-canary.XXXXXX")" \
+    || fail "could not create verifier-owned credential canary"
+  [[ -f "${temporary_file}" ]] \
+    || fail "verifier-created credential canary is not a regular file"
+  require_verifier_owned_temporary_path "${temporary_file}" "${temporary_directory}" '600' \
+    'credential canary'
+  printf '%s\n' "${temporary_file}"
+}
+
 require_dmg_mount_containment() {
   local checked_path="$1" checked_label="$2" canonical_checked_path
   [[ -n "${canonical_dmg_mount_root}" ]] || return 0
@@ -372,9 +413,8 @@ verify_dmg() {
 run_negative_self_checks() (
   local temporary_root copied_app canary_path marker_copy different_dmg_root different_dmg
   local tampered_dmg_root tampered_dmg symlink_dmg_root symlink_dmg parser_failure_log
-  temporary_root="$(mktemp -d "${target_root}/.package-negative.XXXXXX")"
-  canary_path="${workspace_root}/scripts/release/.package-security-credential-canary"
-  trap 'rm -f "${canary_path}"; rm -rf "${temporary_root}"' EXIT
+  temporary_root="$(create_verifier_temporary_directory "${workspace_root}/scripts/release")"
+  trap 'rm -rf -- "${temporary_root}"' EXIT
 
   copied_app="${temporary_root}/my-supervisor.app"
   cp -R "${app_path}" "${copied_app}"
@@ -391,11 +431,11 @@ run_negative_self_checks() (
   fi
 
   canary_name='APPLE_API_KEY'
+  canary_path="$(create_verifier_temporary_file "${temporary_root}")"
   printf '%s=canary\n' "${canary_name}" >"${canary_path}"
   if (scan_credential_inputs) 2>/dev/null; then
     fail "negative self-check accepted an untracked credential canary"
   fi
-  rm -f "${canary_path}"
 
   if (require_arm64_architecture 'x86_64') 2>/dev/null; then
     fail "negative self-check accepted x86_64"
