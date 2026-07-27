@@ -336,7 +336,7 @@ verify_bundle_executables() {
 }
 
 verify_dmg_root_layout() {
-  local root_entry root_entry_name root_entry_count=0
+  local root_entry root_entry_name root_entry_count=0 expected_root_entry_count
   local has_volume_icon=0 has_finder_layout=0 has_applications_link=0 has_app_bundle=0
   while IFS= read -r -d '' root_entry; do
     root_entry_name="${root_entry##*/}"
@@ -368,9 +368,10 @@ verify_dmg_root_layout() {
         ;;
     esac
   done < <(find "${dmg_mount_point}" -mindepth 1 -maxdepth 1 -print0)
-  [[ "${root_entry_count}" == '4' && "${has_volume_icon}" == '1' && "${has_finder_layout}" == '1' \
+  expected_root_entry_count=$((3 + has_finder_layout))
+  [[ "${root_entry_count}" == "${expected_root_entry_count}" && "${has_volume_icon}" == '1' \
     && "${has_applications_link}" == '1' && "${has_app_bundle}" == '1' ]] \
-    || fail "DMG root layout does not contain exactly the expected app, Applications link, Finder layout, and volume icon"
+    || fail "DMG root layout does not contain exactly the expected app, Applications link, volume icon, and optional Finder layout"
 }
 
 verify_dmg() {
