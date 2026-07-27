@@ -35,6 +35,8 @@ dmg_mount_point=""
 mounted_device=""
 dmg_attached=0
 canonical_dmg_mount_root=""
+isolated_target_dir=""
+isolated_artifact_dir=""
 
 fail() {
   printf 'macOS package verification failed: %s\n' "$1" >&2
@@ -71,11 +73,28 @@ cleanup_mounted_dmg() {
   return "${cleanup_status}"
 }
 
+cleanup_isolated_rebuild() {
+  [[ -z "${isolated_target_dir}" ]] && return 0
+  case "${isolated_target_dir}" in
+    "${target_root}"/.package-source-rebuild.[[:alnum:]]*) ;;
+    *) return 1 ;;
+  esac
+  [[ -d "${isolated_target_dir}" && ! -L "${isolated_target_dir}" ]] || return 1
+  rm -rf -- "${isolated_target_dir}"
+  printf 'cleanup|isolated-rebuild-target=%s|removed\n' "${isolated_target_dir}"
+  isolated_target_dir=""
+  isolated_artifact_dir=""
+}
+
 cleanup_on_exit() {
   local exit_status=$?
   trap - EXIT
   if ! cleanup_mounted_dmg; then
     printf 'macOS package verification failed: could not clean up the verifier-created DMG mount\n' >&2
+    [[ "${exit_status}" == '0' ]] && exit_status=1
+  fi
+  if ! cleanup_isolated_rebuild; then
+    printf 'macOS package verification failed: could not clean up the verifier-created isolated rebuild target\n' >&2
     [[ "${exit_status}" == '0' ]] && exit_status=1
   fi
   exit "${exit_status}"
@@ -99,6 +118,78 @@ source_manifest_digest="$(awk -F '\t' '$1 == "manifest_sha256" { print $2 }' "${
 
 require_arm64_architecture() {
   [[ "$1" == "arm64" ]] || fail "expected arm64-only artifact, found $1"
+}
+
+create_isolated_rebuild_target() {
+  isolated_target_dir="$(mktemp -d "${target_root}/.package-source-rebuild.XXXXXX")" \
+    || fail "could not create an isolated source rebuild target"
+  isolated_target_dir="$(canonicalize_existing_path "${isolated_target_dir}")" \
+    || fail "could not canonicalize the isolated source rebuild target"
+  case "${isolated_target_dir}" in
+    "${target_root}"/.package-source-rebuild.[[:alnum:]]*) ;;
+    *) fail "isolated source rebuild target escapes the package target root" ;;
+  esac
+  [[ -d "${isolated_target_dir}" && ! -L "${isolated_target_dir}" ]] \
+    || fail "isolated source rebuild target is not a real directory"
+  isolated_artifact_dir="${isolated_target_dir}/${target_triple}/release"
+  cp "${source_manifest_path}" "${isolated_target_dir}/source-manifest.tsv"
+  cmp -s "${source_manifest_path}" "${isolated_target_dir}/source-manifest.tsv" \
+    || fail "isolated source rebuild manifest does not match the verified supplied manifest"
+}
+
+verify_isolated_source_binaries() {
+  local binary_name rebuilt_binary file_output architecture
+  for binary_name in "${expected_binaries[@]}"; do
+    rebuilt_binary="${isolated_artifact_dir}/${binary_name}"
+    [[ -f "${rebuilt_binary}" ]] || fail "isolated source rebuild did not produce ${binary_name}"
+    [[ -x "${rebuilt_binary}" ]] || fail "isolated source rebuild produced a non-executable ${binary_name}"
+    file_output="$(file "${rebuilt_binary}")"
+    [[ "${file_output}" == *"Mach-O 64-bit executable"* ]] \
+      || fail "isolated source rebuild ${binary_name} is not a 64-bit Mach-O executable"
+    architecture="$(lipo -archs "${rebuilt_binary}")"
+    require_arm64_architecture "${architecture}"
+  done
+}
+
+stage_isolated_helpers_for_desktop_build() {
+  local source_dir="${isolated_target_dir}/${target_triple}/release"
+  local desktop_build_dir="${isolated_target_dir}/release"
+  local binary_name source_binary staged_binary source_architecture
+  mkdir -p "${desktop_build_dir}"
+  for binary_name in msv-daemon msv msv-log-proxy msv-group-reaper; do
+    source_binary="${source_dir}/${binary_name}"
+    staged_binary="${desktop_build_dir}/${binary_name}"
+    [[ -f "${source_binary}" && ! -L "${source_binary}" && -x "${source_binary}" ]] \
+      || fail "isolated source rebuild helper ${binary_name} is not a regular executable"
+    source_architecture="$(lipo -archs "${source_binary}")"
+    require_arm64_architecture "${source_architecture}"
+    install -m 755 "${source_binary}" "${staged_binary}"
+    [[ -f "${staged_binary}" && ! -L "${staged_binary}" && -x "${staged_binary}" ]] \
+      || fail "isolated desktop helper ${binary_name} is not a regular executable"
+    [[ "$(stat -f '%OLp' "${staged_binary}")" == '755' ]] \
+      || fail "isolated desktop helper ${binary_name} does not have mode 755"
+    cmp -s "${source_binary}" "${staged_binary}" \
+      || fail "isolated desktop helper ${binary_name} differs from its fresh source output"
+  done
+}
+
+rebuild_provenance_verified_binaries() {
+  create_isolated_rebuild_target
+  (
+    cd "${workspace_root}"
+    CARGO_TARGET_DIR="${isolated_target_dir}" \
+      CARGO_BUILD_TARGET="${target_triple}" \
+      RUSTFLAGS='-D warnings' \
+      cargo msv-release --locked --offline --quiet
+    stage_isolated_helpers_for_desktop_build
+    CARGO_TARGET_DIR="${isolated_target_dir}" \
+      CARGO_BUILD_TARGET="${target_triple}" \
+      RUSTFLAGS='-D warnings' \
+      cargo build --release -p my-supervisor-app-desktop --bin my-supervisor --locked --offline --quiet
+  ) || fail "isolated source rebuild failed"
+  verify_isolated_source_binaries
+  printf 'isolated-source-rebuild|target=%s|executables=%s|architecture=arm64|warnings=deny|locked=true|offline=true\n' \
+    "${isolated_target_dir}" "${#expected_binaries[@]}"
 }
 
 find_mounted_device_for_mount_point() {
@@ -263,7 +354,7 @@ verify_bundle_identity_and_layout() {
 
 verify_bundle_executables() {
   local bundle_path="$1" bundle_label="$2" peer_bundle_path="${3:-}"
-  local bundle_macos_dir="${bundle_path}/Contents/MacOS" binary_name bundled_binary source_binary
+  local bundle_macos_dir="${bundle_path}/Contents/MacOS" binary_name bundled_binary rebuilt_binary
   local peer_binary file_output mode architecture digest
   for binary_name in "${expected_binaries[@]}"; do
     bundled_binary="${bundle_macos_dir}/${binary_name}"
@@ -274,14 +365,10 @@ verify_bundle_executables() {
     [[ "${file_output}" == *"Mach-O 64-bit executable"* ]] \
       || fail "${bundle_label} ${binary_name} is not a 64-bit Mach-O executable"
 
-    if [[ "${binary_name}" == 'my-supervisor' ]]; then
-      source_binary="${desktop_artifact_dir}/${binary_name}"
-    else
-      source_binary="${sidecar_artifact_dir}/${binary_name}"
-    fi
-    [[ -f "${source_binary}" ]] || fail "release source artifact ${binary_name} is missing"
-    cmp -s "${source_binary}" "${bundled_binary}" \
-      || fail "${bundle_label} ${binary_name} differs from its release source artifact"
+    rebuilt_binary="${isolated_artifact_dir}/${binary_name}"
+    [[ -f "${rebuilt_binary}" ]] || fail "isolated source rebuild artifact ${binary_name} is missing"
+    cmp -s "${rebuilt_binary}" "${bundled_binary}" \
+      || fail "${bundle_label} ${binary_name} differs from its isolated source rebuild"
 
     if [[ -n "${peer_bundle_path}" ]]; then
       peer_binary="${peer_bundle_path}/Contents/MacOS/${binary_name}"
@@ -369,17 +456,41 @@ verify_dmg() {
     "${dmg_digest}" "${source_manifest_digest}"
 }
 
+verify_candidate_with_isolated_reference() {
+  local app_path="$1" dmg_path="${2:-}" info_plist macos_dir
+  [[ -d "${app_path}" ]] || fail "app bundle is missing at ${app_path}"
+  info_plist="${app_path}/Contents/Info.plist"
+  macos_dir="${app_path}/Contents/MacOS"
+
+  verify_bundle_identity_and_layout "${app_path}" 'supplied'
+  verify_bundle_executables "${app_path}" 'supplied'
+  verify_security_contract "${macos_dir}/my-supervisor"
+  verify_embedded_entitlements "${macos_dir}/my-supervisor"
+  scan_credential_inputs
+
+  printf 'bundle|identifier=%s|version=%s|executables=%s|architecture=arm64|source-manifest-sha256=%s|credential-files=0\n' \
+    "${expected_identifier}" "${expected_version}" "${#expected_binaries[@]}" "${source_manifest_digest}"
+
+  if [[ -n "${dmg_path}" ]]; then
+    verify_dmg
+  fi
+}
+
 run_negative_self_checks() (
   local temporary_root copied_app canary_path marker_copy different_dmg_root different_dmg
   local tampered_dmg_root tampered_dmg symlink_dmg_root symlink_dmg parser_failure_log
+  local target_reference_path staged_sidecar_path alternate_binary target_reference_backup staged_sidecar_backup
+  local simultaneous_tamper_app
   temporary_root="$(mktemp -d "${target_root}/.package-negative.XXXXXX")"
   canary_path="${workspace_root}/scripts/release/.package-security-credential-canary"
-  trap 'rm -f "${canary_path}"; rm -rf "${temporary_root}"' EXIT
+  target_reference_backup=""
+  staged_sidecar_backup=""
+  trap 'if [[ -n "${target_reference_backup}" && -f "${target_reference_backup}" ]]; then cp "${target_reference_backup}" "${target_reference_path}"; fi; if [[ -n "${staged_sidecar_backup}" && -f "${staged_sidecar_backup}" ]]; then cp "${staged_sidecar_backup}" "${staged_sidecar_path}"; fi; rm -f "${canary_path}"; rm -rf "${temporary_root}"' EXIT
 
   copied_app="${temporary_root}/my-supervisor.app"
   cp -R "${app_path}" "${copied_app}"
   cp "${macos_dir}/msv" "${copied_app}/Contents/MacOS/my-supervisor"
-  if (MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 "$0" "${copied_app}" '' "${source_manifest_path}") >/dev/null 2>&1; then
+  if verify_candidate_with_isolated_reference "${copied_app}" '' >/dev/null 2>&1; then
     fail "negative self-check accepted a replaced desktop executable"
   fi
 
@@ -401,6 +512,36 @@ run_negative_self_checks() (
     fail "negative self-check accepted x86_64"
   fi
 
+  target_reference_path="${sidecar_artifact_dir}/msv"
+  staged_sidecar_path="${workspace_root}/crates/desktop/binaries/msv-${target_triple}"
+  alternate_binary="${sidecar_artifact_dir}/msv-group-reaper"
+  [[ -x "${target_reference_path}" && -x "${staged_sidecar_path}" && -x "${alternate_binary}" ]] \
+    || fail "negative self-check requires current target and staged msv sidecars"
+  ! cmp -s "${target_reference_path}" "${alternate_binary}" \
+    || fail "negative self-check requires distinct exact-arm64 helper binaries"
+  require_arm64_architecture "$(lipo -archs "${alternate_binary}")"
+  target_reference_backup="${temporary_root}/target-reference-msv"
+  staged_sidecar_backup="${temporary_root}/staged-sidecar-msv"
+  cp "${target_reference_path}" "${target_reference_backup}"
+  cp "${staged_sidecar_path}" "${staged_sidecar_backup}"
+  simultaneous_tamper_app="${temporary_root}/simultaneous-tamper.app"
+  cp -R "${app_path}" "${simultaneous_tamper_app}"
+  cp "${alternate_binary}" "${target_reference_path}"
+  cp "${alternate_binary}" "${staged_sidecar_path}"
+  cp "${alternate_binary}" "${simultaneous_tamper_app}/Contents/MacOS/msv"
+  cmp -s "${target_reference_path}" "${simultaneous_tamper_app}/Contents/MacOS/msv" \
+    || fail "negative self-check could not establish the legacy same-reference comparison condition"
+  cmp -s "${staged_sidecar_path}" "${simultaneous_tamper_app}/Contents/MacOS/msv" \
+    || fail "negative self-check could not establish the staged sidecar tamper condition"
+  if verify_candidate_with_isolated_reference "${simultaneous_tamper_app}" '' >/dev/null 2>&1; then
+    fail "negative self-check accepted simultaneous target-reference, staged-sidecar, and supplied-app tampering"
+  fi
+  cp "${target_reference_backup}" "${target_reference_path}"
+  cp "${staged_sidecar_backup}" "${staged_sidecar_path}"
+  target_reference_backup=""
+  staged_sidecar_backup=""
+  printf 'negative|simultaneous-target-reference-and-sidecar-tampering=rejected-by-isolated-rebuild\n'
+
   [[ -n "${dmg_path}" ]] || fail "negative DMG self-check requires a supplied DMG"
   different_dmg_root="${temporary_root}/different-dmg-root"
   mkdir "${different_dmg_root}"
@@ -412,7 +553,7 @@ run_negative_self_checks() (
   different_dmg="${temporary_root}/different-valid.dmg"
   hdiutil create -volname 'different-valid' -srcfolder "${different_dmg_root}" -fs HFS+ \
     -format UDZO -ov "${different_dmg}" >/dev/null
-  if (MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 "$0" "${app_path}" "${different_dmg}" "${source_manifest_path}") >/dev/null 2>&1; then
+  if verify_candidate_with_isolated_reference "${app_path}" "${different_dmg}" >/dev/null 2>&1; then
     fail "negative self-check accepted a checksum-valid DMG with an arbitrary root entry"
   fi
 
@@ -427,7 +568,7 @@ run_negative_self_checks() (
   tampered_dmg="${temporary_root}/tampered-main-and-sidecar.dmg"
   hdiutil create -volname 'my-supervisor' -srcfolder "${tampered_dmg_root}" -fs HFS+ \
     -format UDZO -ov "${tampered_dmg}" >/dev/null
-  if (MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 "$0" "${app_path}" "${tampered_dmg}" "${source_manifest_path}") >/dev/null 2>&1; then
+  if verify_candidate_with_isolated_reference "${app_path}" "${tampered_dmg}" >/dev/null 2>&1; then
     fail "negative self-check accepted a DMG with changed internal main and sidecar executables"
   fi
 
@@ -440,35 +581,21 @@ run_negative_self_checks() (
   symlink_dmg="${temporary_root}/symlink-app.dmg"
   hdiutil create -volname 'my-supervisor' -srcfolder "${symlink_dmg_root}" -fs HFS+ \
     -format UDZO -ov "${symlink_dmg}" >/dev/null
-  if (MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 "$0" "${app_path}" "${symlink_dmg}" "${source_manifest_path}") >/dev/null 2>&1; then
+  if verify_candidate_with_isolated_reference "${app_path}" "${symlink_dmg}" >/dev/null 2>&1; then
     fail "negative self-check accepted a my-supervisor.app symlink to an external app"
   fi
 
   parser_failure_log="${temporary_root}/attach-parser-failure.log"
-  if MSV_PACKAGE_NEGATIVE_SELF_CHECK=0 MSV_PACKAGE_INJECT_ATTACH_PARSER_FAILURE=1 \
-    "$0" "${app_path}" "${dmg_path}" "${source_manifest_path}" >"${parser_failure_log}" 2>&1; then
+  if MSV_PACKAGE_INJECT_ATTACH_PARSER_FAILURE=1 \
+    verify_candidate_with_isolated_reference "${app_path}" "${dmg_path}" >"${parser_failure_log}" 2>&1; then
     fail "negative self-check accepted an injected attach parser failure"
   fi
   grep -Eq '^cleanup\|detach-target=.*/\.package-dmg-mount\.[[:alnum:]]+\|mount-directory=removed$' "${parser_failure_log}" \
     || fail "negative self-check did not observe exact mount-point detach and mount-directory removal after parser failure"
 )
 
-[[ -d "${app_path}" ]] || fail "app bundle is missing at ${app_path}"
-info_plist="${app_path}/Contents/Info.plist"
-macos_dir="${app_path}/Contents/MacOS"
-
-verify_bundle_identity_and_layout "${app_path}" 'supplied'
-verify_bundle_executables "${app_path}" 'supplied'
-verify_security_contract "${macos_dir}/my-supervisor"
-verify_embedded_entitlements "${macos_dir}/my-supervisor"
-scan_credential_inputs
-
-printf 'bundle|identifier=%s|version=%s|executables=%s|architecture=arm64|source-manifest-sha256=%s|credential-files=0\n' \
-  "${expected_identifier}" "${expected_version}" "${#expected_binaries[@]}" "${source_manifest_digest}"
-
-if [[ -n "${dmg_path}" ]]; then
-  verify_dmg
-fi
+rebuild_provenance_verified_binaries
+verify_candidate_with_isolated_reference "${app_path}" "${dmg_path}"
 
 if [[ "${MSV_PACKAGE_NEGATIVE_SELF_CHECK:-0}" == '1' ]]; then
   run_negative_self_checks
