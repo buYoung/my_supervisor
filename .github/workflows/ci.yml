@@ -167,7 +167,15 @@ jobs:
             target/package-security/source-manifest.tsv 2>&1
           )"; then
             printf '%s\n' "${verification_output}"
-            verification_error="$(printf '%s\n' "${verification_output}" | tail -n 1)"
+            verification_error="$(
+              printf '%s\n' "${verification_output}" \
+                | grep -E '^(macOS package verification failed:|source provenance failed:)' \
+                | tail -n 1 \
+                || true
+            )"
+            if [[ -z "${verification_error}" ]]; then
+              verification_error="$(printf '%s\n' "${verification_output}" | tail -n 1)"
+            fi
             printf '::error::%s\n' "${verification_error}"
             exit 1
           fi
