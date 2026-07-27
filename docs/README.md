@@ -101,6 +101,7 @@
 - [로드맵](./ROADMAP.md) — 단계별 계획 (walking skeleton → 슬라이스 확장)
 - [설계 결정 기록](./DESIGN_DECISIONS.md) — 주요 선택의 근거와 대안
 - [개발 가이드](./DEVELOPMENT.md) — 로컬 환경 세팅·빌드·테스트
+- [CLI·앱 로컬 빌드 가이드](./BUILD.md) — CLI 실행, 앱 개발 모드, 로컬 `.app` 생성
 - [API 레퍼런스](./API.md) — HTTP/WebSocket 스펙
 
 ## 현재 상태

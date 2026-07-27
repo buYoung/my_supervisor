@@ -2,7 +2,7 @@
 
 `my-supervisor` 프로젝트의 로컬 개발 환경 구성, 빌드, 테스트, 디버깅 방법을 정리합니다. 현재 리포지토리는 Cargo workspace와 데스크톱 UI용 독립 pnpm 프로젝트로 구성되어 있으며, 상세 빌드·테스트 플로우는 **PoC 진입 이후** 본 문서를 갱신합니다.
 
-관련 문서: [아키텍처](./ARCHITECTURE.md) · [로드맵](./ROADMAP.md) · [설계 결정](./DESIGN_DECISIONS.md) · [API 레퍼런스](./API.md)
+관련 문서: [로컬 빌드 가이드](./BUILD.md) · [아키텍처](./ARCHITECTURE.md) · [로드맵](./ROADMAP.md) · [설계 결정](./DESIGN_DECISIONS.md) · [API 레퍼런스](./API.md)
 
 ---
 
@@ -146,33 +146,17 @@ pnpm --dir crates/desktop/ui typecheck
 ### Tauri 앱
 
 ```bash
-# Tauri 명령은 desktop crate에서 실행한다.
+# 개발 실행 전에 실제 디버그 helper와 CLI를 준비한다.
+scripts/build-local.sh cli
 cd crates/desktop
-
-# Tauri 개발 모드 (프론트엔드 dev 서버 + Rust 쉘)
 cargo tauri dev
 
-# 배포용 패키징. 먼저 workspace root에서 동일 target의 helper를 준비한다.
+# 저장소 루트에서 서명되지 않은 로컬 검증용 앱을 빌드한다.
 cd ../..
-cargo msv-release
-cd crates/desktop
-cargo tauri build
+scripts/build-local.sh app release
 ```
 
-`cargo msv-release`가 server 배포의 공식 진입점입니다. 완료 후
-`target/release/msv-daemon`, `target/release/msv`,
-`target/release/msv-log-proxy`, `target/release/msv-group-reaper` 네 파일이
-모두 있어야 합니다. `msv-daemon`은 시작할 때 자신의 절대 경로와 같은
-디렉터리에 있는 두 helper를 검증하여 runtime에 주입합니다. 누락되었거나
-실행 권한이 없으면 시작이 실패하며, macOS가 서명 문제로 helper 실행을
-거부하면 detached launch가 해당 helper 경로를 포함한 오류로 실패합니다.
-
-Tauri release build는 위 release helper를
-`crates/desktop/binaries/<helper>-<target-triple>`에 복사하고,
-`externalBin`으로 bundle에 포함합니다. 따라서 `cargo tauri build`를 단독으로
-실행해 helper를 새 profile로 만들지 않습니다. 다른 target을 빌드할 때는
-해당 target으로 `cargo msv-release --target <target-triple>`를 먼저 실행해야
-합니다.
+CLI·데몬 직접 실행, 디버그 앱, 로컬 릴리스 앱의 전체 순서와 산출물 경로는 [CLI·앱 로컬 빌드 가이드](./BUILD.md)를 따릅니다. `cargo tauri build`를 단독 실행하면 소스 출처와 릴리스 사이드카 계약을 충족하지 못할 수 있습니다.
 
 ---
 

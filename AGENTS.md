@@ -35,5 +35,6 @@ This monorepo implements a local process and job supervisor with shared domain l
 
 ## 4. Custom Instructions
 
-- Absolute rule for `fable5.md`: for any work involving `fable5.md`, read `fable5.md` first and treat its current contents as the source of truth. Do not skip this rule for convenience.
 - Absolute rule for `codemap-search`: actively use `codemap-search` for code exploration and repository navigation. Prefer it over generic Read, Grep, Find, shell search, or broad file-reading workflows whenever it is available and suitable; do not skip this rule for convenience.
+- `my_supervisor`는 pm2 상위호환 process manager 개념이고, gui, cli로 관리하도록 하는것이 주 목적
+  - `my_supervisor`의 core는 실제 프로세스를 관리하는 신뢰해야하는 신뢰메인프로세스임.
