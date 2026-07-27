@@ -13,14 +13,17 @@
 
 ## 후보 신원과 provenance
 
-- 후보는 `scripts/release/capture-source-provenance.sh create target/package-security/source-manifest.tsv`가 기록한 실제 build/package 입력의 경로·mode·SHA-256, HEAD, `Cargo.lock` digest에 결속해야 한다. 문서·evidence·orchestration 기록은 artifact input이 아니므로 후보 byte 신원에서 제외한다.
+- 후보는 `scripts/release/capture-source-provenance.sh create target/package-security/source-manifest.tsv`가 기록한 실제 build/package 입력의 경로·tracked state·mode·SHA-256과 `Cargo.lock` digest에 결속해야 한다. V2의 `head`는 audit metadata이고 `manifest_sha256` footer가 build-input identity다. 따라서 evidence-only HEAD 변경은 footer가 같은 한 release validity를 무효화하지 않으며 verify는 `head-status=metadata-changed`로 이를 보고한다. 문서·evidence·orchestration 기록은 artifact input이 아니므로 후보 byte 신원에서 제외한다.
 - build 후 같은 manifest를 `verify`하여 입력 집합과 bytes가 바뀌지 않았음을 확인한다. 다섯 bundle executable은 대응 release artifact와 byte-for-byte로 같아야 하며 모두 정확히 `arm64`여야 한다.
 - desktop Mach-O의 `MSV_SECURITY_CONTRACT_V1` marker는 실제 build가 읽은 CSP, hardened-runtime 입력, entitlement bytes/digest, source manifest digest와 일치해야 한다. credential scan은 같은 tracked+untracked non-ignored 집합을 검사하고 값은 출력하지 않는다.
 - release-quality 단계의 manifest digest `1021749781dace176e28f0231974e45bde9b4bbbe94b7cc35e97994119511807`와 DMG SHA-256 `37879935e697c86f94ac1019414039cdc2f9989327c2cccc4974aa3ff26e3993`은 logging 수정 전의 역사적 관측이며 현재 후보가 아니다.
 - 이전 v3 후보 manifest SHA-256 `d313503774c70c639efec75b92413c5324468daaf7bad4f87c33fdf6830b2ec1`, DMG SHA-256 `5b7e038bd9c5ec9bd83039ed74f84d722e27457c4f76862c4bf0d282e199215f`, desktop SHA-256 `ee3523415ab4a311bba2e1e6077a2720d521ed75090567bb5f132a8d633a23dc`는 역사적 관측이며 현재 후보가 아니다.
-- 현재 v4 unsigned arm64 후보는 HEAD `5cc9bebedcac37c98e9e7e311531607031369a44`의 fresh provenance manifest `target/package-security/source-manifest.tsv`(142 inputs, provenance digest `6debd1a35f97367d5ef99ac0422bcb651a39565f49f6d087ad25c29875b4f805`, manifest-file SHA-256 `48ef39621ace75c177e070b20906f3bc12d8232358dfa6653e8309c6fa54e320`)에 결속한다. app은 `target/package-security/aarch64-apple-darwin/release/bundle/macos/my-supervisor.app`, DMG는 `target/package-security/aarch64-apple-darwin/release/bundle/dmg/my-supervisor_0.1.0_aarch64.dmg`(SHA-256 `4cc244b42b42e9087d7a0f4ad6a73c9d4a3a4f4bb7d14c5ebd6fb3bbf4f88f47`), desktop executable은 `target/package-security/aarch64-apple-darwin/release/my-supervisor`(SHA-256 `dddc1f1270402e31314ca8277621ae909fec25a75ba462706782771cf2fc8dcf`)이다. build 전후 및 negative matrix 후 provenance verify가 모두 통과했다.
+- remediation 전 v4 identity(HEAD `5cc9bebedcac37c98e9e7e311531607031369a44`, provenance digest `6debd1a35f97367d5ef99ac0422bcb651a39565f49f6d087ad25c29875b4f805`, DMG `4cc244b42b42e9087d7a0f4ad6a73c9d4a3a4f4bb7d14c5ebd6fb3bbf4f88f47`)는 V2 provenance source 변경 전의 stale historical observation이며 현재 후보가 아니다.
+- 현재 final-evidence unsigned arm64 후보는 clean source HEAD `4a63a0a237a8a2a344e01dc704093b7b22161619`에서 새로 만든 `MSV_SOURCE_PROVENANCE_V2` manifest `target/package-security/source-manifest.tsv`(142 inputs, V2 build-input footer `fab60fb32dfc20875d49b7833eea29c2fcb3ad37c19ad541125b800a4df7e413`, manifest-file SHA-256 `cef0ecf39bb38c3acf79d6184d9a762a9caeb13852999753c816646e3590fc8c`)에 결속한다. app은 `target/package-security/aarch64-apple-darwin/release/bundle/macos/my-supervisor.app`, DMG는 `target/package-security/aarch64-apple-darwin/release/bundle/dmg/my-supervisor_0.1.0_aarch64.dmg`(SHA-256 `8a1b4cb2c6992b2956f48bbbb27ecd5a3a314bfd6b898314856e8ff0342a8e96`), desktop executable은 `target/package-security/aarch64-apple-darwin/release/my-supervisor`(SHA-256 `e134ee6f7bdecaab3c45611ceb689190632e8602e1e7cbedb4dcb0fb2e694332`)이다. create 직후·package build 후·expanded negative matrix 후 provenance verify가 모두 통과했다.
 
 ## 필수 게이트
+
+이번 final-evidence 실행은 package-facing build와 P01–P03을 새로 실행했다. A01–A05의 전체 Rust/UI 검증은 `phases/integrated-verification/results.md`의 이전 전체 실행을 근거로 유지한다. source commit `4a63a0a237a8a2a344e01dc704093b7b22161619`에서 Rust/UI build inputs는 그 실행과 같고 이후 source 변경은 release shell뿐이므로, 실행하지 않은 전체 Rust/UI gate를 이번 실행으로 재통과했다고 주장하지 않는다.
 
 | ID | 상태 | 게이트 | 현재 근거 또는 충족 기준 |
 |---|---|---|---|
@@ -29,9 +32,9 @@
 | A03 | pass | CLI/GUI 동등 관리 화면 | v4 UI typecheck/build/event-follow와 HTTP/Tauri operations parity가 exit `0`; 실제 GUI 삭제 handler의 non-force, 확인된 force, 취소된 force 및 HTTP/Tauri boolean을 관찰 |
 | A04 | pass | 시간대 설정 오류 | `SchedulerError::InvalidTimezone`이 UTC fallback 없이 stable `invalid_config`/HTTP 400으로 전파되도록 수정했고 focused defaults/config mapping 검증이 exit `0` |
 | A05 | pass | recovery root 소유권 정리 | recovery E2E 3개가 exact root와 UUID marker를 출력하고 exit `0`; 일치하는 non-symlink marker를 가진 exact root만 명시 cleanup과 `Drop` fallback에서 삭제 |
-| P01 | pass | 현재 source의 arm64 warning-free 후보 | fresh manifest에서 `RUSTFLAGS='-D warnings'` arm64 sidecars, explicit `aarch64-apple-darwin` unsigned app/DMG가 생성됐고 build 전후 provenance verify가 exit `0` |
-| P02 | pass | 현재 후보 내용·보안 경계 | supplied app과 read-only DMG의 다섯 executable이 대응 release artifact와 byte-equal이고 모두 exact `arm64`; marker, credential scan 0, unsigned entitlement 관찰, pre/post-negative provenance, DMG checksum이 통과 |
-| P03 | pass | 현재 후보 negative self-check | replaced desktop, marker corruption, credential canary, x86_64, wrong arbitrary-root DMG, tampered main/sidecar DMG, external app symlink, attach-parser-failure exact cleanup을 모두 거부 |
+| P01 | pass | 현재 source의 arm64 warning-free 후보 | fresh V2 manifest에서 `RUSTFLAGS='-D warnings'` explicit `aarch64-apple-darwin` sidecars, prepare, unsigned Tauri app/DMG가 생성됐고 build 전후 provenance verify가 exit `0` |
+| P02 | pass | 현재 후보 내용·보안 경계 | supplied app과 read-only DMG의 다섯 executable이 대응 release artifact와 byte-equal이고 모두 exact `arm64`; marker, credential scan 0, unsigned entitlement 관찰, DMG checksum, verifier 독립 source/app/mounted-DMG 비교, post-negative provenance가 통과 |
+| P03 | pass | 현재 후보 negative self-check | replaced desktop, marker corruption, credential canary, x86_64, wrong arbitrary-root DMG, tampered main/sidecar DMG, external app symlink, attach-parser-failure exact cleanup을 모두 거부했고 `negative-self-checks=passed`/exit `0` |
 | C01 | partial | GitHub-hosted CI | 대표 core/CLI/GUI 및 arm64 provenance package workflow는 구성됨. GitHub-hosted 성공 실행은 관찰되지 않음 |
 | E01 | pending-approval | signing/notarization | 별도 승인, Apple credential, network 및 현재 source의 실제 signed candidate가 필요 |
 | E02 | blocked | 외부 설치 검증 | clean macOS user/VM에서 DMG 설치·first launch·CLI/GUI 관리·login/reboot·uninstall/data preservation 관찰이 필요 |
