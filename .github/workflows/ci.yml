@@ -36,6 +36,24 @@ jobs:
       - name: Test workspace
         run: cargo test --workspace
 
+      - name: Test representative Job defaults contract
+        run: >-
+          cargo test -p my-supervisor-config omitted_job_fields_use_current_macos_defaults
+          && cargo test -p my-supervisor-infra-http --test contracts omitted_job_fields
+
+      - name: Test representative process management contract
+        run: >-
+          cargo test -p my-supervisor-application --test core_flows representative_process_management
+          && cargo test -p my-supervisor-application --test core_flows stopping_during_backoff_cancels_restart
+
+      - name: Test CLI lifecycle contract
+        run: >-
+          cargo test -p my-supervisor-app-cli --test e2e
+          actual_cli_and_ephemeral_daemon_cover_config_cancel_follow_reconnect_and_exit_codes
+
+      - name: Test recovery cleanup ownership
+        run: cargo test -p my-supervisor-app-daemon --test subprocess_recovery_e2e -- --nocapture
+
   desktop-ui:
     name: Desktop UI
     runs-on: macos-latest
@@ -66,3 +84,80 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Test UI event follow
+        run: pnpm test:follow-events
+
+      - name: Test UI transport parity
+        run: node tests/operations-parity.test.mjs
+
+  macos-package:
+    name: Unsigned macOS Package
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install arm64 target
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: crates/desktop/ui/pnpm-lock.yaml
+
+      - name: Install UI dependencies
+        run: pnpm --dir crates/desktop/ui install --frozen-lockfile
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version 2.11.4 --locked
+
+      - name: Capture source provenance
+        run: scripts/release/capture-source-provenance.sh create target/package-security/source-manifest.tsv
+
+      - name: Build arm64 release sidecars without warnings
+        run: >-
+          CARGO_TARGET_DIR=target/package-security
+          CARGO_BUILD_TARGET=aarch64-apple-darwin
+          RUSTFLAGS='-D warnings'
+          cargo msv-release --offline
+
+      - name: Prepare Tauri sidecars
+        run: >-
+          CARGO_TARGET_DIR=target/package-security
+          CARGO_BUILD_TARGET=aarch64-apple-darwin
+          scripts/release/prepare-macos-sidecars.sh
+
+      - name: Build unsigned arm64 app and DMG without warnings
+        run: >-
+          CARGO_TARGET_DIR=../../target/package-security
+          CARGO_BUILD_TARGET=aarch64-apple-darwin
+          RUSTFLAGS='-D warnings'
+          cargo tauri build --target aarch64-apple-darwin --no-sign --bundles app,dmg
+        working-directory: crates/desktop
+
+      - name: Verify source provenance after package build
+        run: scripts/release/capture-source-provenance.sh verify target/package-security/source-manifest.tsv
+
+      - name: Verify unsigned arm64 package inventory and negative self-checks
+        run: >-
+          CARGO_TARGET_DIR=target/package-security
+          CARGO_BUILD_TARGET=aarch64-apple-darwin
+          MSV_PACKAGE_NEGATIVE_SELF_CHECK=1
+          scripts/release/verify-macos-package.sh
+          target/package-security/aarch64-apple-darwin/release/bundle/macos/my-supervisor.app
+          target/package-security/aarch64-apple-darwin/release/bundle/dmg/my-supervisor_0.1.0_aarch64.dmg
+          target/package-security/source-manifest.tsv

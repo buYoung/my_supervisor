@@ -44,6 +44,8 @@ toml = "0.8"
 
 # Time / identity
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+iana-time-zone = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 
 # Errors / logging
@@ -56,6 +58,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 axum = { version = "0.8", features = ["ws"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+subtle = "2"
+
+# macOS runtime guards
+notify = { version = "8.2", default-features = false, features = ["macos_fsevent"] }
 
 # Persistence
 sqlx = { version = "0.8", default-features = false, features = [

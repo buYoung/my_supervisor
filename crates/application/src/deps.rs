@@ -31,6 +31,13 @@ impl DaemonMeta {
             log_dir,
         }
     }
+
+    /// The production daemon composes logs beneath its persistent data root.
+    /// Deriving that parent preserves the public `DaemonMeta` struct shape for
+    /// injected hosts while excluding the daemon's own state directory.
+    pub fn data_root(&self) -> PathBuf {
+        self.log_dir.parent().unwrap_or(&self.log_dir).to_path_buf()
+    }
 }
 
 /// All adapters the facade needs, as trait objects.

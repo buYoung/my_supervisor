@@ -5,13 +5,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use my_supervisor_application::{AppDeps, DaemonMeta, NullProcessServiceRegistrar, OperationsFacade};
+use my_supervisor_application::{
+    AppDeps, DaemonMeta, NullProcessServiceRegistrar, OperationsFacade,
+};
 use my_supervisor_config::TomlConfigSource;
 use my_supervisor_core::domain::{
     DependencyFailurePolicy, Job, JobId, JobRunState, JobTrigger, LogRetention, OverlapPolicy,
 };
 use my_supervisor_core::ports::{LogSink, RealClock};
-use my_supervisor_infra_http::build_router;
+use my_supervisor_infra_http::{build_router, AuthVerifier};
 use my_supervisor_infra_logging::InMemoryLogSink;
 use my_supervisor_infra_scheduler::TokioScheduler;
 use my_supervisor_infra_sqlite::SqliteStore;
@@ -31,6 +33,12 @@ fn long_running_job(name: &str, overlap: OverlapPolicy) -> Job {
         on_dependency_failure: DependencyFailurePolicy::Skip,
         timeout: None,
         log_retention: LogRetention::default(),
+        timezone: "UTC".into(),
+        schedule_revision: 0,
+        trigger_id: uuid::Uuid::new_v4(),
+        misfire_policy: Default::default(),
+        retry_policy: Default::default(),
+        admission: Default::default(),
     }
 }
 
@@ -39,7 +47,10 @@ async fn facade() -> (Arc<OperationsFacade>, PathBuf) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("my-supervisor-api-ownership-{}-{nonce}", std::process::id()));
+    let root = std::env::temp_dir().join(format!(
+        "my-supervisor-api-ownership-{}-{nonce}",
+        std::process::id()
+    ));
     let log_dir = root.join("logs");
     tokio::fs::create_dir_all(&log_dir).await.unwrap();
     let store = Arc::new(SqliteStore::connect(root.join("state.db")).await.unwrap());
@@ -59,9 +70,11 @@ async fn facade() -> (Arc<OperationsFacade>, PathBuf) {
     (OperationsFacade::new(dependencies), root)
 }
 
-async fn post_status(port: u16, path: &str) -> u16 {
-    let mut stream = tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port)).await.unwrap();
-    let request = format!("POST {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+async fn post_status(port: u16, path: &str, token: &str) -> u16 {
+    let mut stream = tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port))
+        .await
+        .unwrap();
+    let request = format!("POST {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer {token}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
     stream.write_all(request.as_bytes()).await.unwrap();
     let mut response = String::new();
     stream.read_to_string(&mut response).await.unwrap();
@@ -71,27 +84,63 @@ async fn post_status(port: u16, path: &str) -> u16 {
 #[tokio::test]
 async fn cancel_route_does_not_mutate_a_run_owned_by_another_job() {
     let (facade, root) = facade().await;
-    facade.add_job(long_running_job("job-a", OverlapPolicy::Skip)).await.unwrap();
-    facade.add_job(long_running_job("job-b", OverlapPolicy::Queue)).await.unwrap();
+    facade
+        .add_job(long_running_job("job-a", OverlapPolicy::Skip))
+        .await
+        .unwrap();
+    facade
+        .add_job(long_running_job("job-b", OverlapPolicy::Queue))
+        .await
+        .unwrap();
     let active = facade.trigger_job("job-b").await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
     let queued = facade.trigger_job("job-b").await.unwrap();
 
-    let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+    let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+        .await
+        .unwrap();
     let port = listener.local_addr().unwrap().port();
     let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
     let server_facade = facade.clone();
+    let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     let server = tokio::spawn(async move {
-        axum::serve(listener, build_router(server_facade))
-            .with_graceful_shutdown(async { let _ = shutdown_receiver.await; })
-            .await
-            .unwrap();
+        axum::serve(
+            listener,
+            build_router(server_facade, AuthVerifier::new(token.to_owned(), 1)),
+        )
+        .with_graceful_shutdown(async {
+            let _ = shutdown_receiver.await;
+        })
+        .await
+        .unwrap();
     });
 
-    assert_eq!(post_status(port, &format!("/api/v1/jobs/job-a/runs/{}/cancel", active.0)).await, 404);
-    assert_eq!(post_status(port, &format!("/api/v1/jobs/job-a/runs/{}/cancel", queued.0)).await, 404);
-    assert_eq!(facade.get_run("job-b", &active).await.unwrap().state, JobRunState::Running);
-    assert_eq!(facade.get_run("job-b", &queued).await.unwrap().state, JobRunState::Pending);
+    assert_eq!(
+        post_status(
+            port,
+            &format!("/api/v1/jobs/job-a/runs/{}/cancel", active.0),
+            token
+        )
+        .await,
+        404
+    );
+    assert_eq!(
+        post_status(
+            port,
+            &format!("/api/v1/jobs/job-a/runs/{}/cancel", queued.0),
+            token
+        )
+        .await,
+        404
+    );
+    assert_eq!(
+        facade.get_run("job-b", &active).await.unwrap().state,
+        JobRunState::Running
+    );
+    assert_eq!(
+        facade.get_run("job-b", &queued).await.unwrap().state,
+        JobRunState::Pending
+    );
 
     facade.cancel_run("job-b", active).await.unwrap();
     let _ = shutdown_sender.send(());

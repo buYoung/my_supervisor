@@ -3,7 +3,8 @@
 //! bootstraps/boots it out of the GUI domain, and reads status via launchctl.
 //! Writes only the user domain (`gui/$(id -u)`) — never the system domain.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -13,6 +14,299 @@ use chrono::Utc;
 use my_supervisor_core::domain::{LogLine, LogStream, ProcessSpec, ProcessState};
 use my_supervisor_core::ports::error::RegistrarError;
 use my_supervisor_core::ports::ProcessServiceRegistrar;
+use serde::Serialize;
+
+pub const SUPERVISOR_LABEL: &str = "com.my-supervisor.daemon";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SupervisorServiceState {
+    NotInstalled,
+    Stopped,
+    Starting,
+    Ready,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SupervisorServiceStatus {
+    pub state: SupervisorServiceState,
+    pub label: String,
+    pub plist_path: String,
+    pub pid: Option<u32>,
+}
+
+/// The supervisor's user LaunchAgent is intentionally separate from
+/// `LaunchdAgentProcess`: it owns the one daemon authority, while that adapter
+/// owns user-requested managed processes.
+pub struct SupervisorLaunchAgent {
+    root: PathBuf,
+    plist_path: PathBuf,
+    binary: PathBuf,
+    uid: u32,
+    label: String,
+}
+
+impl SupervisorLaunchAgent {
+    pub fn new(root: PathBuf, binary: PathBuf) -> Result<Self, String> {
+        let home = dirs::home_dir()
+            .ok_or_else(|| "resolving the current user's home directory".to_string())?;
+        let label = SUPERVISOR_LABEL.to_string();
+        let plist_path = home
+            .join("Library")
+            .join("LaunchAgents")
+            .join(format!("{SUPERVISOR_LABEL}.plist"));
+        #[cfg(debug_assertions)]
+        let (label, plist_path) = test_supervisor_identity(label, plist_path);
+        if !binary.is_file() {
+            return Err(format!(
+                "daemon binary is unavailable at {}",
+                binary.display()
+            ));
+        }
+        Ok(Self {
+            root,
+            plist_path,
+            binary,
+            uid: unsafe { libc::getuid() },
+            label,
+        })
+    }
+
+    pub fn install(&self) -> Result<SupervisorServiceStatus, String> {
+        crate::owner::ensure_private_directory(&self.root)
+            .map_err(|error| format!("claiming service root: {error}"))?;
+        crate::owner::ensure_private_directory(&self.root.join("logs"))
+            .map_err(|error| format!("preparing service logs: {error}"))?;
+        crate::owner::ensure_private_directory(&self.root.join("run"))
+            .map_err(|error| format!("preparing service run directory: {error}"))?;
+        let parent = self
+            .plist_path
+            .parent()
+            .ok_or_else(|| "supervisor plist has no parent".to_string())?;
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("creating LaunchAgents directory: {error}"))?;
+        let plist = self.plist();
+        write_plist_atomic(&self.plist_path, plist.as_bytes())?;
+        // A prior registration may be stale. Bootout is idempotent and the
+        // data root is never touched by any lifecycle operation.
+        let _ = self.launchctl(&["bootout", &self.target()]);
+        self.launchctl_success(&[
+            "bootstrap",
+            &self.domain(),
+            &self.plist_path.display().to_string(),
+        ])?;
+        self.status()
+    }
+
+    pub fn start(&self) -> Result<SupervisorServiceStatus, String> {
+        if !self.plist_path.is_file() {
+            return self.status();
+        }
+        let marker = self.intentional_stop_path();
+        if marker.exists() {
+            std::fs::remove_file(marker)
+                .map_err(|error| format!("clearing intentional-stop marker: {error}"))?;
+        }
+        if self
+            .launchctl(&["print", &self.target()])
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+        {
+            self.launchctl_success(&["kickstart", "-k", &self.target()])?;
+        } else {
+            self.launchctl_success(&[
+                "bootstrap",
+                &self.domain(),
+                &self.plist_path.display().to_string(),
+            ])?;
+        }
+        self.status()
+    }
+
+    pub fn stop(&self) -> Result<SupervisorServiceStatus, String> {
+        if !self.plist_path.is_file() {
+            return self.status();
+        }
+        let marker = self.intentional_stop_path();
+        if let Some(parent) = marker.parent() {
+            crate::owner::ensure_private_directory(parent)
+                .map_err(|error| format!("preparing intentional-stop directory: {error}"))?;
+        }
+        crate::owner::write_private_file_atomic(&marker, b"intentional-stop\n")
+            .map_err(|error| format!("writing intentional-stop marker: {error}"))?;
+        let _ = self.launchctl(&["bootout", &self.target()]);
+        self.status()
+    }
+
+    pub fn uninstall(&self) -> Result<SupervisorServiceStatus, String> {
+        let _ = self.launchctl(&["bootout", &self.target()]);
+        if self.plist_path.exists() {
+            std::fs::remove_file(&self.plist_path)
+                .map_err(|error| format!("removing supervisor plist: {error}"))?;
+        }
+        Ok(SupervisorServiceStatus {
+            state: SupervisorServiceState::NotInstalled,
+            label: self.label.clone(),
+            plist_path: self.plist_path.display().to_string(),
+            pid: None,
+        })
+    }
+
+    pub fn status(&self) -> Result<SupervisorServiceStatus, String> {
+        if !self.plist_path.is_file() {
+            return Ok(SupervisorServiceStatus {
+                state: SupervisorServiceState::NotInstalled,
+                label: self.label.clone(),
+                plist_path: self.plist_path.display().to_string(),
+                pid: None,
+            });
+        }
+        let output = self.launchctl(&["print", &self.target()]);
+        match output {
+            Ok(output) if output.status.success() => {
+                let pid = parse_launchctl_pid(&String::from_utf8_lossy(&output.stdout));
+                Ok(SupervisorServiceStatus {
+                    state: if pid.is_some() {
+                        SupervisorServiceState::Ready
+                    } else {
+                        SupervisorServiceState::Stopped
+                    },
+                    label: self.label.clone(),
+                    plist_path: self.plist_path.display().to_string(),
+                    pid,
+                })
+            }
+            Ok(_) => Ok(SupervisorServiceStatus {
+                state: SupervisorServiceState::Stopped,
+                label: self.label.clone(),
+                plist_path: self.plist_path.display().to_string(),
+                pid: None,
+            }),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn plist(&self) -> String {
+        let marker = self.intentional_stop_path();
+        let out = self.root.join("logs").join("daemon.out.log");
+        let err = self.root.join("logs").join("daemon.err.log");
+        let debug_environment = self.debug_environment();
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>{}</string>
+<key>ProgramArguments</key><array><string>{}</string></array>
+{}
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><dict><key>PathState</key><dict><key>{}</key><false/></dict></dict>
+<key>ThrottleInterval</key><integer>5</integer>
+<key>StandardOutPath</key><string>{}</string>
+<key>StandardErrorPath</key><string>{}</string>
+</dict></plist>"#,
+            xml(&self.label),
+            xml(&self.binary.display().to_string()),
+            debug_environment,
+            xml(&marker.display().to_string()),
+            xml(&out.display().to_string()),
+            xml(&err.display().to_string())
+        )
+    }
+
+    fn debug_environment(&self) -> String {
+        #[cfg(debug_assertions)]
+        {
+            let values = [
+                (
+                    "MSV_DAEMON_TEST_DATA_DIR",
+                    std::env::var("MSV_DAEMON_TEST_DATA_DIR").ok(),
+                ),
+                (
+                    "MSV_DAEMON_TEST_CONFIG_PATH",
+                    std::env::var("MSV_DAEMON_TEST_CONFIG_PATH").ok(),
+                ),
+                (
+                    "MSV_DAEMON_TEST_BIND_ADDR",
+                    std::env::var("MSV_DAEMON_TEST_BIND_ADDR").ok(),
+                ),
+            ];
+            let body: String = values
+                .into_iter()
+                .filter_map(|(key, value)| {
+                    value.map(|value| {
+                        format!("<key>{}</key><string>{}</string>", xml(key), xml(&value))
+                    })
+                })
+                .collect();
+            if body.is_empty() {
+                String::new()
+            } else {
+                format!("<key>EnvironmentVariables</key><dict>{body}</dict>")
+            }
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            String::new()
+        }
+    }
+
+    fn domain(&self) -> String {
+        format!("gui/{}", self.uid)
+    }
+    fn target(&self) -> String {
+        format!("{}/{}", self.domain(), self.label)
+    }
+    fn intentional_stop_path(&self) -> PathBuf {
+        self.root.join("run").join("intentional-stop")
+    }
+    fn launchctl(&self, args: &[&str]) -> Result<std::process::Output, String> {
+        Command::new("launchctl")
+            .args(args)
+            .output()
+            .map_err(|error| format!("launchctl: {error}"))
+    }
+    fn launchctl_success(&self, args: &[&str]) -> Result<(), String> {
+        let output = self.launchctl(args)?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "launchctl {} failed: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+fn test_supervisor_identity(label: String, plist_path: PathBuf) -> (String, PathBuf) {
+    let label = std::env::var_os("MSV_DAEMON_TEST_LABEL")
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or(label);
+    let plist_path = std::env::var_os("MSV_DAEMON_TEST_PLIST_PATH")
+        .map(PathBuf::from)
+        .unwrap_or(plist_path);
+    (label, plist_path)
+}
+
+fn write_plist_atomic(path: &Path, contents: &[u8]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "supervisor plist has no parent".to_string())?;
+    let temporary = parent.join(format!(
+        ".{}.{}.tmp",
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("supervisor"),
+        std::process::id()
+    ));
+    std::fs::write(&temporary, contents)
+        .map_err(|error| format!("writing supervisor plist: {error}"))?;
+    std::fs::rename(&temporary, path)
+        .map_err(|error| format!("installing supervisor plist: {error}"))
+}
 
 pub struct LaunchdAgentProcess {
     agents_dir: PathBuf,
@@ -195,7 +489,7 @@ fn xml(s: &str) -> String {
 
 fn parse_launchctl_pid(output: &str) -> Option<u32> {
     output.lines().find_map(|line| {
-        if !line.contains("\"PID\"") {
+        if !line.contains("\"PID\"") && !line.trim_start().starts_with("pid =") {
             return None;
         }
         line.split_once('=')?
@@ -298,7 +592,9 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
         if !output.status.success() {
             return Err(RegistrarError::NotFound(unit_name.to_string()));
         }
-        Ok(parse_launchctl_pid(&String::from_utf8_lossy(&output.stdout)))
+        Ok(parse_launchctl_pid(&String::from_utf8_lossy(
+            &output.stdout,
+        )))
     }
 
     async fn tail_logs(
@@ -306,18 +602,22 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
         unit_name: &str,
         lines: usize,
     ) -> Result<Vec<LogLine>, RegistrarError> {
-        let stdout = tokio::fs::read_to_string(self.out_log(unit_name))
-            .await
-            .unwrap_or_default();
-        let stderr = tokio::fs::read_to_string(self.err_log(unit_name))
-            .await
-            .unwrap_or_default();
+        // launchd owns these raw files.  The supervisor neither rotates nor
+        // assigns their file offsets public cursor meaning; a bounded `tail`
+        // read keeps external ingestion from loading unbounded history.
+        let per_stream = if lines == 0 {
+            10_000
+        } else {
+            lines.div_ceil(2)
+        };
+        let stdout = bounded_tail(self.out_log(unit_name), per_stream).await;
+        let stderr = bounded_tail(self.err_log(unit_name), per_stream).await;
         let stdout_lines: Vec<&str> = stdout.lines().collect();
         let stderr_lines: Vec<&str> = stderr.lines().collect();
         let stdout_start = if lines == 0 {
             0
         } else {
-            stdout_lines.len().saturating_sub((lines + 1) / 2)
+            stdout_lines.len().saturating_sub(lines.div_ceil(2))
         };
         let stderr_start = if lines == 0 {
             0
@@ -334,14 +634,34 @@ impl ProcessServiceRegistrar for LaunchdAgentProcess {
                 stream: LogStream::Stdout,
                 line: (*line).to_string(),
             })
-            .chain(stderr_lines[stderr_start..].iter().enumerate().map(|(offset, line)| LogLine {
-                sequence: (stdout_lines.len() - stdout_start + offset + 1) as u64,
-                timestamp,
-                stream: LogStream::Stderr,
-                line: (*line).to_string(),
-            }))
+            .chain(
+                stderr_lines[stderr_start..]
+                    .iter()
+                    .enumerate()
+                    .map(|(offset, line)| LogLine {
+                        sequence: (stdout_lines.len() - stdout_start + offset + 1) as u64,
+                        timestamp,
+                        stream: LogStream::Stderr,
+                        line: (*line).to_string(),
+                    }),
+            )
             .collect();
         Ok(collected)
+    }
+}
+
+async fn bounded_tail(path: PathBuf, lines: usize) -> String {
+    let count = lines.to_string();
+    let output = tokio::process::Command::new("tail")
+        .args(["-n", &count])
+        .arg(path)
+        .output()
+        .await;
+    match output {
+        Ok(output) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout).into_owned()
+        }
+        _ => String::new(),
     }
 }
 

@@ -1,490 +1,93 @@
-import { ArrowRightLeft, Check, Copy, Pause, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { ArrowRightLeft, Pause, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { Badge, Button, DataTable, EmptyState, Field, IconButton, Panel, PanelHeader, TableCell } from "../../components/ui/primitives";
-import { usePolledResource, useOperationsClient, toErrorMessage } from "../../services/use-operations";
+import type { OperationsClient, ResourcePage } from "../../services/operations-client";
+import { useOperationsClient, usePolledResource, toErrorMessage } from "../../services/use-operations";
 import type { ProcessConfigDto } from "../../services/wire-types";
-import type { ProcessState } from "../../shared/types";
+import type { ProcessInstanceStatus, ProcessOperation, ProcessState, ProcessStatus } from "../../shared/types";
 
-const PROCESSES_POLL_INTERVAL_MS = 2000;
+const PAGE_LIMIT = 50;
+const POLL_INTERVAL_MS = 2000;
+const stateTone: Record<ProcessState, "success" | "warning" | "danger" | "info" | "neutral"> = { starting: "info", running: "success", stopping: "warning", crashed: "danger", stopped: "neutral" };
+const formatMemory = (bytes: number) => bytes === 0 ? "-" : `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 
-type ServicePlatform = "macos" | "linux" | "windows";
+type ProcessActionRunner = (name: string, action: () => Promise<unknown>) => void;
 
-const stateTone: Record<ProcessState, "success" | "warning" | "danger" | "info" | "neutral"> = {
-  starting: "info",
-  running: "success",
-  stopping: "warning",
-  crashed: "danger",
-  stopped: "neutral",
-};
-
-function formatMemory(memoryBytes: number) {
-  if (memoryBytes === 0) {
-    return "-";
-  }
-
-  return `${(memoryBytes / 1024 / 1024).toFixed(1)} MiB`;
+/** The regular GUI restart mirrors `msv restart`; rolling stays an explicit future action. */
+export function restartProcess(client: Pick<OperationsClient, "restartProcess">, name: string): Promise<void> {
+  return client.restartProcess(name);
 }
 
-const servicePlatformLabels: Record<ServicePlatform, string> = {
-  macos: "macOS launchd",
-  linux: "Linux systemd",
-  windows: "Windows Service",
-};
-
-function detectServicePlatform(): ServicePlatform {
-  const userAgent = navigator.userAgent.toLowerCase();
-  const platform = navigator.platform.toLowerCase();
-
-  if (userAgent.includes("windows") || platform.includes("win")) {
-    return "windows";
-  }
-
-  if (userAgent.includes("linux") || platform.includes("linux")) {
-    return "linux";
-  }
-
-  return "macos";
-}
-
-function getServiceRegistrationPreview(servicePlatform: ServicePlatform) {
-  if (servicePlatform === "linux") {
-    return {
-      commandTitle: "등록 명령",
-      command:
-        "mkdir -p ~/.config/systemd/user\ncp my-supervisor-managed-api-server.service ~/.config/systemd/user/\nsystemctl --user daemon-reload\nsystemctl --user enable --now my-supervisor-managed-api-server.service",
-      configPath: "~/.config/systemd/user/my-supervisor-managed-api-server.service",
-      config: `[Unit]
-Description=my-supervisor managed process: api-server
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/Users/buyonglee/projects/api
-ExecStart=/bin/sh -lc 'pnpm dev'
-Restart=on-failure
-RestartSec=3
-Environment=MYSUPERVISOR_PROCESS_NAME=api-server
-
-[Install]
-WantedBy=default.target`,
-    };
-  }
-
-  if (servicePlatform === "windows") {
-    return {
-      commandTitle: "등록 명령",
-      command:
-        'New-Service -Name "my-supervisor-managed-api-server" -DisplayName "my-supervisor api-server" -BinaryPathName "cmd.exe /c cd /d C:\\Users\\buyonglee\\projects\\api && pnpm dev" -StartupType Automatic\nStart-Service "my-supervisor-managed-api-server"',
-      configPath: "PowerShell 등록 스크립트",
-      config: `# register-api-server.ps1
-$serviceName = "my-supervisor-managed-api-server"
-$displayName = "my-supervisor api-server"
-$workingDirectory = "C:\\Users\\buyonglee\\projects\\api"
-$command = "pnpm dev"
-
-New-Service \`
-  -Name $serviceName \`
-  -DisplayName $displayName \`
-  -BinaryPathName "cmd.exe /c cd /d $workingDirectory && $command" \`
-  -StartupType Automatic
-
-Start-Service $serviceName`,
-    };
-  }
-
-  return {
-    commandTitle: "등록 명령",
-    command:
-      "cp com.my-supervisor.managed.api-server.plist ~/Library/LaunchAgents/\nlaunchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.my-supervisor.managed.api-server.plist\nlaunchctl enable gui/$(id -u)/com.my-supervisor.managed.api-server",
-    configPath: "~/Library/LaunchAgents/com.my-supervisor.managed.api-server.plist",
-    config: `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.my-supervisor.managed.api-server</string>
-  <key>WorkingDirectory</key>
-  <string>/Users/buyonglee/projects/api</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/sh</string>
-    <string>-lc</string>
-    <string>pnpm dev</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>/Users/buyonglee/Library/Logs/my-supervisor/api-server.out.log</string>
-  <key>StandardErrorPath</key>
-  <string>/Users/buyonglee/Library/Logs/my-supervisor/api-server.err.log</string>
-</dict>
-</plist>`,
-  };
+export function ProcessLifecycleActions({
+  client,
+  process,
+  pending,
+  runAction,
+}: {
+  client: OperationsClient;
+  process: ProcessStatus;
+  pending: boolean;
+  runAction: ProcessActionRunner;
+}) {
+  const stopPropagation = (event: MouseEvent) => event.stopPropagation();
+  return <div className="flex gap-2"><IconButton label="시작" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.startProcess(process.name)); }}><Play aria-hidden="true" size={15} /></IconButton><IconButton label="중지" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.stopProcess(process.name)); }}><Pause aria-hidden="true" size={15} /></IconButton><IconButton label="재시작" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => restartProcess(client, process.name)); }}><RotateCcw aria-hidden="true" size={15} /></IconButton><IconButton label="관리 모드 전환" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.convertProcess(process.name, process.managementMode.type === "direct" ? "system_registered" : "direct", { autoStart: process.managementMode.type === "direct" })); }}><ArrowRightLeft aria-hidden="true" size={15} /></IconButton><IconButton label="삭제" disabled={pending} onClick={(event) => { stopPropagation(event); runAction(process.name, () => client.removeProcess(process.name, true)); }}><Trash2 aria-hidden="true" size={15} /></IconButton></div>;
 }
 
 export function ProcessesView() {
   const client = useOperationsClient();
-  const [selectedManagementMode, setSelectedManagementMode] = useState<"direct" | "system_registered">("direct");
-  const [copiedSnippet, setCopiedSnippet] = useState<"command" | "config" | null>(null);
+  const [displayedPage, setDisplayedPage] = useState<ResourcePage<ProcessStatus> | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | undefined>();
+  const [selectedProcess, setSelectedProcess] = useState<ProcessStatus | null>(null);
+  const [instances, setInstances] = useState<ProcessInstanceStatus[]>([]);
+  const [operation, setOperation] = useState<ProcessOperation | null>(null);
+  const [desiredInstances, setDesiredInstances] = useState("1");
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingProcess, setPendingProcess] = useState<string | null>(null);
   const [formName, setFormName] = useState("api-server");
   const [formCommand, setFormCommand] = useState("pnpm dev");
-  const [formCwd, setFormCwd] = useState("/Users/buyonglee/projects/api");
-  const servicePlatform = useMemo(() => detectServicePlatform(), []);
-  const serviceRegistrationPreview = useMemo(
-    () => getServiceRegistrationPreview(servicePlatform),
-    [servicePlatform],
-  );
+  const [formCwd, setFormCwd] = useState("");
+  const [managementMode, setManagementMode] = useState<"direct" | "system_registered">("direct");
 
-  const listProcesses = useCallback(() => client.listProcesses(), [client]);
-  const { data: processes, isLoading, errorMessage, refresh } = usePolledResource(
-    listProcesses,
-    PROCESSES_POLL_INTERVAL_MS,
-  );
+  const listFirstPage = useCallback(() => client.listProcessesPage(undefined, undefined, PAGE_LIMIT), [client]);
+  const { data: page, isLoading, errorMessage, refresh } = usePolledResource(listFirstPage, POLL_INTERVAL_MS);
+  const processes = displayedPage?.records ?? [];
+  useEffect(() => { setDisplayedPage(page ?? null); setNextCursor(page?.nextCursor); }, [page]);
 
-  const runProcessAction = useCallback(
-    async (name: string, action: () => Promise<void>) => {
-      setActionError(null);
-      setPendingProcess(name);
-      try {
-        await action();
-        await refresh();
-      } catch (error) {
-        setActionError(toErrorMessage(error));
-      } finally {
-        setPendingProcess(null);
-      }
-    },
-    [refresh],
-  );
+  useEffect(() => {
+    if (!selectedProcess) { setInstances([]); return; }
+    let cancelled = false;
+    void client.processInstances(selectedProcess.name).then((result) => { if (!cancelled) { setInstances(result.instances); setDesiredInstances(String(result.desiredInstances)); } }).catch((error) => { if (!cancelled) setActionError(toErrorMessage(error)); });
+    return () => { cancelled = true; };
+  }, [client, selectedProcess?.name]);
 
-  const handleConvert = useCallback(
-    (name: string, currentMode: "direct" | "system_registered") => {
-      const target = currentMode === "direct" ? "system_registered" : "direct";
-      return runProcessAction(name, async () => {
-        // Real convert (child 06): on macOS this writes/boots a launchd
-        // LaunchAgent; a failed registration rolls back to the prior mode.
-        await client.convertProcess(name, target, {
-          autoStart: target === "system_registered",
-        });
-      });
-    },
-    [client, runProcessAction],
-  );
+  const runAction = useCallback(async (name: string, action: () => Promise<unknown>) => {
+    setActionError(null); setPendingProcess(name);
+    try { const result = await action(); if (isProcessOperation(result)) setOperation(result); await refresh(); }
+    catch (error) { setActionError(toErrorMessage(error)); } finally { setPendingProcess(null); }
+  }, [refresh]);
 
-  const handleAddProcess = useCallback(async () => {
-    setActionError(null);
-    if (!formName.trim() || !formCommand.trim()) {
-      setActionError("이름과 명령은 필수 항목입니다.");
-      return;
-    }
-    setPendingProcess(formName);
-    const config: ProcessConfigDto = {
-      name: formName.trim(),
-      command: formCommand.trim(),
-      ...(formCwd.trim() ? { cwd: formCwd.trim() } : {}),
-      management_mode:
-        selectedManagementMode === "system_registered"
-          ? { type: "system_registered", unit_name: `my-supervisor-managed-${formName.trim()}` }
-          : { type: "direct" },
-    };
-    try {
-      await client.addProcess(config);
-      await refresh();
-    } catch (error) {
-      setActionError(toErrorMessage(error));
-    } finally {
-      setPendingProcess(null);
-    }
-  }, [client, formName, formCommand, formCwd, selectedManagementMode, refresh]);
-
-  const processList = processes ?? [];
-  const runningCount = processList.filter((process) => process.state === "running").length;
-  const systemRegisteredCount = processList.filter(
-    (process) => process.managementMode.type === "system_registered",
-  ).length;
-  const crashedCount = processList.filter((process) => process.state === "crashed").length;
-
-  const copySnippet = async (snippetType: "command" | "config", value: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopiedSnippet(snippetType);
-    window.setTimeout(() => setCopiedSnippet(null), 1600);
+  const selectProcess = (process: ProcessStatus) => {
+    setSelectedProcess(process); setOperation(null); setFormName(process.name); setManagementMode(process.managementMode.type);
+  };
+  const saveProcess = async () => {
+    if (!formName.trim() || !formCommand.trim()) { setActionError("이름과 명령은 필수입니다."); return; }
+    const config: ProcessConfigDto = { name: formName.trim(), command: formCommand.trim(), ...(formCwd.trim() ? { cwd: formCwd.trim() } : {}), management_mode: managementMode === "direct" ? { type: "direct" } : { type: "system_registered", unit_name: `my-supervisor-managed-${formName.trim()}` } };
+    await runAction(config.name, () => client.addProcess(config));
+  };
+  const loadNext = async () => {
+    if (!nextCursor || !displayedPage) return;
+    try { const next = await client.listProcessesPage(nextCursor, displayedPage.highWatermark, PAGE_LIMIT); setDisplayedPage(next); setNextCursor(next.nextCursor); if (next.partial) setActionError(`일부 파티션을 읽지 못했습니다: ${next.failedPartitions.join(", ")}`); }
+    catch (error) { setActionError(toErrorMessage(error)); }
   };
 
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="grid gap-5">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Panel className="p-4">
-            <p className="text-xs font-medium text-muted">전체 프로세스</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{processList.length}</p>
-          </Panel>
-          <Panel className="p-4">
-            <p className="text-xs font-medium text-muted">실행 중</p>
-            <p className="mt-2 text-2xl font-semibold text-success">{runningCount}</p>
-          </Panel>
-          <Panel className="p-4">
-            <p className="text-xs font-medium text-muted">시스템 등록</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{systemRegisteredCount}</p>
-          </Panel>
-          <Panel className="p-4">
-            <p className="text-xs font-medium text-muted">주의 필요</p>
-            <p className="mt-2 text-2xl font-semibold text-danger">{crashedCount}</p>
-          </Panel>
-        </div>
-
-        <Panel>
-          <PanelHeader
-            action={
-              <Button variant="primary" disabled={pendingProcess !== null} onClick={handleAddProcess}>
-                <Plus aria-hidden="true" size={16} />
-                프로세스 추가
-              </Button>
-            }
-            description="데몬이 관리하는 프로세스 목록입니다. 2초마다 자동으로 갱신됩니다."
-            title="프로세스"
-          />
-          {actionError ? (
-            <div className="border-b border-border bg-danger/10 px-4 py-2 text-xs font-medium text-danger">
-              {actionError}
-            </div>
-          ) : null}
-          {isLoading ? (
-            <div className="px-4 py-6 text-sm text-muted">불러오는 중…</div>
-          ) : errorMessage && processList.length === 0 ? (
-            <div className="p-4">
-              <EmptyState title="데몬에 연결할 수 없습니다" description={errorMessage} />
-            </div>
-          ) : processList.length === 0 ? (
-            <div className="p-4">
-              <EmptyState
-                title="등록된 프로세스가 없습니다"
-                description="우측 폼에서 새 프로세스를 추가해 보세요."
-              />
-            </div>
-          ) : (
-            <DataTable columns={["이름", "상태", "관리 모드", "PID 또는 유닛", "업타임", "자원", "동작"]}>
-              {processList.map((process) => (
-                <tr className="transition-colors duration-200 hover:bg-surface" key={process.name}>
-                  <TableCell>
-                    <div className="font-medium text-foreground">{process.name}</div>
-                    <div className="text-xs text-muted">재시작 {process.restartCount}회</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge tone={stateTone[process.state]}>{process.state}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge tone={process.managementMode.type === "direct" ? "info" : "warning"}>
-                      {process.managementMode.type === "direct" ? "Direct" : "System"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-mono text-xs text-muted">
-                      {process.managementMode.type === "direct"
-                        ? process.pid ?? "-"
-                        : process.managementMode.unitName}
-                    </span>
-                  </TableCell>
-                  <TableCell>{process.uptime}</TableCell>
-                  <TableCell>
-                    <div className="text-xs text-muted">
-                      <span className="text-foreground">{process.cpuPercent.toFixed(1)}%</span> CPU
-                    </div>
-                    <div className="text-xs text-muted">
-                      <span className="text-foreground">{formatMemory(process.memoryBytes)}</span> 메모리
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <IconButton
-                        label="시작"
-                        disabled={pendingProcess === process.name}
-                        onClick={() => runProcessAction(process.name, () => client.startProcess(process.name))}
-                      >
-                        <Play aria-hidden="true" size={15} />
-                      </IconButton>
-                      <IconButton
-                        label="중지"
-                        disabled={pendingProcess === process.name}
-                        onClick={() => runProcessAction(process.name, () => client.stopProcess(process.name))}
-                      >
-                        <Pause aria-hidden="true" size={15} />
-                      </IconButton>
-                      <IconButton
-                        label="재시작"
-                        disabled={pendingProcess === process.name}
-                        onClick={() => runProcessAction(process.name, () => client.restartProcess(process.name))}
-                      >
-                        <RotateCcw aria-hidden="true" size={15} />
-                      </IconButton>
-                      <IconButton
-                        label={
-                          process.managementMode.type === "direct"
-                            ? "SystemRegistered로 전환"
-                            : "Direct로 전환"
-                        }
-                        disabled={pendingProcess === process.name}
-                        onClick={() => handleConvert(process.name, process.managementMode.type)}
-                      >
-                        <ArrowRightLeft aria-hidden="true" size={15} />
-                      </IconButton>
-                      <IconButton
-                        label="삭제"
-                        disabled={pendingProcess === process.name}
-                        onClick={() => runProcessAction(process.name, () => client.removeProcess(process.name, true))}
-                      >
-                        <Trash2 aria-hidden="true" size={15} />
-                      </IconButton>
-                    </div>
-                  </TableCell>
-                </tr>
-              ))}
-            </DataTable>
-          )}
-        </Panel>
-      </div>
-
-      <aside className="grid content-start gap-5">
-        <Panel>
-          <PanelHeader title="추가·수정 폼" description="실제 저장 대신 화면 구조만 표현합니다." />
-          <div className="grid gap-3 p-4">
-            <Field label="이름">
-              <input
-                className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                onChange={(event) => setFormName(event.target.value)}
-                value={formName}
-              />
-            </Field>
-            <Field label="명령">
-              <input
-                className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                onChange={(event) => setFormCommand(event.target.value)}
-                value={formCommand}
-              />
-            </Field>
-            <Field label="작업 경로">
-              <input
-                className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                onChange={(event) => setFormCwd(event.target.value)}
-                value={formCwd}
-              />
-            </Field>
-            <fieldset className="grid gap-2 rounded-lg border border-border p-3">
-              <legend className="px-1 text-xs font-medium text-muted">관리 모드</legend>
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                  checked={selectedManagementMode === "direct"}
-                  name="management-mode"
-                  onChange={() => setSelectedManagementMode("direct")}
-                  type="radio"
-                />
-                Direct
-              </label>
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                  checked={selectedManagementMode === "system_registered"}
-                  name="management-mode"
-                  onChange={() => setSelectedManagementMode("system_registered")}
-                  type="radio"
-                />
-                SystemRegistered
-              </label>
-            </fieldset>
-            {selectedManagementMode === "system_registered" ? (
-              <div className="grid gap-3 rounded-lg border border-info/30 bg-info/10 p-3">
-                <div>
-                  <p className="text-xs font-semibold text-info">실제 시스템 등록 미리보기</p>
-                  <p className="mt-1 text-xs text-muted">
-                    현재 OS에 맞는 서비스 등록 명령과 설정 파일 내용을 복사할 수 있습니다.
-                  </p>
-                </div>
-                <div className="rounded-md border border-border bg-surface px-3 py-2">
-                  <p className="text-xs font-medium text-muted">감지된 실행 환경</p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">
-                    {servicePlatformLabels[servicePlatform]}
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-foreground">
-                        {serviceRegistrationPreview.commandTitle}
-                      </p>
-                      <p className="mt-1 text-xs text-muted">터미널에서 실행할 명령입니다.</p>
-                    </div>
-                    <Button
-                      className="shrink-0"
-                      onClick={() => copySnippet("command", serviceRegistrationPreview.command)}
-                    >
-                      {copiedSnippet === "command" ? (
-                        <Check aria-hidden="true" size={16} />
-                      ) : (
-                        <Copy aria-hidden="true" size={16} />
-                      )}
-                      {copiedSnippet === "command" ? "복사됨" : "복사"}
-                    </Button>
-                  </div>
-                  <pre className="max-w-full overflow-x-auto whitespace-pre-wrap rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground">
-                    <code>{serviceRegistrationPreview.command}</code>
-                  </pre>
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-foreground">설정 파일</p>
-                      <p className="mt-1 break-all font-mono text-xs text-muted">
-                        {serviceRegistrationPreview.configPath}
-                      </p>
-                    </div>
-                    <Button
-                      className="shrink-0"
-                      onClick={() => copySnippet("config", serviceRegistrationPreview.config)}
-                    >
-                      {copiedSnippet === "config" ? (
-                        <Check aria-hidden="true" size={16} />
-                      ) : (
-                        <Copy aria-hidden="true" size={16} />
-                      )}
-                      {copiedSnippet === "config" ? "복사됨" : "복사"}
-                    </Button>
-                  </div>
-                  <pre className="max-h-80 max-w-full overflow-auto rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground">
-                    <code>{serviceRegistrationPreview.config}</code>
-                  </pre>
-                </div>
-              </div>
-            ) : null}
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="primary" disabled={pendingProcess !== null} onClick={handleAddProcess}>
-                저장
-              </Button>
-              <Button>취소</Button>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel>
-          <PanelHeader title="관리 모드 전환" description="Direct ↔ SystemRegistered(launchd) 실제 전환 결과를 표시합니다." />
-          <div className="grid gap-3 p-4 text-sm">
-            {actionError ? (
-              <div className="rounded-md border border-danger/30 bg-danger/10 p-3 text-danger">
-                {actionError}
-              </div>
-            ) : (
-              <p className="text-xs text-muted">
-                각 프로세스 행의 전환 버튼(<ArrowRightLeft className="inline align-text-bottom" aria-hidden="true" size={13} />)으로
-                Direct ↔ SystemRegistered를 전환합니다. 실패 시 데몬이 원래 모드로 롤백하며 그 결과가 여기에 표시됩니다.
-              </p>
-            )}
-            <p className="text-xs text-muted">
-              SystemRegistered 전환은 macOS에서 launchd LaunchAgent를 생성·부트스트랩합니다. 적용될 plist는 위 폼의 미리보기에서 확인할 수 있습니다.
-            </p>
-          </div>
-        </Panel>
-      </aside>
-    </div>
-  );
+  return <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"><div className="grid gap-5">
+    <Panel><PanelHeader action={<Button variant="primary" disabled={pendingProcess !== null} onClick={() => { setSelectedProcess(null); setOperation(null); }}><Plus aria-hidden="true" size={16} />프로세스 추가</Button>} description="첫 50개와 명시적 다음 cursor만 요청합니다. 실패 시 마지막 성공 page를 유지합니다." title="프로세스" />
+      {actionError || errorMessage || displayedPage?.partial ? <div className="border-b border-border bg-danger/10 px-4 py-2 text-xs font-medium text-danger">{actionError ?? errorMessage ?? `일부 파티션을 읽지 못했습니다: ${displayedPage?.failedPartitions.join(", ")}`}</div> : null}
+      {isLoading ? <div className="p-4 text-sm text-muted">불러오는 중…</div> : processes.length === 0 ? <div className="p-4"><EmptyState title="등록된 프로세스가 없습니다" description="오른쪽 폼에서 macOS 프로세스를 추가하세요." /></div> : <DataTable columns={["이름", "상태", "관리 모드", "자원", "동작"]}>{processes.map((process) => <tr className="cursor-pointer hover:bg-surface" key={process.name} onClick={() => selectProcess(process)}><TableCell><div className="font-medium">{process.name}</div><div className="text-xs text-muted">재시작 {process.restartCount}회</div></TableCell><TableCell><Badge tone={stateTone[process.state]}>{process.state}</Badge></TableCell><TableCell><Badge tone={process.managementMode.type === "direct" ? "info" : "warning"}>{process.managementMode.type === "direct" ? "Direct" : "SystemRegistered"}</Badge></TableCell><TableCell><div className="text-xs">{process.cpuPercent.toFixed(1)}% CPU · {formatMemory(process.memoryBytes)}</div></TableCell><TableCell><ProcessLifecycleActions client={client} pending={pendingProcess === process.name} process={process} runAction={(name, action) => { void runAction(name, action); }} /></TableCell></tr>)}</DataTable>}
+      {nextCursor ? <div className="border-t border-border p-3"><Button onClick={() => void loadNext()}>다음 50개</Button></div> : null}
+    </Panel>
+    {selectedProcess ? <Panel><PanelHeader title={`${selectedProcess.name} 인스턴스와 롤아웃`} description="실제 backend 결과만 표시합니다." /><div className="grid gap-3 p-4"><div className="flex items-end gap-2"><Field label="목표 인스턴스"><input className="h-9 w-24 rounded-md border border-border bg-surface px-3 text-sm" inputMode="numeric" onChange={(event) => setDesiredInstances(event.target.value)} value={desiredInstances} /></Field><Button disabled={pendingProcess === selectedProcess.name} onClick={() => { const target = Number(desiredInstances); if (!Number.isInteger(target) || target < 1) { setActionError("목표 인스턴스는 1 이상의 정수여야 합니다."); return; } void runAction(selectedProcess.name, () => client.scaleProcess(selectedProcess.name, target)); }}>스케일</Button></div>{instances.map((instance) => <div className="flex justify-between rounded border border-border p-2 text-xs" key={instance.instanceId}><span>#{instance.ordinal} generation {instance.generation}</span><Badge tone={stateTone[instance.state]}>{instance.state}</Badge></div>)}{operation ? <div className="rounded border border-info/30 bg-info/10 p-3 text-xs"><p className="font-medium">{operation.kind} · {operation.phase} · batch {operation.batch}</p>{operation.outcomes.map((outcome) => <p key={outcome.instanceId}>#{outcome.ordinal}: {outcome.state}{outcome.failedStage ? ` (${outcome.failedStage})` : ""}</p>)}</div> : null}</div></Panel> : null}
+  </div><aside className="grid content-start gap-5"><Panel><PanelHeader title="macOS 프로세스 추가" description="SystemRegistered는 backend가 생성·등록하며, 수동 plist/타 OS 안내는 제공하지 않습니다." /><div className="grid gap-3 p-4"><Field label="이름"><input className="h-9 rounded-md border border-border bg-surface px-3 text-sm" onChange={(event) => setFormName(event.target.value)} value={formName} /></Field><Field label="명령"><input className="h-9 rounded-md border border-border bg-surface px-3 text-sm" onChange={(event) => setFormCommand(event.target.value)} value={formCommand} /></Field><Field label="작업 경로(선택)"><input className="h-9 rounded-md border border-border bg-surface px-3 text-sm" onChange={(event) => setFormCwd(event.target.value)} value={formCwd} /></Field><label className="grid gap-1 text-xs font-medium text-muted"><span>관리 모드</span><select className="h-9 rounded-md border border-border bg-surface px-3 text-sm" onChange={(event) => setManagementMode(event.target.value as "direct" | "system_registered")} value={managementMode}><option value="direct">Direct</option><option value="system_registered">SystemRegistered</option></select></label><Button variant="primary" disabled={pendingProcess !== null} onClick={() => void saveProcess()}>저장</Button></div></Panel></aside></div>;
 }
+
+function isProcessOperation(value: unknown): value is ProcessOperation { return Boolean(value && typeof value === "object" && "operationId" in value && "outcomes" in value); }

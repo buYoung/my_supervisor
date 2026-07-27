@@ -1,4 +1,4 @@
-import { Filter, Pause, Play, Search } from "lucide-react";
+import { Pause, Play, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, EmptyState, Field, Panel, PanelHeader } from "../../components/ui/primitives";
 import { useOperationsClient, usePolledResource, toErrorMessage } from "../../services/use-operations";
@@ -21,6 +21,7 @@ export function LogsView() {
   const [selectedProcess, setSelectedProcess] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [droppedCount, setDroppedCount] = useState(0);
+  const [cursorBoundary, setCursorBoundary] = useState<string | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,12 +54,14 @@ export function LogsView() {
     if (!selectedProcess) {
       setLogs([]);
       setDroppedCount(0);
+      setCursorBoundary(null);
       return;
     }
 
     let cancelled = false;
     setLogError(null);
     setDroppedCount(0);
+    setCursorBoundary(null);
     logKeyCounterRef.current = 0;
 
     client
@@ -74,6 +77,11 @@ export function LogsView() {
         }));
         setLogs(seeded);
         setDroppedCount(tail.droppedCount);
+        if (tail.cursorExpired) {
+          setCursorBoundary(`이전 cursor가 만료되어 보존된 가장 이른 위치${tail.earliestRetainedSequence !== undefined ? ` (${tail.earliestRetainedSequence})` : ""}부터 다시 표시합니다.`);
+        } else if (tail.truncated) {
+          setCursorBoundary(`tail은 최근 ${TAIL_LINE_COUNT}줄로 제한됩니다${tail.earliestRetainedSequence !== undefined ? ` (보존 시작 ${tail.earliestRetainedSequence})` : ""}.`);
+        }
       })
       .catch((error) => {
         if (!cancelled) {
@@ -168,11 +176,8 @@ export function LogsView() {
               <option value="system">system</option>
             </select>
           </label>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="primary" disabled>
-              <Filter aria-hidden="true" size={16} />
-              적용
-            </Button>
+          <div className="grid gap-2">
+            <p className="text-xs text-muted">검색과 스트림 필터는 입력 즉시 적용됩니다.</p>
             <Button onClick={() => setIsFollowing((previous) => !previous)}>
               {isFollowing ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
               {isFollowing ? "일시 정지" : "follow"}
@@ -197,6 +202,7 @@ export function LogsView() {
             초당 라인 상한 초과로 {droppedCount}줄이 생략되었습니다.
           </div>
         ) : null}
+        {cursorBoundary ? <div className="border-b border-border bg-warning/10 px-4 py-2 text-xs font-medium text-warning">{cursorBoundary}</div> : null}
         {logError ? (
           <div className="border-b border-border bg-danger/10 px-4 py-2 text-xs font-medium text-danger">
             {logError}

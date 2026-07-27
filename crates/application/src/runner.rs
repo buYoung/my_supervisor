@@ -14,8 +14,8 @@ use my_supervisor_core::domain::{
 };
 use my_supervisor_core::ports::error::RunnerError;
 use my_supervisor_core::ports::{
-    JobRepository, JobRunner, LifecycleController, RunExecutionControl, SystemClock,
-    CleanupTicket, TransientCompletion, TransientTerminalEvent, LogSink,
+    CleanupTicket, JobRepository, JobRunner, LifecycleController, LogSink, RunExecutionControl,
+    SystemClock, TransientCompletion, TransientTerminalEvent,
 };
 
 use crate::events::{DomainEvent, PublishedEvent};
@@ -23,6 +23,7 @@ use crate::events::{DomainEvent, PublishedEvent};
 /// Build a transient Direct/detached `ProcessSpec` from a Job definition.
 fn job_to_spec(job: &Job) -> ProcessSpec {
     ProcessSpec {
+        definition_id: my_supervisor_core::domain::ProcessDefinitionId::new(),
         name: format!("job:{}", job.name),
         command: job.command.clone(),
         args: job.args.clone(),
@@ -36,6 +37,12 @@ fn job_to_spec(job: &Job) -> ProcessSpec {
             ..RestartPolicy::default()
         },
         shutdown: ShutdownPolicy::default(),
+        instances: 1,
+        watch: None,
+        memory: None,
+        liveness: None,
+        readiness: None,
+        rolling: None,
     }
 }
 
@@ -67,6 +74,7 @@ impl ProcessJobRunner {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn enqueue_cleanup_ticket(
         &self,
         job: &Job,
@@ -117,7 +125,14 @@ impl JobRunner for ProcessJobRunner {
         run_id: JobRunId,
         control: Arc<dyn RunExecutionControl>,
     ) -> Result<JobRun, RunnerError> {
-        let scheduled_at = self.clock.now();
+        let scheduled_at = match &triggered_by {
+            TriggeredBy::Scheduled { occurrence } => occurrence.scheduled_at,
+            _ => self.clock.now(),
+        };
+        let occurrence = match &triggered_by {
+            TriggeredBy::Scheduled { occurrence } => Some(occurrence.clone()),
+            _ => None,
+        };
 
         let mut run = JobRun {
             run_id,
@@ -129,15 +144,19 @@ impl JobRunner for ProcessJobRunner {
             ended_at: None,
             exit_code: None,
             state: JobRunState::Running,
+            original_scheduled_at: occurrence.as_ref().map(|value| value.scheduled_at),
+            occurrence,
         };
         // The facade persisted Pending before registering this active run. This
         // transition is best-effort; only a valid, non-tombstoned final save is
         // authoritative.
         let _ = self.job_repo.save_run(&run).await;
-        let _ = self.events.send(PublishedEvent::ordinary(DomainEvent::JobRunStarted {
-            name: job.name.clone(),
-            run_id,
-        }));
+        let _ = self
+            .events
+            .send(PublishedEvent::ordinary(DomainEvent::JobRunStarted {
+                name: job.name.clone(),
+                run_id,
+            }));
 
         let spec = job_to_spec(job);
         let execution_result = async {
@@ -173,7 +192,12 @@ impl JobRunner for ProcessJobRunner {
                 run.exit_code = outcome.exit_code;
                 run.state = JobRunState::Cancelled;
             }
-            Ok(TransientCompletion::CleanupPending { cause, stage, intended_terminal_state, outcome }) => {
+            Ok(TransientCompletion::CleanupPending {
+                cause,
+                stage,
+                intended_terminal_state,
+                outcome,
+            }) => {
                 self.enqueue_cleanup_ticket(
                     job,
                     run_id,
@@ -182,7 +206,8 @@ impl JobRunner for ProcessJobRunner {
                     intended_terminal_state,
                     cause.clone(),
                     outcome,
-                ).await?;
+                )
+                .await?;
                 return Err(RunnerError::Unreaped(cause));
             }
             Err(e) => {
@@ -210,7 +235,8 @@ impl JobRunner for ProcessJobRunner {
                     ended_at: run.ended_at.unwrap_or_else(|| self.clock.now()),
                     exit_code: run.exit_code,
                 },
-            ).await?;
+            )
+            .await?;
             return Err(RunnerError::Unreaped(cause));
         }
         if !control.should_persist_terminal() {
@@ -239,15 +265,36 @@ impl JobRunner for ProcessJobRunner {
                     run_id,
                     &control,
                     my_supervisor_core::ports::TransientCleanupStage::PersistTerminal,
-                run.state,
-                cause.clone(),
-                my_supervisor_core::ports::TransientOutcome {
-                    started_at: run.started_at.unwrap_or(scheduled_at),
-                    ended_at: run.ended_at.unwrap_or_else(|| self.clock.now()),
-                    exit_code: run.exit_code,
-                },
-                ).await?;
+                    run.state,
+                    cause.clone(),
+                    my_supervisor_core::ports::TransientOutcome {
+                        started_at: run.started_at.unwrap_or(scheduled_at),
+                        ended_at: run.ended_at.unwrap_or_else(|| self.clock.now()),
+                        exit_code: run.exit_code,
+                    },
+                )
+                .await?;
                 return Err(RunnerError::Unreaped(cause));
+            }
+        }
+
+        // The terminal Run/outbox remains the existing durable transport
+        // boundary.  Scheduled work adds a second, logical-occurrence
+        // boundary after that commit so retries never publish dependency work
+        // for an intermediate failed attempt.
+        if run.occurrence.is_some() {
+            match self
+                .job_repo
+                .finalize_schedule_attempt(job, &run, self.clock.now())
+                .await
+            {
+                Ok(my_supervisor_core::domain::ScheduleFinalization::Retry(_)) => return Ok(run),
+                Ok(my_supervisor_core::domain::ScheduleFinalization::Finalized(_)) => {}
+                Err(error) => {
+                    return Err(RunnerError::Backend(format!(
+                        "finalizing scheduled occurrence: {error}"
+                    )))
+                }
             }
         }
 

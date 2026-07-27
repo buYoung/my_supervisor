@@ -16,27 +16,38 @@ import {
   OperationsError,
   type OperationsClient,
   type ProcessLogsTail,
+  type ResourcePage,
 } from "./operations-client";
 import {
   mapDaemonStatus,
   mapEventEnvelope,
   mapJobRun,
+  mapJobPreview,
   mapJobStatus,
   mapLogLine,
   mapProcessStatus,
+  mapProcessInstanceStatus,
+  mapProcessOperation,
 } from "./wire-mapping";
 import type {
   DaemonStatusDto,
   EventEnvelopeDto,
   JobConfigDto,
+  JobPreviewDto,
+  JobPreviewRequestDto,
   JobStatusDto,
+  JobPageDto,
   ListJobsDto,
   ListProcessesDto,
+  ProcessPageDto,
   ListRunsDto,
   LogLineDto,
   ProcessConfigDto,
   ProcessLogsDto,
   ProcessStatusDto,
+  ProcessInstancesDto,
+  ProcessOperationDto,
+  JobRunDto,
   TriggerJobDto,
 } from "./wire-types";
 
@@ -110,9 +121,28 @@ export function createInvokeClient(
       return dto.processes.map(mapProcessStatus);
     },
 
+    async listProcessesPage(cursor, highWatermark, limit) {
+      const dto = await invokeCommand<ProcessPageDto>("cmd_list_processes_page", { cursor, highWatermark, limit });
+      const result: ResourcePage<import("../shared/types").ProcessStatus> = { records: dto.processes.map(mapProcessStatus), nextCursor: dto.next_cursor ?? undefined, highWatermark: dto.high_watermark, partial: dto.partial ?? false, failedPartitions: dto.failed_partitions ?? [] };
+      return result;
+    },
+
     async getProcess(name) {
       const dto = await invokeCommand<ProcessStatusDto>("cmd_get_process", { name });
       return mapProcessStatus(dto);
+    },
+
+    async processInstances(name) {
+      const dto = await invokeCommand<ProcessInstancesDto>("process_instances", { name });
+      return { name: dto.name, desiredInstances: dto.desired_instances, instances: dto.instances.map(mapProcessInstanceStatus) };
+    },
+
+    async scaleProcess(name, instances, operationId) {
+      return mapProcessOperation(await invokeCommand<ProcessOperationDto>("scale_process", { name, instances, operationId }));
+    },
+
+    async rollingRestartProcess(name, operationId) {
+      return mapProcessOperation(await invokeCommand<ProcessOperationDto>("rolling_restart_process", { name, operationId }));
     },
 
     async addProcess(config: ProcessConfigDto) {
@@ -154,6 +184,8 @@ export function createInvokeClient(
         lines,
         truncated: dto.truncated,
         droppedCount: dto.dropped_count,
+        earliestRetainedSequence: dto.earliest_retained_sequence ?? undefined,
+        cursorExpired: dto.cursor_expired ?? false,
       };
       return result;
     },
@@ -235,9 +267,27 @@ export function createInvokeClient(
       return dto.jobs.map(mapJobStatus);
     },
 
+    async listJobsPage(cursor, highWatermark, limit) {
+      const dto = await invokeCommand<JobPageDto>("cmd_list_jobs_page", { cursor, highWatermark, limit });
+      const result: ResourcePage<import("../shared/types").JobStatus> = { records: dto.jobs.map(mapJobStatus), nextCursor: dto.next_cursor ?? undefined, highWatermark: dto.high_watermark, partial: dto.partial ?? false, failedPartitions: dto.failed_partitions ?? [] };
+      return result;
+    },
+
+    async getJob(name) {
+      return mapJobStatus(await invokeCommand<JobStatusDto>("cmd_get_job", { name }));
+    },
+
     async addJob(config: JobConfigDto) {
       const dto = await invokeCommand<JobStatusDto>("cmd_add_job", { config });
       return mapJobStatus(dto);
+    },
+
+    async updateJob(name, config) {
+      return mapJobStatus(await invokeCommand<JobStatusDto>("cmd_update_job", { name, config }));
+    },
+
+    async previewJob(request: JobPreviewRequestDto) {
+      return mapJobPreview(await invokeCommand<JobPreviewDto>("cmd_preview_job", { request }));
     },
 
     async removeJob(name, force = false) {
@@ -256,6 +306,14 @@ export function createInvokeClient(
         truncated: dto.truncated,
       };
       return result;
+    },
+
+    async getRun(name, runId) {
+      return mapJobRun(await invokeCommand<JobRunDto>("cmd_get_run", { name, runId }));
+    },
+
+    async cancelRun(name, runId) {
+      await invokeCommand<void>("cmd_cancel_run", { name, runId });
     },
 
     async daemonStatus() {

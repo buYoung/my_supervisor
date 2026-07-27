@@ -7,6 +7,7 @@ pub mod deps;
 pub mod error;
 pub mod events;
 pub mod facade;
+pub mod observability;
 pub mod registrar_null;
 pub mod runner;
 pub mod views;
@@ -14,10 +15,10 @@ pub mod views;
 pub use deps::{AppDeps, DaemonMeta};
 pub use error::{AppError, AppResult, ConflictReason, ResourceKind};
 pub use events::{DomainEvent, PublishedEvent};
-pub use facade::OperationsFacade;
+pub use facade::{OperationsFacade, PagePartitionFailureSource};
 pub use registrar_null::NullProcessServiceRegistrar;
 pub use runner::ProcessJobRunner;
 pub use views::{
-    ConvertTarget, DaemonInfo, JobView, LogPage, RecoveryDiagnostic, RecoveryDiagnostics,
-    RestartOutcome,
+    ConvertTarget, DaemonInfo, JobPreview, JobPreviewOccurrence, JobView, LogPage,
+    RecoveryDiagnostic, RecoveryDiagnostics, RestartOutcome,
 };

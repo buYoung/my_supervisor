@@ -15,17 +15,31 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tokio::net::TcpListener;
 
-use my_supervisor_app_daemon::{build_runtime, data_dir, DEFAULT_BIND_PORT};
+#[cfg(debug_assertions)]
+use my_supervisor_app_daemon::build_runtime;
+use my_supervisor_app_daemon::{data_dir, DEFAULT_BIND_PORT};
 use my_supervisor_application::{AppError, ConvertTarget, OperationsFacade, RestartOutcome};
+use my_supervisor_core::domain::JobRunId;
 use my_supervisor_infra_http::mapping::{
-    daemon_info_to_dto, job_config_to_job, job_run_to_dto, job_view_to_dto, log_line_to_dto,
-    log_page_to_dto, process_config_to_spec, process_status_to_dto,
+    alert_episode_to_dto, daemon_info_to_dto, delivery_attempt_to_dto, job_config_to_job,
+    job_preview_to_dto, job_run_to_dto, job_view_to_dto, log_line_to_dto, log_page_to_dto,
+    metric_sample_to_dto, observability_page_to_dto, operator_event_to_dto, process_config_to_spec,
+    process_operation_to_dto, process_status_to_dto,
 };
-use my_supervisor_infra_http::{event_to_wire, Assembled};
+use my_supervisor_infra_http::{event_to_wire, Assembled, AuthVerifier};
 use my_supervisor_shared::api::{
-    ConvertTargetDto, DaemonStatusDto, JobConfigDto, JobListDto, JobRunListDto, LogsResponseDto,
-    ProcessConfigDto, ProcessListDto, ProcessStatusDto,
+    AlertEpisodeDto, AlertRuleDto, AlertSeverityDto, ConvertTargetDto, DaemonStatusDto,
+    DeliveryAttemptDto, JobConfigDto, JobListDto, JobPageDto, JobPreviewDto, JobPreviewRequestDto,
+    JobRunDto, JobRunListDto, JobStatusDto, LogsResponseDto, MetricSampleDto, ObservabilityPageDto,
+    OperatorEventDto, ProcessConfigDto, ProcessInstancesDto, ProcessListDto, ProcessOperationDto,
+    ProcessPageDto, ProcessStatusDto, UpsertAlertRuleRequestDto,
 };
+
+/// Build-time package-security evidence retained in the release Mach-O for
+/// artifact verification. It records no credentials and does not assert that
+/// an unsigned candidate has a hardened runtime or embedded entitlements.
+#[used]
+static MSV_SECURITY_CONTRACT_MARKER: &str = concat!(env!("MSV_SECURITY_CONTRACT_MARKER"), "\0");
 
 /// Serializable command error carrying the API §5 code.
 #[derive(Debug, Serialize)]
@@ -62,8 +76,103 @@ async fn cmd_list_processes(facade: Facade<'_>) -> CmdResult<ProcessListDto> {
 }
 
 #[tauri::command]
+async fn cmd_list_processes_page(
+    facade: Facade<'_>,
+    cursor: Option<String>,
+    high_watermark: Option<String>,
+    limit: Option<usize>,
+) -> CmdResult<ProcessPageDto> {
+    let limit = limit.unwrap_or(50);
+    if limit == 0 || limit > 200 {
+        return Err(CmdError {
+            code: "invalid_request".into(),
+            message: "limit must be between 1 and 200".into(),
+        });
+    }
+    let page = facade
+        .list_processes_page(cursor.as_deref(), high_watermark.as_deref(), limit)
+        .await?;
+    let partial = !page.failed_partitions.is_empty();
+    Ok(ProcessPageDto {
+        processes: page
+            .records
+            .into_iter()
+            .map(process_status_to_dto)
+            .collect(),
+        next_cursor: page.next_cursor,
+        high_watermark: page.high_watermark,
+        partial,
+        failed_partitions: page.failed_partitions,
+    })
+}
+
+#[tauri::command]
 async fn cmd_get_process(facade: Facade<'_>, name: String) -> CmdResult<ProcessStatusDto> {
     Ok(process_status_to_dto(facade.get_process(&name).await?))
+}
+
+#[tauri::command]
+async fn process_instances(facade: Facade<'_>, name: String) -> CmdResult<ProcessInstancesDto> {
+    let (desired_instances, instances) = facade.process_instances(&name).await?;
+    Ok(ProcessInstancesDto {
+        name,
+        desired_instances,
+        instances: instances
+            .into_iter()
+            .map(
+                |instance| my_supervisor_shared::api::ProcessInstanceStatusDto {
+                    instance_id: instance.instance_id.0,
+                    ordinal: instance.ordinal,
+                    generation: instance.generation,
+                    state: my_supervisor_infra_http::mapping::process_state_to_dto(instance.state),
+                    pid: instance.pid,
+                    restart_count: instance.restart_count,
+                    started_at: instance.started_at,
+                    cpu_percent: instance.cpu_percent,
+                    memory_bytes: instance.memory_bytes,
+                },
+            )
+            .collect(),
+    })
+}
+
+#[tauri::command]
+async fn scale_process(
+    facade: Facade<'_>,
+    name: String,
+    instances: u16,
+    operation_id: Option<String>,
+) -> CmdResult<ProcessOperationDto> {
+    let operation_id = operation_id
+        .map(|value| {
+            uuid::Uuid::parse_str(&value).map_err(|_| CmdError {
+                code: "invalid_request".into(),
+                message: "operation_id must be a UUID".into(),
+            })
+        })
+        .transpose()?;
+    Ok(process_operation_to_dto(
+        facade.scale_process(&name, instances, operation_id).await?,
+    ))
+}
+
+#[tauri::command]
+async fn rolling_restart_process(
+    facade: Facade<'_>,
+    name: String,
+    operation_id: Option<String>,
+) -> CmdResult<ProcessOperationDto> {
+    let operation_id = operation_id
+        .map(|value| {
+            uuid::Uuid::parse_str(&value).map_err(|_| CmdError {
+                code: "invalid_request".into(),
+                message: "operation_id must be a UUID".into(),
+            })
+        })
+        .transpose()?;
+    Ok(process_operation_to_dto(
+        facade.rolling_restart_process(&name, operation_id).await?,
+    ))
 }
 
 #[tauri::command]
@@ -144,12 +253,67 @@ async fn cmd_list_jobs(facade: Facade<'_>) -> CmdResult<JobListDto> {
 }
 
 #[tauri::command]
+async fn cmd_list_jobs_page(
+    facade: Facade<'_>,
+    cursor: Option<String>,
+    high_watermark: Option<String>,
+    limit: Option<usize>,
+) -> CmdResult<JobPageDto> {
+    let limit = limit.unwrap_or(50);
+    if limit == 0 || limit > 200 {
+        return Err(CmdError {
+            code: "invalid_request".into(),
+            message: "limit must be between 1 and 200".into(),
+        });
+    }
+    let page = facade
+        .list_jobs_page(cursor.as_deref(), high_watermark.as_deref(), limit)
+        .await?;
+    let partial = !page.failed_partitions.is_empty();
+    Ok(JobPageDto {
+        jobs: page.records.into_iter().map(job_view_to_dto).collect(),
+        next_cursor: page.next_cursor,
+        high_watermark: page.high_watermark,
+        partial,
+        failed_partitions: page.failed_partitions,
+    })
+}
+
+#[tauri::command]
+async fn cmd_get_job(facade: Facade<'_>, name: String) -> CmdResult<JobStatusDto> {
+    Ok(job_view_to_dto(facade.get_job(&name).await?))
+}
+
+#[tauri::command]
 async fn cmd_add_job(facade: Facade<'_>, config: JobConfigDto) -> CmdResult<serde_json::Value> {
     let view = facade.add_job(job_config_to_job(config)).await?;
     serde_json::to_value(job_view_to_dto(view)).map_err(|e| CmdError {
         code: "internal_error".into(),
         message: e.to_string(),
     })
+}
+
+#[tauri::command]
+async fn cmd_update_job(
+    facade: Facade<'_>,
+    name: String,
+    config: JobConfigDto,
+) -> CmdResult<JobStatusDto> {
+    Ok(job_view_to_dto(
+        facade.update_job(&name, job_config_to_job(config)).await?,
+    ))
+}
+
+#[tauri::command]
+async fn cmd_preview_job(
+    facade: Facade<'_>,
+    request: JobPreviewRequestDto,
+) -> CmdResult<JobPreviewDto> {
+    Ok(job_preview_to_dto(
+        facade
+            .preview_job(job_config_to_job(request.config), request.at, request.count)
+            .await?,
+    ))
 }
 
 #[tauri::command]
@@ -172,9 +336,130 @@ async fn cmd_list_runs(facade: Facade<'_>, name: String, limit: usize) -> CmdRes
     })
 }
 
+fn command_run_id(value: String) -> CmdResult<JobRunId> {
+    uuid::Uuid::parse_str(&value)
+        .map(JobRunId)
+        .map_err(|_| CmdError {
+            code: "invalid_request".into(),
+            message: "run_id must be a UUID".into(),
+        })
+}
+
+#[tauri::command]
+async fn cmd_get_run(facade: Facade<'_>, name: String, run_id: String) -> CmdResult<JobRunDto> {
+    Ok(job_run_to_dto(
+        &facade.get_run(&name, &command_run_id(run_id)?).await?,
+    ))
+}
+
+#[tauri::command]
+async fn cmd_cancel_run(facade: Facade<'_>, name: String, run_id: String) -> CmdResult<()> {
+    facade
+        .cancel_run(&name, command_run_id(run_id)?)
+        .await
+        .map_err(Into::into)
+}
+
 #[tauri::command]
 async fn cmd_daemon_status(facade: Facade<'_>) -> CmdResult<DaemonStatusDto> {
     Ok(daemon_info_to_dto(facade.daemon_status().await?))
+}
+
+#[tauri::command]
+async fn cmd_list_operator_events(
+    facade: Facade<'_>,
+    cursor: Option<String>,
+    limit: usize,
+) -> CmdResult<ObservabilityPageDto<OperatorEventDto>> {
+    Ok(observability_page_to_dto(
+        facade
+            .list_operator_events(cursor.as_deref(), limit)
+            .await?,
+        operator_event_to_dto,
+    ))
+}
+#[tauri::command]
+async fn cmd_list_metric_samples(
+    facade: Facade<'_>,
+    source: Option<String>,
+    cursor: Option<String>,
+    limit: usize,
+) -> CmdResult<ObservabilityPageDto<MetricSampleDto>> {
+    Ok(observability_page_to_dto(
+        facade
+            .list_metric_samples(source.as_deref(), cursor.as_deref(), limit)
+            .await?,
+        metric_sample_to_dto,
+    ))
+}
+#[tauri::command]
+async fn cmd_list_alert_episodes(
+    facade: Facade<'_>,
+    cursor: Option<String>,
+    limit: usize,
+) -> CmdResult<ObservabilityPageDto<AlertEpisodeDto>> {
+    Ok(observability_page_to_dto(
+        facade.list_alert_episodes(cursor.as_deref(), limit).await?,
+        alert_episode_to_dto,
+    ))
+}
+#[tauri::command]
+async fn cmd_list_delivery_attempts(
+    facade: Facade<'_>,
+    cursor: Option<String>,
+    limit: usize,
+) -> CmdResult<ObservabilityPageDto<DeliveryAttemptDto>> {
+    Ok(observability_page_to_dto(
+        facade
+            .list_delivery_attempts(None, cursor.as_deref(), limit)
+            .await?,
+        delivery_attempt_to_dto,
+    ))
+}
+#[tauri::command]
+async fn cmd_list_alert_rules(facade: Facade<'_>, limit: usize) -> CmdResult<Vec<AlertRuleDto>> {
+    Ok(facade
+        .list_alert_rules(limit)
+        .await?
+        .into_iter()
+        .map(my_supervisor_infra_http::mapping::alert_rule_to_dto)
+        .collect())
+}
+#[tauri::command]
+async fn cmd_upsert_alert_rule(
+    facade: Facade<'_>,
+    request: UpsertAlertRuleRequestDto,
+) -> CmdResult<AlertRuleDto> {
+    if request.name.trim().is_empty() || request.condition.trim().is_empty() {
+        return Err(CmdError {
+            code: "invalid_request".into(),
+            message: "rule name and condition are required".into(),
+        });
+    }
+    let now = chrono::Utc::now();
+    let severity = match request.severity {
+        AlertSeverityDto::Info => my_supervisor_core::domain::AlertSeverity::Info,
+        AlertSeverityDto::Warning => my_supervisor_core::domain::AlertSeverity::Warning,
+        AlertSeverityDto::Critical => my_supervisor_core::domain::AlertSeverity::Critical,
+    };
+    Ok(my_supervisor_infra_http::mapping::alert_rule_to_dto(
+        facade
+            .save_alert_rule(my_supervisor_core::domain::AlertRule {
+                id: request.id.unwrap_or_else(uuid::Uuid::new_v4),
+                name: request.name,
+                condition: request.condition,
+                severity,
+                cooldown_seconds: request.cooldown_seconds,
+                enabled: request.enabled,
+                created_at: now,
+                updated_at: now,
+            })
+            .await?,
+    ))
+}
+#[tauri::command]
+async fn cmd_acknowledge_alert_episode(facade: Facade<'_>, id: uuid::Uuid) -> CmdResult<bool> {
+    Ok(facade.acknowledge_alert_episode(id).await?)
 }
 
 /// Start forwarding a process's logs to the `process-log:{name}` Tauri event
@@ -220,6 +505,9 @@ fn main() {
             let assembled: Assembled =
                 tauri::async_runtime::block_on(async { build_host().await })?;
             let facade = assembled.facade.clone();
+            // Keep the development-owner lock alive for the full desktop
+            // process even if the optional test devBridge is not serving.
+            app.manage::<AuthVerifier>(assembled.auth.clone());
 
             tauri::async_runtime::block_on(async {
                 facade.bootstrap().await.ok();
@@ -248,7 +536,11 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             cmd_list_processes,
+            cmd_list_processes_page,
             cmd_get_process,
+            process_instances,
+            scale_process,
+            rolling_restart_process,
             cmd_add_process,
             cmd_start_process,
             cmd_stop_process,
@@ -257,11 +549,24 @@ fn main() {
             cmd_convert_process,
             cmd_process_logs,
             cmd_list_jobs,
+            cmd_list_jobs_page,
+            cmd_get_job,
             cmd_add_job,
+            cmd_update_job,
+            cmd_preview_job,
             cmd_remove_job,
             cmd_trigger_job,
             cmd_list_runs,
+            cmd_get_run,
+            cmd_cancel_run,
             cmd_daemon_status,
+            cmd_list_operator_events,
+            cmd_list_metric_samples,
+            cmd_list_alert_episodes,
+            cmd_list_delivery_attempts,
+            cmd_list_alert_rules,
+            cmd_upsert_alert_rule,
+            cmd_acknowledge_alert_episode,
             cmd_follow_logs,
         ])
         .run(tauri::generate_context!())
@@ -313,7 +618,17 @@ async fn run_devbridge(router: axum::Router, port: u16, data_dir: PathBuf) {
     let _ = tokio::fs::remove_file(&discovery).await;
 }
 
-/// In-process composition shared with the daemon runtime.
+/// In-process composition is available only to the explicit development host.
+#[cfg(debug_assertions)]
 async fn build_host() -> anyhow::Result<Assembled> {
+    if std::env::var("MSV_DESKTOP_EMBEDDED_DEV").as_deref() != Ok("1") {
+        anyhow::bail!("desktop embedded owner requires MSV_DESKTOP_EMBEDDED_DEV=1; installed client mode is owned by U19");
+    }
     build_runtime().await
+}
+
+/// Release candidates deliberately reject the development-only embedded host.
+#[cfg(not(debug_assertions))]
+async fn build_host() -> anyhow::Result<Assembled> {
+    anyhow::bail!("desktop embedded owner is unavailable outside explicit development mode");
 }

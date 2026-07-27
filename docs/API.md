@@ -11,7 +11,7 @@
 ## 1. 원칙
 
 - **바인딩**: `127.0.0.1:<port>` (기본 9876). `0.0.0.0` 바인딩은 코드 레벨에서 금지 (DD-011).
-- **인증**: 없음 (단일 유저·로컬 전용 전제). 같은 사용자 세션의 다른 프로세스가 API를 호출하는 것은 차단하지 않으므로 이를 신뢰할 수 없는 환경에서는 사용하지 않습니다.
+- **인증**: 모든 `/api/v1` HTTP·WebSocket route는 `Authorization: Bearer <token>`을 먼저 검증한다. 토큰은 설치별 user-only credential file에서 native CLI/proxy가 읽으며, bearer를 WebView·URL·query string·로그·local storage·UI state에 노출해서는 안 된다. 자세한 현재/목표 transport 경계는 §8을 따른다.
 - **Prefix**: 모든 REST 엔드포인트는 `/api/v1/` 하위. breaking change는 `/api/v2/` 신설로 처리.
 - **Content-Type**: 요청·응답 모두 `application/json` (UTF-8).
 - **타입 출처**: `crates/shared` (패키지 `my-supervisor-shared`) 의 Rust 타입 (`serde` 직렬화) 과 1:1 대응. 구체 경로는 `crates/shared/src/api.rs` (REST), `crates/shared/src/events.rs` (WS 이벤트), `crates/shared/src/config.rs` (TOML 스키마). 본 문서의 스키마는 그 서브셋을 기술적 설명용으로 재표기한 것.
@@ -386,7 +386,7 @@
 }
 ```
 
-`event_id`는 durable terminal Run 이벤트에만 서버가 넣는 안정 ID다. 이는 additive field이므로 구 daemon은 이 필드를 생략할 수 있고, 수신자는 ID 없는 envelope을 정상 수신해야 한다. 새 daemon은 `job.run_succeeded`, `job.run_failed`, `job.run_timed_out`, `job.run_cancelled`의 terminal frame에 항상 같은 ID를 보낸다.
+`event_id`는 additive 안정 UUID다. 구 daemon은 이 필드를 생략할 수 있고, 수신자는 ID 없는 envelope을 정상 수신해야 한다. 새 daemon은 `job.run_succeeded`, `job.run_failed`, `job.run_timed_out`, `job.run_cancelled`의 terminal frame과 모든 `process.state_changed` frame에 ID를 보낸다. process 상태 이벤트의 ID는 관찰 frame 식별자일 뿐 durable outbox/receipt 보장을 뜻하지 않는다.
 
 terminal 이벤트는 SQLite outbox에서 연결된 외부 transport 중 하나가 실제 write에 성공할 때까지 재시도하는 at-least-once 전달이다. 연결 전 전체 history나 소비자별 exactly-once를 제공하지 않으며, write 성공 뒤 acknowledgement 전 daemon crash가 나면 같은 `event_id`가 재전송될 수 있다. CLI와 desktop renderer는 세션 메모리의 bounded ID cache로 이를 중복 제거한다. 이 cache는 재시작 뒤에는 비어 있으므로 영구 exactly-once를 주장하지 않는다.
 
@@ -394,7 +394,7 @@ terminal 이벤트는 SQLite outbox에서 연결된 외부 transport 중 하나�
 
 | `type` | `payload` 요약 |
 |---|---|
-| `process.state_changed` | `{ name, from, to }` — `ProcessState` 전이 |
+| `process.state_changed` | `{ name, from, to, definition_id, instance_id, generation }` — `ProcessState` 전이. `instance_id`와 `generation`은 저장소가 슬롯 조회를 지원하지 않으면 `null`일 수 있다. |
 | `process.crashed` | `{ name, exit_code, signal, restart_count }` |
 | `process.crash_loop_detected` | `{ name, window_sec, threshold }` |
 | `process.health_check_failed` | `{ name, check_type, failure_count }` |
@@ -450,6 +450,12 @@ type ManagementMode =
   | { type: "system_registered"; unit_name: string };
 ```
 
+U03 추가 응답 계약: 새 daemon은 `ProcessStatus`에 `definition_id`(UUID), `desired_instances`(기본 `1`), `instances`를 추가한다. `instances`의 각 항목은 `instance_id`(UUID), `ordinal`, `generation`, `state`, `pid`, `restart_count`, `started_at`(RFC3339 또는 `null`), `cpu_percent`, `memory_bytes`를 포함한다. 이전 daemon 응답에는 이 additive 필드가 없을 수 있으며, 수신자는 이를 각각 ID 없음, `desired_instances=1`, 빈 목록으로 해석한다.
+
+U08 추가 응답 계약: 새 daemon은 선택적 `guard` 객체를 추가한다. `process_id`, `native_generation`, `observed_at`, `liveness`, `readiness`, `memory`, `watch`, `last_restart_cause`, `last_error`, `is_historical`을 포함한다. 상태 값은 `unknown`, `healthy`, `unhealthy`, `unsupported`이며, restart cause는 `watch_changed`, `memory_ceiling`, `liveness_failure`이다. `is_historical=true`인 persisted guard snapshot은 이전 daemon의 증거일 뿐 현재 generation의 readiness로 해석하면 안 된다. 새 daemon은 변경 시 `process.guard_changed` WebSocket 이벤트로 같은 `guard` 객체를 전달한다.
+
+`instances`는 저장소가 지원하는 활성 슬롯을 ordinal 오름차순으로 제공한다. 현재 runtime 관찰은 ordinal `0`에만 연결하며, 아직 조정(reconciliation)되지 않은 다른 슬롯은 `stopped`, PID 없음, 사용량 0으로 표시한다. `desired_instances > 1`이면 legacy aggregate의 `pid`는 `null`, `started_at`은 관찰된 인스턴스의 가장 이른 시작 시각, `restart_count`·`cpu_percent`·`memory_bytes`는 인스턴스 합계다. aggregate state는 `running`, `starting`, `stopping`, `crashed`, `stopped` 순으로 관찰된 상태를 선택한다. 단일 인스턴스의 기존 aggregate 의미는 유지한다.
+
 ### 4.2 ProcessState
 
 ```ts
@@ -483,6 +489,8 @@ interface ProcessConfig {
 ```
 
 하위 객체의 필드는 `ARCHITECTURE.md` §16 / §7 / §8 / §9 / §14 과 일치한다. `management_mode` 의 시맨틱은 §6.4.
+
+U03 추가 설정 계약: `definition_id`는 선택 UUID이며 생략하면 변환 경계가 이름 기반의 안정 ID를 만든다. `instances`는 선택 정수(생략 시 `1`)이고, `watch`, `memory`, `liveness`, `readiness`, `rolling`은 선택 정책 객체다. 시간은 모든 공개 설정 경계에서 `_ms` 단위, 메모리는 `ceiling_bytes`/`memory_bytes` 바이트 단위를 사용한다. 이 정책은 Direct 전용이며 SystemRegistered는 `instances=1`과 모든 Direct 전용 정책 비활성만 허용한다. 유효하지 않은 인스턴스·정책·모드 조합은 `invalid_config` 또는 요청 경계의 `invalid_request`로 어떠한 process·SQLite row·registrar 변경보다 먼저 거부된다.
 
 ### 4.4 JobConfig · JobStatus · JobRun
 
@@ -599,6 +607,14 @@ type JobRunState =
 
 ## 6. 버전 정책
 
+### Schedule preview
+
+`POST /api/v1/jobs/preview`는 `{ config, at, count }`를 받고 최대 100개의 UTC 예정 시각과 IANA local-time 표기를 반환한다. 이 호출은 job/run 행, scheduler timer 또는 event outbox를 생성·갱신하지 않는다. `count` 기본값은 10이고 탐색은 5년 또는 100,000 candidate에서 bounded error로 종료한다.
+
+Job schedule의 additive 필드는 `timezone`, `schedule_revision`, `trigger_id`, `misfire_policy`, `retry_policy`, `admission`이다. 최초 출시의 새 Job은 TOML file bootstrap, HTTP `POST/PATCH /jobs`, HTTP config apply(및 이를 호출하는 CLI), Tauri/GUI 어느 입력 경계에서든 `timezone` 생략 시 현재 macOS IANA zone을 저장하고, `misfire_policy` 생략 시 `run_once`, `trigger_id` 생략 시 새 UUID를 사용한다. 시간대 해석 실패는 UTC로 조용히 대체하지 않는다. 명시한 timezone·misfire policy·trigger UUID는 그대로 보존한다. DST의 존재하지 않는 local time은 생략하고 반복 local time은 이른 UTC instant 한 번만 쓴다.
+
+Schedule run은 `original_scheduled_at` 및 occurrence `(trigger_id, schedule_revision, scheduled_at, attempt)`를 additive로 노출한다. 기존/manual/dependency run의 이 필드는 null/omitted일 수 있다.
+
 - 본 API는 `/api/v1/` prefix 하에 **하위 호환 변경만** 허용한다 (필드 추가, 새 엔드포인트).
 - 기존 필드 타입 변경·필드 제거·의미 변경은 **breaking change**로 간주하며 `/api/v2/`를 신설해 병행 서비스 후 이전한다.
 - WebSocket 이벤트 `type` 문자열은 안정 키로 취급한다. 동일한 이벤트의 의미 변경 금지, 대신 새 `type` 도입.
@@ -610,7 +626,52 @@ type JobRunState =
 
 다음은 본 문서 초안 시점에 확정되지 않은 항목이며 PoC·MVP 구현 시 확정한다.
 
-- 페이지네이션: `GET /api/v1/processes`·`GET /api/v1/jobs` 가 많은 엔티티에서 페이징이 필요한지 (MVP 목표 1000 프로세스 기준)
+- 페이지네이션: 현재 `GET /api/v1/processes`·`GET /api/v1/jobs`는 cursor pagination이 없다. §8의 default `50`/cap `200`, opaque cursor, aggregate-query 계약은 U21 additive 구현 항목이다.
 - 대량 로그 조회의 응답 상한 정책 (현재 `tail <= 10000` 가정)
 - 모든 Job에 강제로 적용할 전역 이력 보존 상한 도입 여부. 현재는 Job별 `log_retention` 설정을 적용한다.
-- 인증 도입 시점·형태 (현재는 로컬 전용, 원격 지원은 Post-Production)
+- native session bootstrap/cookie/CSRF/Origin 및 installed desktop proxy는 §8에서 계약을 고정했지만 아직 U21 구현·관찰 대상이다.
+
+---
+
+## 8. Wave 9 Operator capability 계약 고정
+
+이 절은 Wave 9 U20의 권위 capability matrix다. `구현됨`은 아래에 든 현재 source의 동작만 뜻하며 installed desktop proxy, browser-free session, 새 aggregate API 또는 UI parity를 뜻하지 않는다. `U21 필수`는 shape를 지금 고정하되 source 구현은 다음 배치가 소유한다. 모든 새 wire DTO는 `crates/shared/src/api.rs`의 snake_case이며, 기존 `/api/v1`, Tauri command/event, `--output json`의 이름·shape·의미를 바꾸지 않는다.
+
+공통 오류는 §5 `ErrorBody`이고, mutation의 부분 결과는 성공으로 축약하지 않는다. `ProcessOperationDto.outcomes`와 미래 aggregate response의 `partial`은 실패 partition 및 prior data 보존을 명시해야 한다. 현재 list의 한도는 개별 route가 실제로 검증하는 값이 권위이며, 아래 `50/200`은 기존 route를 재해석하지 않는 U21 additive 목표다.
+
+| capability | HTTP 현재 계약 | Tauri / native 현재 계약 | CLI 현재 계약 | DTO·오류·cursor | credential/session 및 상태 |
+|---|---|---|---|---|---|
+| process definition/group | `GET/POST /processes`, `GET/DELETE /processes/{name}`, start/stop/restart/convert | `cmd_list_processes`, `cmd_get_process`, `cmd_add_process`, `cmd_start_process`, `cmd_stop_process`, `cmd_restart_process`, `cmd_remove_process`, `cmd_convert_process`는 embedded facade | `ps`, `show`, `add`, `start`, `stop`, `restart`, `remove`, `convert`; `--output json` | `ProcessConfigDto`, `ProcessListDto`, `ProcessStatusDto`; §5 stable errors; 현재 목록 cursor 없음 | HTTP/CLI bearer 구현됨. Tauri direct facade와 TS HTTP 무인증 path는 installed proxy가 아니므로 **U21 필수** |
+| instance / scale / rollout | `GET /processes/{name}/instances`, `POST .../scale`, `POST .../rolling-restart` | `process_instances`, `scale_process`, `rolling_restart_process` embedded command은 있으나 UI client에 없음 | `instances`, `scale`, `restart --rolling`; partial outcome은 현재 CLI exit 3 | `ProcessInstancesDto`, `ProcessOperationDto`; Idempotency-Key/`operation_id`; list cursor 없음 | native proxy 및 OperationsClient parity, partial renderer는 **U21 필수** |
+| process logs | `GET /processes/{name}/logs` REST/WS upgrade; `tail`, `since`, `after_sequence` | `cmd_process_logs`, `cmd_follow_logs`; tail/follow만 | `logs [--follow] [--tail] [--since]`; follow는 JSONL | `LogsResponseDto`, numeric `high_watermark`/`next_sequence`; retained cursor expiry를 명시 | bearer WS는 구현됨. cookie session + cursor-resume proxy는 **U21 필수**; 기존 CLI follow row-loss 제한은 별도 미해결 |
+| job definition / preview | `GET/POST /jobs`, `GET/PATCH/DELETE /jobs/{name}`, `POST /jobs/preview` | `cmd_list_jobs`, `cmd_add_job`, `cmd_preview_job`, `cmd_remove_job`; update/get은 없음 | `job ls`, `show`, `remove`, `preview`; `--output json` | `JobConfigDto`, `JobStatusDto`, `JobPreviewRequestDto/JobPreviewDto`; current list cursor 없음 | HTTP/CLI bearer 구현됨; full invoke/TS parity·bounded form은 **U21/U22 consumer** |
+| occurrence / attempt / cancel | `POST /jobs/{name}/trigger`, `GET .../runs`, `GET .../runs/{run_id}`, `POST .../cancel` | `cmd_trigger_job`, `cmd_list_runs`만; get/cancel 없음 | `job trigger`, `runs`, `cancel`; `job logs` | `JobRunListDto`, run DTO; current `limit` is route-owned, cursor 없음; §5 `run_*` errors | installed proxy and no-silent-partial aggregate run history are **U21 필수** |
+| job logs | `GET /jobs/{name}/runs/{run_id}/logs` REST/WS upgrade | no invoke logs command | `job logs [--follow] [--tail] [--since]` | `LogsResponseDto`, numeric cursor/high-watermark | bearer WS 구현됨; native session and invoke parity는 **U21 필수** |
+| metrics / events | `GET /observability/metrics`, `/events`; live `GET /events` WS | `cmd_list_metric_samples`, `cmd_list_operator_events`; global event forwarder | `observability metrics`, `events`; `daemon events` follow | `ObservabilityPageDto<MetricSampleDto/OperatorEventDto>`; opaque cursor is current for observability | HTTP/CLI bearer 구현됨; proxy/session and UI filters are **U21 필수** |
+| alerts / acknowledgement / delivery | rules CRUD, `GET /observability/alerts`, `POST .../ack`, `GET .../deliveries` | list rules/episodes/deliveries, upsert, acknowledge embedded commands | `observability alerts`, `deliveries`; no rule mutation command | `AlertRuleDto`, `AlertEpisodeDto`, `DeliveryAttemptDto`, `ObservabilityPageDto`; cursor on paged records | bearer 구현됨; full CLI/invoke/TS parity and explicit partial UX are **U21 필수** |
+| daemon / service maintenance | daemon status/recovery/reload/config/shutdown; authenticated service rotate-token/backup/upgrade/rollback | only `cmd_daemon_status` embedded | `daemon status/events/shutdown`, config commands; service lifecycle local and maintenance RPC | `DaemonStatusDto`, `RecoveryDiagnosticsDto`, config/service DTO; §5 errors | CLI native credential refresh 구현됨. Tauri installed native proxy and session revocation are **U21 필수** |
+| config | `POST /daemon/config/validate`, `/apply` | no invoke command | `config validate|apply`; legacy `--output json` | `ConfigApplyRequestDto/ResultDto`; recovery-required stays error, not partial success | HTTP/CLI bearer 구현됨; invoke/UI parity는 **U21 필수** |
+
+### Native session 및 transport 경계
+
+- production Tauri와 CLI는 user-only credential을 native layer에서만 읽어 installed daemon에 주입한다. renderer는 bearer를 반환받거나 저장·조합하지 않는다. 현재 CLI만 이 경계를 구현했으며, 현재 desktop은 embedded facade와 debug-only devBridge이므로 production installed proxy로 표현하면 안 된다.
+- U21 debug devBridge bootstrap은 one-time native command로 daemon-issued opaque session cookie와 memory-only non-secret CSRF nonce를 교환한다. cookie는 정확히 `10m`, `HttpOnly`, `SameSite=Strict`, exact-loopback `Path`, no `Domain`이며 bearer 자체가 아니다. mutation은 nonce를 보내고 WS upgrade는 cookie 및 strict Origin을 요구한다.
+- daemon restart, bearer rotation, logout 또는 `15m` absolute age는 session을 폐기한다. native bootstrap은 재인증 후 마지막 numeric log cursor에서 재개한다. token rotation generation으로 기존 bearer/WS를 무효화하는 현재 HTTP primitive는 이 목표와 충돌하지 않는다.
+
+### Pagination·aggregate·fixture 계약
+
+- U21 additive list/aggregate endpoint는 기본 `50`, cap `200`, stable opaque cursor와 snapshot high-watermark를 사용한다. panel refresh는 resource family당 aggregate request 하나이며 client concurrency는 최대 `4`다. partition failure는 prior data를 보존하고 `partial`과 실패 partition을 표시한다. 현재 process/job list와 기존 UI fan-out은 이 계약을 아직 구현하지 않았다.
+- U22 scale acceptance input은 `250 jobs`, `50 instances`, `10,000 entries`다. U20은 fixture나 test case를 만들지 않는다.
+- U21 debug-only fixture control은 기존 debug daemon host에만 둔다. partition-failure/scale control 이름과 input은 `fixture=partition_failure|scale`, `resource_family`, `partition`, `enabled`로 고정하고, `enabled=false`는 injected fault를 제거한다. isolated `mktemp -d` root, unused loopback port, `MSV_DAEMON_TEST_DATA_DIR`, `MSV_DAEMON_TEST_CONFIG_PATH`, `MSV_DAEMON_TEST_BIND_ADDR`, `MSV_DAEMON_TEST_CONTROL_SOCKET`을 사용하며 public API/CLI로 setup·cleanup한다. cleanup target은 검증된 fixture root와 spawned process group뿐이다.
+
+### CLI json-v2 및 exit 계약
+
+기존 `--output json`은 opt-in `json-v2`로 대체하지 않는다. 현재 `print_json`의 pretty JSON document, log/event follow의 one-object-per-line JSONL, stdout success / stderr `error: ...`, 그리고 현 `CliError` exit (`0` success, `1` general/domain, `2` not found, `3` daemon unreachable 또는 current partial)는 byte-level compatibility 기준이다.
+
+U21은 additive `--output json-v2`만 추가하며 모든 command에 versioned envelope `{"ok": boolean, "data": ..., "error": ..., "partial": ...}`를 쓴다. `error`와 `partial`은 각각 `null` 가능 필드이고 successful partial도 `partial`을 생략해 숨기지 않는다. json-v2 exit는 `0=success`, `1=domain failure`, `2=usage/validation`, `3=partial`, `4=daemon/auth/transport unavailable`으로 고정한다. 이것은 현 CLI exit를 소급 변경하지 않는다.
+
+### U21 additive session transport surface
+
+`POST /api/v1/session/bootstrap`은 native bearer로만 호출할 수 있다. 응답은 memory-only CSRF nonce와 만료 시각을 반환하고, opaque session id는 `HttpOnly; SameSite=Strict; Max-Age=600; Path=/api/v1` cookie로만 설정한다. `Domain` 속성은 설정하지 않는다. `POST /api/v1/session/logout`은 현재 cookie를 폐기하고 만료 cookie를 반환한다.
+
+세션 인증은 loopback `Origin`을 요구하고 mutation에는 `X-CSRF-Token`이 필요하다. 세션은 최근 사용 10분, 절대 15분, bearer generation rotation, 또는 host restart에서 무효화된다. 기존 bearer route, legacy list DTO/route 및 WebSocket numeric cursor 의미는 변경하지 않는다.

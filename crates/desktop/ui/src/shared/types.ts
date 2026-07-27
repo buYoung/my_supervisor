@@ -8,6 +8,22 @@ export type ManagementMode =
   | { type: "direct" }
   | { type: "system_registered"; unitName: string };
 
+export type GuardState = "unknown" | "healthy" | "unhealthy" | "unsupported";
+export type GuardRestartCause = "watch_changed" | "memory_ceiling" | "liveness_failure";
+
+export interface GuardStatus {
+  processId: string;
+  nativeGeneration: string | null;
+  observedAt: string;
+  liveness: GuardState;
+  readiness: GuardState;
+  memory: GuardState;
+  watch: GuardState;
+  lastRestartCause: GuardRestartCause | null;
+  lastError: string | null;
+  isHistorical: boolean;
+}
+
 export interface ProcessStatus {
   name: string;
   state: ProcessState;
@@ -18,6 +34,38 @@ export interface ProcessStatus {
   cpuPercent: number;
   memoryBytes: number;
   uptime: string;
+  guard?: GuardStatus;
+}
+
+export interface ProcessInstanceStatus {
+  instanceId: string;
+  ordinal: number;
+  generation: number;
+  state: ProcessState;
+  pid: number | null;
+  restartCount: number;
+  startedAt: string | null;
+  cpuPercent: number;
+  memoryBytes: number;
+}
+
+export interface ProcessOperationOutcome {
+  instanceId: string;
+  ordinal: number;
+  state: "completed" | "failed" | "not_attempted" | "superseded";
+  failedStage?: string;
+  retryable: boolean;
+}
+
+export interface ProcessOperation {
+  operationId: string;
+  name: string;
+  kind: string;
+  targetInstances?: number;
+  phase: string;
+  batch: number;
+  completed: boolean;
+  outcomes: ProcessOperationOutcome[];
 }
 
 export type JobRunState =
@@ -25,6 +73,7 @@ export type JobRunState =
   | "running"
   | "succeeded"
   | "failed"
+  | "timed_out"
   | "cancelled"
   | "skipped";
 
@@ -49,6 +98,8 @@ export interface JobStatus {
   nextRunAt?: string;
   successRateRecent?: number;
   dependencies: { upstream: string[]; downstream: string[] };
+  timezone?: string;
+  misfirePolicy?: "skip" | "run_once" | "catch_up";
 }
 
 export interface JobRun {
@@ -61,6 +112,9 @@ export interface JobRun {
   exitCode?: number;
   state: JobRunState;
 }
+
+export interface JobPreviewOccurrence { scheduledAt: string; localTime: string; timezone: string; }
+export interface JobPreview { occurrences: JobPreviewOccurrence[]; }
 
 export interface LogLine {
   id: string;

@@ -3,7 +3,9 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use my_supervisor_core::domain::{ApplyMode, ConfigDiff, ConfigSnapshot, LoadedConfig, ManagementMode};
+use my_supervisor_core::domain::{
+    ApplyMode, ConfigDiff, ConfigSnapshot, LoadedConfig, ManagementMode,
+};
 
 pub fn target_snapshot(
     current: &ConfigSnapshot,
@@ -31,8 +33,17 @@ pub fn target_snapshot(
     }
     for job in &loaded.jobs {
         let mut job = job.clone();
-        if let Some(existing) = current.jobs.iter().find(|existing| existing.name == job.name) {
+        if let Some(existing) = current
+            .jobs
+            .iter()
+            .find(|existing| existing.name == job.name)
+        {
             job.id = existing.id;
+            if job.trigger_id.is_nil() {
+                job.trigger_id = existing.trigger_id;
+            }
+        } else if job.trigger_id.is_nil() {
+            job.trigger_id = uuid::Uuid::new_v4();
         }
         jobs.insert(job.name.clone(), job);
     }
@@ -48,8 +59,16 @@ pub fn target_snapshot(
 }
 
 pub fn diff(current: &ConfigSnapshot, target: &ConfigSnapshot) -> ConfigDiff {
-    let current_processes: HashMap<_, _> = current.processes.iter().map(|spec| (&spec.name, spec)).collect();
-    let target_processes: HashMap<_, _> = target.processes.iter().map(|spec| (&spec.name, spec)).collect();
+    let current_processes: HashMap<_, _> = current
+        .processes
+        .iter()
+        .map(|spec| (&spec.name, spec))
+        .collect();
+    let target_processes: HashMap<_, _> = target
+        .processes
+        .iter()
+        .map(|spec| (&spec.name, spec))
+        .collect();
     let current_jobs: HashMap<_, _> = current.jobs.iter().map(|job| (&job.name, job)).collect();
     let target_jobs: HashMap<_, _> = target.jobs.iter().map(|job| (&job.name, job)).collect();
     ConfigDiff {
@@ -80,11 +99,26 @@ pub fn desired_running_target(previous: &ConfigSnapshot, target: &ConfigSnapshot
 }
 
 fn names_only<'a, T>(left: &HashMap<&'a String, T>, right: &HashMap<&'a String, T>) -> Vec<String> {
-    let names: BTreeSet<String> = left.keys().filter(|name| !right.contains_key(*name)).map(|name| (*name).clone()).collect();
+    let names: BTreeSet<String> = left
+        .keys()
+        .filter(|name| !right.contains_key(*name))
+        .map(|name| (*name).clone())
+        .collect();
     names.iter().cloned().collect()
 }
 
-fn changed_names<'a, T: PartialEq>(left: &HashMap<&'a String, T>, right: &HashMap<&'a String, T>) -> Vec<String> {
-    let names: BTreeSet<String> = left.iter().filter_map(|(name, value)| right.get(*name).filter(|other| *other != value).map(|_| (*name).clone())).collect();
+fn changed_names<'a, T: PartialEq>(
+    left: &HashMap<&'a String, T>,
+    right: &HashMap<&'a String, T>,
+) -> Vec<String> {
+    let names: BTreeSet<String> = left
+        .iter()
+        .filter_map(|(name, value)| {
+            right
+                .get(*name)
+                .filter(|other| *other != value)
+                .map(|_| (*name).clone())
+        })
+        .collect();
     names.iter().cloned().collect()
 }

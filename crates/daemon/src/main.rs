@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Context;
-use my_supervisor_app_daemon::{build_runtime, build_test_runtime_with_paths, DaemonTestControls, DEFAULT_BIND_ADDR};
+use my_supervisor_app_daemon::{
+    build_runtime, build_test_runtime_with_paths, DaemonTestControls, DEFAULT_BIND_ADDR,
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, UnixListener};
 use tokio::sync::Notify;
@@ -27,7 +29,12 @@ async fn main() -> anyhow::Result<()> {
                 .test_config_path
                 .clone()
                 .unwrap_or_else(|| root.join("config.toml"));
-            let (assembled, controls) = build_test_runtime_with_paths(root.clone(), config_path).await?;
+            let (assembled, controls) = build_test_runtime_with_paths(
+                root.clone(),
+                config_path,
+                format!("http://{}", launch.bind_addr),
+            )
+            .await?;
             (assembled, Some(controls))
         }
         None => (build_runtime().await?, None),
@@ -43,6 +50,10 @@ async fn main() -> anyhow::Result<()> {
         .context("bootstrap (config load + scheduler arm + autostart)")?;
     let scheduler = tokio::spawn(facade.clone().run_scheduler_loop());
     let supervisor = tokio::spawn(facade.clone().run_process_supervisor_loop());
+    #[cfg(target_os = "macos")]
+    let observability = tokio::spawn(facade.clone().run_observability_loop(Arc::new(
+        my_supervisor_platform_macos::NotificationCenterDelivery::new(),
+    )));
 
     let listener = TcpListener::bind(launch.bind_addr)
         .await
@@ -59,6 +70,8 @@ async fn main() -> anyhow::Result<()> {
     facade.shutdown_all().await.context("shutdown drain")?;
     scheduler.await.context("scheduler join")?;
     supervisor.await.context("process supervisor join")?;
+    #[cfg(target_os = "macos")]
+    observability.await.context("observability worker join")?;
     Ok(())
 }
 
@@ -74,8 +87,10 @@ impl LaunchOptions {
         #[cfg(debug_assertions)]
         {
             let test_root = std::env::var_os("MSV_DAEMON_TEST_DATA_DIR").map(PathBuf::from);
-            let test_config_path = std::env::var_os("MSV_DAEMON_TEST_CONFIG_PATH").map(PathBuf::from);
-            let control_socket = std::env::var_os("MSV_DAEMON_TEST_CONTROL_SOCKET").map(PathBuf::from);
+            let test_config_path =
+                std::env::var_os("MSV_DAEMON_TEST_CONFIG_PATH").map(PathBuf::from);
+            let control_socket =
+                std::env::var_os("MSV_DAEMON_TEST_CONTROL_SOCKET").map(PathBuf::from);
             if (test_config_path.is_some() || control_socket.is_some()) && test_root.is_none() {
                 anyhow::bail!("MSV_DAEMON_TEST_* controls require MSV_DAEMON_TEST_DATA_DIR");
             }
@@ -83,11 +98,18 @@ impl LaunchOptions {
                 &std::env::var("MSV_DAEMON_TEST_BIND_ADDR")
                     .unwrap_or_else(|_| DEFAULT_BIND_ADDR.to_string()),
             )?;
-            return Ok(Self { bind_addr, test_root, test_config_path, control_socket });
+            Ok(Self {
+                bind_addr,
+                test_root,
+                test_config_path,
+                control_socket,
+            })
         }
         #[cfg(not(debug_assertions))]
         {
-            if std::env::vars_os().any(|(key, _)| key.to_string_lossy().starts_with("MSV_DAEMON_TEST_")) {
+            if std::env::vars_os()
+                .any(|(key, _)| key.to_string_lossy().starts_with("MSV_DAEMON_TEST_"))
+            {
                 anyhow::bail!("MSV_DAEMON_TEST_* controls are unavailable outside debug builds");
             }
             Ok(Self {
@@ -128,12 +150,17 @@ async fn serve_test_controls(socket_path: PathBuf, controls: DaemonTestControls)
         }
     };
     #[cfg(unix)]
-    if let Err(error) = std::fs::set_permissions(&socket_path, std::os::unix::fs::PermissionsExt::from_mode(0o600)) {
+    if let Err(error) = std::fs::set_permissions(
+        &socket_path,
+        std::os::unix::fs::PermissionsExt::from_mode(0o600),
+    ) {
         tracing::error!(%error, path = %socket_path.display(), "securing test control socket failed");
         return;
     }
     loop {
-        let Ok((mut stream, _)) = listener.accept().await else { return; };
+        let Ok((mut stream, _)) = listener.accept().await else {
+            return;
+        };
         let controls = controls.clone();
         tokio::spawn(async move {
             let mut bytes = [0_u8; 256];

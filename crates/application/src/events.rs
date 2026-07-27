@@ -4,7 +4,9 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use my_supervisor_core::domain::{JobRunId, ProcessState};
+use my_supervisor_core::domain::{
+    GuardStatus, JobRunId, ProcessDefinitionId, ProcessInstanceId, ProcessState,
+};
 use tokio::sync::Notify;
 use uuid::Uuid;
 
@@ -27,10 +29,23 @@ struct DeliveryReceipt {
 
 impl PublishedEvent {
     pub fn ordinary(event: DomainEvent) -> Self {
-        Self { event, event_id: None, occurred_at: None, receipt: None }
+        let is_process_observation = matches!(
+            event,
+            DomainEvent::ProcessStateChanged { .. } | DomainEvent::ProcessGuardChanged { .. }
+        );
+        Self {
+            event,
+            event_id: is_process_observation.then(Uuid::new_v4),
+            occurred_at: is_process_observation.then(Utc::now),
+            receipt: None,
+        }
     }
 
-    pub fn durable_terminal(event: DomainEvent, event_id: Uuid, occurred_at: DateTime<Utc>) -> Self {
+    pub fn durable_terminal(
+        event: DomainEvent,
+        event_id: Uuid,
+        occurred_at: DateTime<Utc>,
+    ) -> Self {
         Self {
             event,
             event_id: Some(event_id),
@@ -45,7 +60,9 @@ impl PublishedEvent {
     /// Called exclusively by an external transport after its write succeeds.
     pub fn complete_delivery(&self) {
         if let Some(receipt) = &self.receipt {
-            receipt.delivered.store(true, std::sync::atomic::Ordering::Release);
+            receipt
+                .delivered
+                .store(true, std::sync::atomic::Ordering::Release);
             receipt.notified.notify_waiters();
         }
     }
@@ -76,6 +93,16 @@ pub enum DomainEvent {
         name: String,
         from: ProcessState,
         to: ProcessState,
+        definition_id: ProcessDefinitionId,
+        instance_id: Option<ProcessInstanceId>,
+        generation: Option<u64>,
+    },
+    /// Additive guard observation. It exposes bounded, persisted evidence
+    /// without overloading lifecycle state transitions.
+    ProcessGuardChanged {
+        name: String,
+        definition_id: ProcessDefinitionId,
+        guard: GuardStatus,
     },
     JobRunScheduled {
         name: String,

@@ -5,7 +5,10 @@ use my_supervisor_core::ports::ProcessServiceRegistrar;
 use my_supervisor_platform_macos::LaunchdAgentProcess;
 
 fn temporary_directory() -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("my-supervisor-launchd-e2e-{}", uuid::Uuid::new_v4()))
+    std::env::temp_dir().join(format!(
+        "my-supervisor-launchd-e2e-{}",
+        uuid::Uuid::new_v4()
+    ))
 }
 
 #[tokio::test]
@@ -18,7 +21,9 @@ async fn launchd_registration_start_and_cleanup_leave_no_unit_or_plist() {
     spec.args = vec!["-c".into(), "sleep 30".into()];
     let registrar = LaunchdAgentProcess::new(directory.clone());
     let home = std::env::var("HOME").expect("GUI-session HOME is available");
-    let plist = std::path::PathBuf::from(home).join("Library/LaunchAgents").join(format!("{label}.plist"));
+    let plist = std::path::PathBuf::from(home)
+        .join("Library/LaunchAgents")
+        .join(format!("{label}.plist"));
     // SAFETY: getuid is a pure libc query.
     let target = format!("gui/{}/{}", unsafe { libc::getuid() }, label);
 
@@ -32,9 +37,11 @@ async fn launchd_registration_start_and_cleanup_leave_no_unit_or_plist() {
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
-        Err(my_supervisor_core::ports::RegistrarError::RegistrationFailed(
-            "launchd unit did not publish a PID".into(),
-        ))
+        Err(
+            my_supervisor_core::ports::RegistrarError::RegistrationFailed(
+                "launchd unit did not publish a PID".into(),
+            ),
+        )
     }
     .await;
 
@@ -49,6 +56,9 @@ async fn launchd_registration_start_and_cleanup_leave_no_unit_or_plist() {
 
     result.expect("launchd registration/start succeeds");
     cleanup.expect("launchd cleanup succeeds");
-    assert!(!print_status.success(), "removed launchd unit remains registered");
+    assert!(
+        !print_status.success(),
+        "removed launchd unit remains registered"
+    );
     assert!(plist_removed, "removed launchd plist remains on disk");
 }

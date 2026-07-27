@@ -5,7 +5,7 @@
  * wire-mapping layer; this adapter holds no domain logic.
  */
 
-import type { ProcessStatus } from "../shared/types";
+import type { JobStatus, ProcessStatus } from "../shared/types";
 import {
   createEventDeduper,
   type EventEnvelope,
@@ -15,28 +15,39 @@ import {
   OperationsError,
   type OperationsClient,
   type ProcessLogsTail,
+  type ResourcePage,
 } from "./operations-client";
 import {
   mapDaemonStatus,
   mapEventEnvelope,
   mapJobRun,
+  mapJobPreview,
   mapJobStatus,
   mapLogLine,
   mapProcessStatus,
+  mapProcessInstanceStatus,
+  mapProcessOperation,
 } from "./wire-mapping";
 import type {
   DaemonStatusDto,
   EventEnvelopeDto,
   JobConfigDto,
+  JobPreviewDto,
+  JobPreviewRequestDto,
   JobStatusDto,
+  JobPageDto,
   ListJobsDto,
   ListProcessesDto,
+  ProcessPageDto,
   ListRunsDto,
   LogDroppedFrameDto,
   LogLineDto,
   ProcessConfigDto,
   ProcessLogsDto,
   ProcessStatusDto,
+  ProcessInstancesDto,
+  ProcessOperationDto,
+  JobRunDto,
   TriggerJobDto,
 } from "./wire-types";
 
@@ -128,9 +139,32 @@ export function createHttpClient(): OperationsClient {
       return dto.processes.map(mapProcessStatus);
     },
 
+    async listProcessesPage(cursor, highWatermark, limit) {
+      const query = new URLSearchParams();
+      if (cursor) query.set("cursor", cursor);
+      if (highWatermark) query.set("high_watermark", highWatermark);
+      if (limit !== undefined) query.set("limit", String(limit));
+      const dto = await requestJson<ProcessPageDto>(`/api/v1/processes/page?${query}`);
+      const result: ResourcePage<ProcessStatus> = { records: dto.processes.map(mapProcessStatus), nextCursor: dto.next_cursor ?? undefined, highWatermark: dto.high_watermark, partial: dto.partial ?? false, failedPartitions: dto.failed_partitions ?? [] };
+      return result;
+    },
+
     async getProcess(name) {
       const dto = await requestJson<ProcessStatusDto>(`/api/v1/processes/${encode(name)}`);
       return mapProcessStatus(dto);
+    },
+
+    async processInstances(name) {
+      const dto = await requestJson<ProcessInstancesDto>(`/api/v1/processes/${encode(name)}/instances`);
+      return { name: dto.name, desiredInstances: dto.desired_instances, instances: dto.instances.map(mapProcessInstanceStatus) };
+    },
+
+    async scaleProcess(name, instances, operationId) {
+      return mapProcessOperation(await requestJson<ProcessOperationDto>(`/api/v1/processes/${encode(name)}/scale`, { method: "POST", headers: operationId ? { "Idempotency-Key": operationId } : undefined, body: JSON.stringify({ instances, operation_id: operationId }) }));
+    },
+
+    async rollingRestartProcess(name, operationId) {
+      return mapProcessOperation(await requestJson<ProcessOperationDto>(`/api/v1/processes/${encode(name)}/rolling-restart`, { method: "POST", headers: operationId ? { "Idempotency-Key": operationId } : undefined, body: JSON.stringify({ operation_id: operationId }) }));
     },
 
     async addProcess(config: ProcessConfigDto) {
@@ -184,6 +218,8 @@ export function createHttpClient(): OperationsClient {
         lines,
         truncated: dto.truncated,
         droppedCount: dto.dropped_count,
+        earliestRetainedSequence: dto.earliest_retained_sequence ?? undefined,
+        cursorExpired: dto.cursor_expired ?? false,
       };
       return result;
     },
@@ -287,12 +323,34 @@ export function createHttpClient(): OperationsClient {
       return dto.jobs.map(mapJobStatus);
     },
 
+    async listJobsPage(cursor, highWatermark, limit) {
+      const query = new URLSearchParams();
+      if (cursor) query.set("cursor", cursor);
+      if (highWatermark) query.set("high_watermark", highWatermark);
+      if (limit !== undefined) query.set("limit", String(limit));
+      const dto = await requestJson<JobPageDto>(`/api/v1/jobs/page?${query}`);
+      const result: ResourcePage<JobStatus> = { records: dto.jobs.map(mapJobStatus), nextCursor: dto.next_cursor ?? undefined, highWatermark: dto.high_watermark, partial: dto.partial ?? false, failedPartitions: dto.failed_partitions ?? [] };
+      return result;
+    },
+
+    async getJob(name) {
+      return mapJobStatus(await requestJson<JobStatusDto>(`/api/v1/jobs/${encode(name)}`));
+    },
+
     async addJob(config: JobConfigDto) {
       const dto = await requestJson<JobStatusDto>("/api/v1/jobs", {
         method: "POST",
         body: JSON.stringify(config),
       });
       return mapJobStatus(dto);
+    },
+
+    async updateJob(name, config) {
+      return mapJobStatus(await requestJson<JobStatusDto>(`/api/v1/jobs/${encode(name)}`, { method: "PATCH", body: JSON.stringify(config) }));
+    },
+
+    async previewJob(request: JobPreviewRequestDto) {
+      return mapJobPreview(await requestJson<JobPreviewDto>("/api/v1/jobs/preview", { method: "POST", body: JSON.stringify(request) }));
     },
 
     async removeJob(name, force = false) {
@@ -318,6 +376,14 @@ export function createHttpClient(): OperationsClient {
         truncated: dto.truncated,
       };
       return result;
+    },
+
+    async getRun(name, runId) {
+      return mapJobRun(await requestJson<JobRunDto>(`/api/v1/jobs/${encode(name)}/runs/${encode(runId)}`));
+    },
+
+    async cancelRun(name, runId) {
+      await requestNoContent(`/api/v1/jobs/${encode(name)}/runs/${encode(runId)}/cancel`, { method: "POST" });
     },
 
     async daemonStatus() {

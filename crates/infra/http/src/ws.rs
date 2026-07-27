@@ -5,7 +5,7 @@
 use std::convert::Infallible;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{FromRequestParts, Path, Query, State};
+use axum::extract::{Extension, FromRequestParts, Path, Query, State};
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -13,10 +13,11 @@ use futures_util::{SinkExt, StreamExt};
 use serde_json::json;
 use tokio::sync::broadcast;
 
-use my_supervisor_application::{DomainEvent, PublishedEvent};
 use my_supervisor_application::views::LogPage;
+use my_supervisor_application::{DomainEvent, PublishedEvent};
 use my_supervisor_core::domain::LogLine;
 
+use crate::auth::{AuthSession, AuthVerifier};
 use crate::error::HttpError;
 use crate::handlers::{Facade, LogQuery};
 use crate::mapping::{log_line_to_dto, log_page_to_dto, process_state_to_dto};
@@ -47,13 +48,18 @@ pub async fn process_logs(
     Path(name): Path<String>,
     Query(q): Query<LogQuery>,
     MaybeWs(upgrade): MaybeWs,
+    Extension(session): Extension<AuthSession>,
+    Extension(auth): Extension<AuthVerifier>,
 ) -> Result<Response, HttpError> {
     if let Some(upgrade) = upgrade {
         let rx = f.subscribe_process_logs(&name).await?;
         // Subscribe before taking the snapshot.  The high-watermark filter in
         // `forward_logs` then turns this into one no-gap boundary.
         let page = process_log_page(&f, &name, &q).await?;
-        Ok(upgrade.on_upgrade(move |socket| forward_logs(socket, page, rx)))
+        let generation = auth.generation_receiver();
+        Ok(upgrade.on_upgrade(move |socket| {
+            forward_logs(socket, page, rx, generation, session.generation)
+        }))
     } else {
         let page = process_log_page(&f, &name, &q).await?;
         Ok(Json(log_page_to_dto(page)).into_response())
@@ -66,6 +72,8 @@ pub async fn run_logs(
     Path((name, run_id)): Path<(String, String)>,
     Query(q): Query<LogQuery>,
     MaybeWs(upgrade): MaybeWs,
+    Extension(session): Extension<AuthSession>,
+    Extension(auth): Extension<AuthVerifier>,
 ) -> Result<Response, HttpError> {
     let rid = crate::handlers::parse_run_id(&run_id)?;
     // Confirm the run exists so a bad id closes cleanly rather than hanging.
@@ -73,21 +81,45 @@ pub async fn run_logs(
     if let Some(upgrade) = upgrade {
         let rx = f.subscribe_run_logs(rid);
         let page = run_log_page(&f, &name, rid, &q).await?;
-        Ok(upgrade.on_upgrade(move |socket| forward_logs(socket, page, rx)))
+        let generation = auth.generation_receiver();
+        Ok(upgrade.on_upgrade(move |socket| {
+            forward_logs(socket, page, rx, generation, session.generation)
+        }))
     } else {
         Ok(Json(log_page_to_dto(run_log_page(&f, &name, rid, &q).await?)).into_response())
     }
 }
 
 /// `WS /api/v1/events` — global event stream.
-pub async fn events(State(f): State<Facade>, upgrade: WebSocketUpgrade) -> Response {
+pub async fn events(
+    State(f): State<Facade>,
+    Extension(auth): Extension<AuthVerifier>,
+    Extension(session): Extension<AuthSession>,
+    upgrade: WebSocketUpgrade,
+) -> Response {
     let rx = f.subscribe_events();
-    upgrade.on_upgrade(move |socket| forward_events(socket, rx))
+    let generation = auth.generation_receiver();
+    let delivery_facade = f.clone();
+    let response = upgrade
+        .on_upgrade(move |socket| forward_events(socket, rx, generation, session.generation));
+    tokio::spawn(async move {
+        delivery_facade.retry_pending_terminal_events().await;
+    });
+    response
 }
 
-async fn process_log_page(facade: &Facade, name: &str, query: &LogQuery) -> Result<LogPage, HttpError> {
+async fn process_log_page(
+    facade: &Facade,
+    name: &str,
+    query: &LogQuery,
+) -> Result<LogPage, HttpError> {
     let page = facade
-        .process_logs_with_cursor(name, query.tail.unwrap_or(100).min(10_000), query.since, query.after_sequence)
+        .process_logs_with_cursor(
+            name,
+            query.tail.unwrap_or(100).min(10_000),
+            query.since,
+            query.after_sequence,
+        )
         .await?;
     Ok(page)
 }
@@ -113,6 +145,8 @@ async fn forward_logs(
     socket: WebSocket,
     page: LogPage,
     mut rx: broadcast::Receiver<LogLine>,
+    mut generation: tokio::sync::watch::Receiver<u64>,
+    authenticated_generation: u64,
 ) {
     let (mut sender, mut receiver) = socket.split();
     let mut last_sequence = page.lines.last().map(|line| line.sequence).unwrap_or(0);
@@ -151,11 +185,21 @@ async fn forward_logs(
                 Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
                 _ => {}
             },
+            changed = generation.changed() => {
+                if changed.is_err() || *generation.borrow() != authenticated_generation {
+                    break;
+                }
+            },
         }
     }
 }
 
-async fn forward_events(socket: WebSocket, mut rx: broadcast::Receiver<PublishedEvent>) {
+async fn forward_events(
+    socket: WebSocket,
+    mut rx: broadcast::Receiver<PublishedEvent>,
+    mut generation: tokio::sync::watch::Receiver<u64>,
+    authenticated_generation: u64,
+) {
     let (mut sender, mut receiver) = socket.split();
     loop {
         tokio::select! {
@@ -177,6 +221,11 @@ async fn forward_events(socket: WebSocket, mut rx: broadcast::Receiver<Published
                 Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
                 _ => {}
             },
+            changed = generation.changed() => {
+                if changed.is_err() || *generation.borrow() != authenticated_generation {
+                    break;
+                }
+            },
         }
     }
 }
@@ -187,12 +236,34 @@ async fn forward_events(socket: WebSocket, mut rx: broadcast::Receiver<Published
 /// transport-equivalent to the HTTP WebSocket stream.
 pub fn event_to_wire(published: &PublishedEvent) -> serde_json::Value {
     let (event_type, payload) = match &published.event {
-        DomainEvent::ProcessStateChanged { name, from, to } => (
+        DomainEvent::ProcessStateChanged {
+            name,
+            from,
+            to,
+            definition_id,
+            instance_id,
+            generation,
+        } => (
             "process.state_changed",
             json!({
                 "name": name,
                 "from": process_state_to_dto(*from),
                 "to": process_state_to_dto(*to),
+                "definition_id": definition_id.0.to_string(),
+                "instance_id": instance_id.map(|id| id.0.to_string()),
+                "generation": generation,
+            }),
+        ),
+        DomainEvent::ProcessGuardChanged {
+            name,
+            definition_id,
+            guard,
+        } => (
+            "process.guard_changed",
+            json!({
+                "name": name,
+                "definition_id": definition_id.0.to_string(),
+                "guard": crate::mapping::guard_status_to_dto(guard.clone()),
             }),
         ),
         DomainEvent::JobRunScheduled { name, run_id } => (

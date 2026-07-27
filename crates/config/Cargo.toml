@@ -9,4 +9,6 @@ my-supervisor-core = { workspace = true }
 my-supervisor-shared = { workspace = true }
 async-trait = { workspace = true }
 toml = { workspace = true }
+iana-time-zone = { workspace = true }
+uuid = { workspace = true }
 tokio = { version = "1", default-features = false, features = ["fs", "sync"] }

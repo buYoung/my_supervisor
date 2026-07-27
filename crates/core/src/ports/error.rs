@@ -19,6 +19,10 @@ pub enum RepoError {
 pub enum SchedulerError {
     #[error("invalid cron expression: {0}")]
     InvalidCron(String),
+    #[error("invalid or unavailable timezone: {0}")]
+    InvalidTimezone(String),
+    #[error("schedule preview is bounded or unsatisfiable: {0}")]
+    PreviewBounded(String),
     #[error("scheduler error: {0}")]
     Backend(String),
 }

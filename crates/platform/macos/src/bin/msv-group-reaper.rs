@@ -10,8 +10,8 @@ use std::os::{fd::FromRawFd, unix::ffi::OsStringExt};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use my_supervisor_platform_macos::process_identity::{snapshot, verify_group_leader};
 use my_supervisor_core::ports::SignalError;
+use my_supervisor_platform_macos::process_identity::{snapshot, verify_group_leader};
 
 const GRACE_PERIOD: Duration = Duration::from_secs(2);
 const GROUP_EXIT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -34,10 +34,20 @@ fn read_line(stream: &mut std::os::unix::net::UnixStream) -> std::io::Result<Opt
     loop {
         match stream.read(&mut byte) {
             Ok(0) if bytes.is_empty() => return Ok(None),
-            Ok(0) => return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "partial control message")),
-            Ok(_) if byte[0] == b'\n' => return String::from_utf8(bytes)
-                .map(Some)
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "control message is not UTF-8")),
+            Ok(0) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "partial control message",
+                ))
+            }
+            Ok(_) if byte[0] == b'\n' => {
+                return String::from_utf8(bytes).map(Some).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "control message is not UTF-8",
+                    )
+                })
+            }
             Ok(_) => bytes.push(byte[0]),
             Err(error) => return Err(error),
         }
@@ -70,21 +80,31 @@ fn parse_identity(message: &str, expected_message: &str) -> Result<GroupIdentity
         return Err("invalid target group identity".into());
     }
     let journal = match (expected_message, parts.next()) {
-        ("ANCHOR", Some(encoded)) => Some(PathBuf::from(std::ffi::OsString::from_vec(decode_path(encoded)?))),
+        ("ANCHOR", Some(encoded)) => Some(PathBuf::from(std::ffi::OsString::from_vec(
+            decode_path(encoded)?,
+        ))),
         ("ANCHOR", None) => return Err("missing detached journal path".into()),
         (_, None) => None,
         _ => return Err("unexpected detached journal path".into()),
     };
-    Ok(GroupIdentity { pid, pgid, generation, journal })
+    Ok(GroupIdentity {
+        pid,
+        pgid,
+        generation,
+        journal,
+    })
 }
 
 fn decode_path(encoded: &str) -> Result<Vec<u8>, String> {
-    if encoded.len() % 2 != 0 {
+    if !encoded.len().is_multiple_of(2) {
         return Err("invalid detached journal path encoding".into());
     }
     (0..encoded.len())
         .step_by(2)
-        .map(|offset| u8::from_str_radix(&encoded[offset..offset + 2], 16).map_err(|_| "invalid detached journal path encoding".into()))
+        .map(|offset| {
+            u8::from_str_radix(&encoded[offset..offset + 2], 16)
+                .map_err(|_| "invalid detached journal path encoding".into())
+        })
         .collect()
 }
 
@@ -107,7 +127,9 @@ fn signal_group(pgid: u32, signal: i32) -> Result<bool, SignalError> {
     match std::io::Error::last_os_error().raw_os_error() {
         Some(libc::ESRCH) => Ok(false),
         Some(libc::EPERM) => Err(SignalError::PermissionDenied),
-        _ => Err(SignalError::IoFailure(std::io::Error::last_os_error().to_string())),
+        _ => Err(SignalError::IoFailure(
+            std::io::Error::last_os_error().to_string(),
+        )),
     }
 }
 
@@ -118,7 +140,9 @@ fn wait_for_group_exit(pgid: u32) -> Result<(), SignalError> {
             return Ok(());
         }
         if Instant::now() >= deadline {
-            return Err(SignalError::IoFailure(format!("process group {pgid} remained after detached cleanup")));
+            return Err(SignalError::IoFailure(format!(
+                "process group {pgid} remained after detached cleanup"
+            )));
         }
         std::thread::sleep(Duration::from_millis(25));
     }
@@ -146,8 +170,33 @@ fn remove_failed_journal(identity: &GroupIdentity) -> Result<(), SignalError> {
     match std::fs::remove_file(journal) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(SignalError::IoFailure(format!("removing failed detached journal {}: {error}", journal.display()))),
+        Err(error) => Err(SignalError::IoFailure(format!(
+            "removing failed detached journal {}: {error}",
+            journal.display()
+        ))),
     }
+}
+
+#[cfg(debug_assertions)]
+fn test_flags(args: impl Iterator<Item = std::ffi::OsString>) -> (bool, bool) {
+    let mut withhold_takeover_ack = false;
+    let mut crash_after_start = false;
+    for argument in args {
+        match argument.to_string_lossy().as_ref() {
+            "--test-withhold-takeover-ack" => withhold_takeover_ack = true,
+            "--test-crash-after-start" => crash_after_start = true,
+            _ => usage(),
+        }
+    }
+    (withhold_takeover_ack, crash_after_start)
+}
+
+#[cfg(not(debug_assertions))]
+fn test_flags(args: impl Iterator<Item = std::ffi::OsString>) -> (bool, bool) {
+    for _ in args {
+        usage();
+    }
+    (false, false)
 }
 
 fn main() {
@@ -160,25 +209,7 @@ fn main() {
         .and_then(|value| value.to_string_lossy().parse::<i32>().ok())
         .filter(|value| *value >= 0)
         .unwrap_or_else(|| usage());
-    let mut withhold_takeover_ack = false;
-    let mut crash_after_start = false;
-    while let Some(argument) = args.next() {
-        match argument.to_string_lossy().as_ref() {
-            "--test-withhold-takeover-ack" => {
-                #[cfg(debug_assertions)]
-                { withhold_takeover_ack = true; }
-                #[cfg(not(debug_assertions))]
-                usage();
-            }
-            "--test-crash-after-start" => {
-                #[cfg(debug_assertions)]
-                { crash_after_start = true; }
-                #[cfg(not(debug_assertions))]
-                usage();
-            }
-            _ => usage(),
-        }
-    }
+    let (withhold_takeover_ack, crash_after_start) = test_flags(args);
     // SAFETY: `descriptor` is an inherited Unix-domain socket supplied only by
     // `spawn_detached_child`; this process becomes its sole owner after exec.
     let mut control = unsafe { std::os::unix::net::UnixStream::from_raw_fd(descriptor) };
@@ -213,7 +244,9 @@ fn main() {
                 if identity.pgid != proxy_identity.pgid {
                     return Err("anchor process group differs from proxy group".into());
                 }
-                verify_anchor(&identity).map(|_| identity).map_err(|error| error.to_string())
+                verify_anchor(&identity)
+                    .map(|_| identity)
+                    .map_err(|error| error.to_string())
             }) {
                 Ok(identity) => identity,
                 Err(error) => {

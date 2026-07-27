@@ -24,6 +24,8 @@ pub struct LogPage {
     pub dropped_count: u64,
     pub high_watermark: u64,
     pub next_sequence: u64,
+    pub earliest_retained_sequence: Option<u64>,
+    pub cursor_expired: bool,
 }
 
 /// Daemon identity + live counts.
@@ -67,4 +69,15 @@ pub enum RestartOutcome {
 pub enum ConvertTarget {
     Direct,
     SystemRegistered,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobPreviewOccurrence {
+    pub scheduled_at: DateTime<Utc>,
+    pub local_time: String,
+    pub timezone: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobPreview {
+    pub occurrences: Vec<JobPreviewOccurrence>,
 }

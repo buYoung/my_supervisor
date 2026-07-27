@@ -1,7 +1,7 @@
 //! Log domain values shared by process and job-run capture.
 
-use chrono::{DateTime, Utc};
 use crate::domain::JobRunId;
+use chrono::{DateTime, Utc};
 
 /// Which stream a captured line came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

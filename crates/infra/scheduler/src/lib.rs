@@ -9,11 +9,12 @@ use std::time::Duration as StdDuration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
 use croner::Cron;
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 
-use my_supervisor_core::domain::JobTrigger;
+use my_supervisor_core::domain::{Job, JobTrigger, ScheduleOccurrence};
 use my_supervisor_core::ports::error::SchedulerError;
 use my_supervisor_core::ports::scheduler::{
     ScheduleEvent, ScheduledJob, Scheduler, SchedulerSnapshot,
@@ -60,18 +61,31 @@ fn parse_cron(expr: &str) -> Result<Cron, SchedulerError> {
         .map_err(|e| SchedulerError::InvalidCron(format!("{e}")))
 }
 
-fn next_cron(cron: &Cron, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
-    cron.find_next_occurrence(&after, false).ok()
+fn next_cron(cron: &Cron, after: DateTime<Utc>, timezone: &str) -> Option<DateTime<Utc>> {
+    let timezone: Tz = timezone.parse().ok()?;
+    cron.find_next_occurrence(&after.with_timezone(&timezone), false)
+        .ok()
+        .map(|value| value.with_timezone(&Utc))
 }
 
 /// Compute the next fire time for any trigger (pure).
-fn next_for(trigger: &JobTrigger, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
+fn next_for_in_timezone(
+    trigger: &JobTrigger,
+    after: DateTime<Utc>,
+    timezone: &str,
+) -> Option<DateTime<Utc>> {
     match trigger {
-        JobTrigger::Cron(expr) => parse_cron(expr).ok().and_then(|c| next_cron(&c, after)),
+        JobTrigger::Cron(expr) => parse_cron(expr)
+            .ok()
+            .and_then(|c| next_cron(&c, after, timezone)),
         JobTrigger::Interval(dur) => chrono::Duration::from_std(*dur).ok().map(|d| after + d),
         JobTrigger::OneShot(at) => (*at > after).then_some(*at),
         JobTrigger::DependsOn(_) => None,
     }
+}
+
+fn next_for(trigger: &JobTrigger, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    next_for_in_timezone(trigger, after, "UTC")
 }
 
 /// Sleep until `target`, but no longer than `MAX_SLEEP` per hop so the timer
@@ -115,8 +129,14 @@ impl Scheduler for TokioScheduler {
                 sleep_until(next).await;
                 if event_sender
                     .send(ScheduleEvent {
-                    job_name: name.clone(),
-                    scheduled_at: next,
+                        job_name: name.clone(),
+                        scheduled_at: next,
+                        occurrence: ScheduleOccurrence {
+                            trigger_id: uuid::Uuid::nil(),
+                            schedule_revision: 0,
+                            scheduled_at: next,
+                            attempt: 1,
+                        },
                     })
                     .is_err()
                 {
@@ -131,6 +151,55 @@ impl Scheduler for TokioScheduler {
             .lock()
             .unwrap()
             .insert(job_name.to_string(), handle);
+        Ok(())
+    }
+
+    async fn register_job(&self, job: &Job) -> Result<(), SchedulerError> {
+        if let JobTrigger::Cron(expr) = &job.trigger {
+            parse_cron(expr)?;
+            if job.timezone.parse::<Tz>().is_err() {
+                return Err(SchedulerError::InvalidTimezone(job.timezone.clone()));
+            }
+        }
+        self.abort(&job.name);
+        self.triggers
+            .lock()
+            .unwrap()
+            .insert(job.name.clone(), job.trigger.clone());
+        if matches!(job.trigger, JobTrigger::DependsOn(_)) {
+            return Ok(());
+        }
+        let event_sender = self.event_sender.clone();
+        let name = job.name.clone();
+        let trigger = job.trigger.clone();
+        let timezone = job.timezone.clone();
+        let trigger_id = job.trigger_id;
+        let schedule_revision = job.schedule_revision;
+        let handle = tokio::spawn(async move {
+            while let Some(next) = next_for_in_timezone(&trigger, Utc::now(), &timezone) {
+                sleep_until(next).await;
+                let occurrence = ScheduleOccurrence {
+                    trigger_id,
+                    schedule_revision,
+                    scheduled_at: next,
+                    attempt: 1,
+                };
+                if event_sender
+                    .send(ScheduleEvent {
+                        job_name: name.clone(),
+                        scheduled_at: next,
+                        occurrence,
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+                if matches!(trigger, JobTrigger::OneShot(_)) {
+                    break;
+                }
+            }
+        });
+        self.timers.lock().unwrap().insert(job.name.clone(), handle);
         Ok(())
     }
 
@@ -168,6 +237,35 @@ impl Scheduler for TokioScheduler {
 
     fn next_run(&self, trigger: &JobTrigger, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
         next_for(trigger, after)
+    }
+
+    fn preview(
+        &self,
+        job: &Job,
+        after: DateTime<Utc>,
+        count: u16,
+    ) -> Result<Vec<DateTime<Utc>>, SchedulerError> {
+        if count > 100 {
+            return Err(SchedulerError::PreviewBounded("count exceeds 100".into()));
+        }
+        if job.timezone.parse::<Tz>().is_err() {
+            return Err(SchedulerError::InvalidTimezone(job.timezone.clone()));
+        }
+        let mut results = Vec::with_capacity(count as usize);
+        let mut cursor = after;
+        for _ in 0..count {
+            let Some(next) = next_for_in_timezone(&job.trigger, cursor, &job.timezone) else {
+                break;
+            };
+            if next - after > chrono::Duration::days(365 * 5) {
+                return Err(SchedulerError::PreviewBounded(
+                    "search horizon exceeds 5 years".into(),
+                ));
+            }
+            results.push(next);
+            cursor = next;
+        }
+        Ok(results)
     }
 
     async fn next_event(&self) -> Option<ScheduleEvent> {

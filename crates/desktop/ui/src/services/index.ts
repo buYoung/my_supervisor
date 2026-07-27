@@ -18,6 +18,7 @@ export type {
   JobRunsResult,
   OperationsClient,
   ProcessLogsTail,
+  ResourcePage,
 } from "./operations-client";
 
 /** True when running inside a Tauri webview (the production path). */

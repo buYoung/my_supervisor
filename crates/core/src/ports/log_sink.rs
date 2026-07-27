@@ -8,8 +8,8 @@ use tokio::sync::broadcast;
 use crate::domain::{JobRunId, LogLine};
 use crate::ports::error::LogError;
 
-/// Result of a tail read: the returned lines plus whether older matching lines
-/// were dropped by the `limit`.
+/// Result of a tail read: returned lines, page-limit truncation, and the
+/// independent retained-history cursor boundary.
 #[derive(Debug, Clone, Default)]
 pub struct LogTail {
     pub lines: Vec<LogLine>,
@@ -18,6 +18,12 @@ pub struct LogTail {
     pub high_watermark: u64,
     /// Cursor a consumer should use to ask for lines after this page.
     pub next_sequence: u64,
+    /// The first sequence that retention still guarantees is readable.
+    /// `None` means the journal has no retained entries yet.
+    pub earliest_retained_sequence: Option<u64>,
+    /// The requested numeric cursor predates retained history.  This is
+    /// deliberately distinct from page-limit truncation and live lag.
+    pub cursor_expired: bool,
 }
 
 #[async_trait]

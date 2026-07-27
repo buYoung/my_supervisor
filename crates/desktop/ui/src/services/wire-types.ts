@@ -15,6 +15,22 @@ export type ManagementModeDto =
 /** Target mode for `POST /api/v1/processes/{name}/convert` (docs/API.md §2). */
 export type ConvertTargetDto = "direct" | "system_registered";
 
+export type GuardStateDto = "unknown" | "healthy" | "unhealthy" | "unsupported";
+export type GuardRestartCauseDto = "watch_changed" | "memory_ceiling" | "liveness_failure";
+
+export interface GuardStatusDto {
+  process_id: string;
+  native_generation: string | null;
+  observed_at: string;
+  liveness: GuardStateDto;
+  readiness: GuardStateDto;
+  memory: GuardStateDto;
+  watch: GuardStateDto;
+  last_restart_cause: GuardRestartCauseDto | null;
+  last_error: string | null;
+  is_historical: boolean;
+}
+
 export interface ProcessStatusDto {
   name: string;
   state: ProcessState;
@@ -25,16 +41,41 @@ export interface ProcessStatusDto {
   started_at: string | null;
   cpu_percent: number;
   memory_bytes: number;
+  /** Absent when connected to an older daemon. */
+  guard?: GuardStatusDto;
 }
 
 export interface ListProcessesDto {
   processes: ProcessStatusDto[];
+}
+export interface ProcessPageDto { processes: ProcessStatusDto[]; next_cursor?: string | null; high_watermark: string; partial?: boolean; failed_partitions?: string[]; }
+
+export interface ProcessInstanceStatusDto {
+  instance_id: string;
+  ordinal: number;
+  generation: number;
+  state: ProcessState;
+  pid: number | null;
+  restart_count: number;
+  started_at: string | null;
+  cpu_percent: number;
+  memory_bytes: number;
+}
+
+export interface ProcessInstancesDto { name: string; desired_instances: number; instances: ProcessInstanceStatusDto[]; }
+export interface ProcessOperationDto {
+  operation_id: string; name: string; kind: string; target_instances?: number; phase: string; batch: number; completed: boolean;
+  outcomes: Array<{ instance_id: string; ordinal: number; state: "completed" | "failed" | "not_attempted" | "superseded"; failed_stage?: string; retryable: boolean }>;
 }
 
 export interface ProcessLogsDto {
   lines: LogLineDto[];
   truncated: boolean;
   dropped_count: number;
+  /** Absent when connected to an older daemon. */
+  earliest_retained_sequence?: number | null;
+  /** Absent when connected to an older daemon. */
+  cursor_expired?: boolean;
 }
 
 export interface JobRunSummaryDto {
@@ -52,11 +93,14 @@ export interface JobStatusDto {
   next_run_at?: string;
   success_rate_recent?: number;
   dependencies: { upstream: string[]; downstream: string[] };
+  timezone?: string;
+  misfire_policy?: "skip" | "run_once" | "catch_up";
 }
 
 export interface ListJobsDto {
   jobs: JobStatusDto[];
 }
+export interface JobPageDto { jobs: JobStatusDto[]; next_cursor?: string | null; high_watermark: string; partial?: boolean; failed_partitions?: string[]; }
 
 export type TriggeredByDto =
   | { type: "schedule" }
@@ -82,6 +126,9 @@ export interface ListRunsDto {
 export interface TriggerJobDto {
   run_id: string;
 }
+
+export interface JobPreviewRequestDto { config: JobConfigDto; at: string; count?: number; }
+export interface JobPreviewDto { occurrences: Array<{ scheduled_at: string; local_time: string; timezone: string }>; }
 
 export interface DaemonStatusDto {
   version: string;

@@ -5,8 +5,7 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
-use my_supervisor_app_daemon::build_deps_with_paths;
-use my_supervisor_infra_http::assemble;
+use my_supervisor_app_daemon::build_test_runtime_with_paths;
 use tokio::io::AsyncReadExt;
 use tokio::process::Child;
 use tokio::sync::oneshot;
@@ -23,12 +22,19 @@ struct EphemeralDaemon {
 
 impl EphemeralDaemon {
     async fn start(root: &Path) -> Self {
-        let assembled = assemble(
-            build_deps_with_paths(root.join("daemon-data"), root.join("daemon-config.toml"))
-                .await
-                .expect("daemon dependencies assemble"),
-        );
-        assembled.facade.bootstrap().await.expect("daemon bootstrap");
+        let (assembled, _) = build_test_runtime_with_paths(
+            root.join("daemon-data"),
+            root.join("daemon-config.toml"),
+            my_supervisor_app_daemon::DEFAULT_BASE_URL.to_owned(),
+        )
+        .await
+        .expect("daemon runtime assembles");
+        std::env::set_var("MSV_DAEMON_TEST_DATA_DIR", root.join("daemon-data"));
+        assembled
+            .facade
+            .bootstrap()
+            .await
+            .expect("daemon bootstrap");
         let facade = assembled.facade;
         let scheduler = tokio::spawn(facade.clone().run_scheduler_loop());
         let supervisor = tokio::spawn(facade.clone().run_process_supervisor_loop());
@@ -60,7 +66,9 @@ impl EphemeralDaemon {
         let router = self.router.clone();
         self.server = Some(tokio::spawn(async move {
             axum::serve(listener, router)
-                .with_graceful_shutdown(async { let _ = receiver.await; })
+                .with_graceful_shutdown(async {
+                    let _ = receiver.await;
+                })
                 .await
                 .expect("ephemeral daemon serves");
         }));
@@ -78,7 +86,10 @@ impl EphemeralDaemon {
 
     async fn stop(mut self) {
         self.stop_transport().await;
-        self.facade.shutdown_all().await.expect("daemon drains work");
+        self.facade
+            .shutdown_all()
+            .await
+            .expect("daemon drains work");
         self.scheduler.await.expect("scheduler joins");
         self.supervisor.await.expect("supervisor joins");
     }
@@ -89,7 +100,9 @@ fn temporary_directory() -> PathBuf {
 }
 
 async fn write_config(path: &Path, contents: &str) {
-    tokio::fs::write(path, contents).await.expect("configuration writes");
+    tokio::fs::write(path, contents)
+        .await
+        .expect("configuration writes");
 }
 
 async fn cli(url: &str, args: &[&str]) -> std::process::Output {
@@ -121,12 +134,18 @@ async fn start_follow(url: &str, args: &[&str]) -> FollowChild {
         child,
         stdout: tokio::spawn(async move {
             let mut output = Vec::new();
-            stdout.read_to_end(&mut output).await.expect("follow stdout reads");
+            stdout
+                .read_to_end(&mut output)
+                .await
+                .expect("follow stdout reads");
             output
         }),
         stderr: tokio::spawn(async move {
             let mut output = Vec::new();
-            stderr.read_to_end(&mut output).await.expect("follow stderr reads");
+            stderr
+                .read_to_end(&mut output)
+                .await
+                .expect("follow stderr reads");
             output
         }),
     }
@@ -135,7 +154,11 @@ async fn start_follow(url: &str, args: &[&str]) -> FollowChild {
 async fn interrupt_follow(mut follow: FollowChild) -> std::process::Output {
     let pid = follow.child.id().expect("follow child has PID") as i32;
     // SAFETY: PID belongs to the child process just spawned by this test.
-    assert_eq!(unsafe { libc::kill(pid, libc::SIGINT) }, 0, "SIGINT reaches msv follow");
+    assert_eq!(
+        unsafe { libc::kill(pid, libc::SIGINT) },
+        0,
+        "SIGINT reaches msv follow"
+    );
     let status = tokio::time::timeout(Duration::from_secs(10), follow.child.wait())
         .await
         .expect("msv follow exits after SIGINT")
@@ -177,7 +200,10 @@ async fn wait_for_process_group_exit(process_group: u32) {
     for _ in 0..100 {
         // SAFETY: this test owns the Direct process group recorded by its leader.
         if unsafe { libc::kill(-(process_group as i32), 0) } != 0 {
-            assert_eq!(std::io::Error::last_os_error().raw_os_error(), Some(libc::ESRCH));
+            assert_eq!(
+                std::io::Error::last_os_error().raw_os_error(),
+                Some(libc::ESRCH)
+            );
             return;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -203,26 +229,54 @@ fn json_lines(output: &str, expected_count: usize, first_line: &str, last_line: 
     let lines = output
         .lines()
         .map(|line| {
-            serde_json::from_str::<serde_json::Value>(line)
-                .unwrap_or_else(|error| panic!("follow emits one JSON object per line; invalid row {line:?}: {error}"))
+            serde_json::from_str::<serde_json::Value>(line).unwrap_or_else(|error| {
+                panic!("follow emits one JSON object per line; invalid row {line:?}: {error}")
+            })
         })
         .collect::<Vec<_>>();
-    assert_eq!(lines.len(), expected_count, "follow emits every expected JSONL row");
+    assert_eq!(
+        lines.len(),
+        expected_count,
+        "follow emits every expected JSONL row"
+    );
     let sequences = lines
         .iter()
-        .map(|line| line["sequence"].as_u64().expect("log row has a numeric sequence"))
+        .map(|line| {
+            line["sequence"]
+                .as_u64()
+                .expect("log row has a numeric sequence")
+        })
         .collect::<Vec<_>>();
-    assert!(sequences.iter().all(|sequence| *sequence > 0), "log sequence never uses compatibility zero");
-    assert!(sequences.windows(2).all(|pair| pair[0] < pair[1]), "log sequence is unique and strictly increasing");
-    assert_eq!(lines.first().and_then(|line| line["line"].as_str()), Some(first_line));
-    assert_eq!(lines.last().and_then(|line| line["line"].as_str()), Some(last_line));
+    assert!(
+        sequences.iter().all(|sequence| *sequence > 0),
+        "log sequence never uses compatibility zero"
+    );
+    assert!(
+        sequences.windows(2).all(|pair| pair[0] < pair[1]),
+        "log sequence is unique and strictly increasing"
+    );
+    assert_eq!(
+        lines.first().and_then(|line| line["line"].as_str()),
+        Some(first_line)
+    );
+    assert_eq!(
+        lines.last().and_then(|line| line["line"].as_str()),
+        Some(last_line)
+    );
 }
 
 fn assert_failed_command(output: &std::process::Output, expected_code: &str) {
-    assert_eq!(output.status.code(), Some(1), "command keeps the documented general failure exit code");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "command keeps the documented general failure exit code"
+    );
     assert!(output.stdout.is_empty(), "failed command writes no stdout");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains(expected_code), "stderr contains the stable API error code: {stderr}");
+    assert!(
+        stderr.contains(expected_code),
+        "stderr contains the stable API error code: {stderr}"
+    );
 }
 
 #[test]
@@ -241,7 +295,9 @@ fn cli_exposes_cancel_config_and_follow_contracts() {
 #[tokio::test]
 async fn actual_cli_and_ephemeral_daemon_cover_config_cancel_follow_reconnect_and_exit_codes() {
     let root = temporary_directory();
-    tokio::fs::create_dir_all(&root).await.expect("temporary directory creates");
+    tokio::fs::create_dir_all(&root)
+        .await
+        .expect("temporary directory creates");
     let config = root.join("valid.toml");
     let replacement = root.join("replacement.toml");
     let invalid = root.join("invalid.toml");
@@ -258,6 +314,12 @@ command = "/bin/sh"
 args = ["-c", "echo before-disconnect; sleep 2; echo after-reconnect; sleep 30"]
 autostart = false
 
+[[process]]
+name = "lifecycle-process"
+command = "/bin/sh"
+args = ["-c", "sleep 30"]
+autostart = false
+
 [[job]]
 name = "cancel-job"
 command = "/bin/sh"
@@ -272,8 +334,14 @@ trigger = { type = "interval", every_sec = 3600 }
 
 [[job]]
 name = "event-job"
-command = "/bin/true"
+command = "/bin/sh"
+args = ["-c", "sleep 1; exit 0"]
 trigger = { type = "interval", every_sec = 3600 }
+
+[[job]]
+name = "local-defaults-job"
+command = "/bin/true"
+trigger = { type = "cron", expr = "0 * * * *" }
 "#;
     let term_tree_pids = root.join("term-tree-pids");
     let term_tree = format!(
@@ -313,16 +381,95 @@ command = ""
     let mut daemon = EphemeralDaemon::start(&root).await;
     let url = daemon.url();
     let result = async {
-        output_text(&cli(&url, &["config", "validate", "--file", config.to_str().unwrap(), "--mode", "replace"]).await);
-        let invalid_validate = cli(&url, &["config", "validate", "--file", invalid.to_str().unwrap()]).await;
+        output_text(
+            &cli(
+                &url,
+                &[
+                    "config",
+                    "validate",
+                    "--file",
+                    config.to_str().unwrap(),
+                    "--mode",
+                    "replace",
+                ],
+            )
+            .await,
+        );
+        let invalid_validate = cli(
+            &url,
+            &["config", "validate", "--file", invalid.to_str().unwrap()],
+        )
+        .await;
         assert_failed_command(&invalid_validate, "invalid_config");
-        let invalid_apply = cli(&url, &["config", "apply", "--file", invalid.to_str().unwrap()]).await;
+        let invalid_apply = cli(
+            &url,
+            &["config", "apply", "--file", invalid.to_str().unwrap()],
+        )
+        .await;
         assert_failed_command(&invalid_apply, "invalid_config");
-        output_text(&cli(&url, &["config", "apply", "--file", config.to_str().unwrap(), "--mode", "replace"]).await);
+        output_text(
+            &cli(
+                &url,
+                &[
+                    "config",
+                    "apply",
+                    "--file",
+                    config.to_str().unwrap(),
+                    "--mode",
+                    "replace",
+                ],
+            )
+            .await,
+        );
+
+        let default_job = output_text(&cli(&url, &["job", "show", "local-defaults-job"]).await);
+        let default_job =
+            serde_json::from_str::<serde_json::Value>(&default_job).expect("job show returns JSON");
+        assert!(
+            default_job["timezone"]
+                .as_str()
+                .is_some_and(|timezone| !timezone.is_empty()),
+            "config-apply persists the resolver-selected timezone"
+        );
+        assert_eq!(default_job["misfire_policy"].as_str(), Some("run_once"));
+        assert!(
+            default_job["trigger_id"]
+                .as_str()
+                .is_some_and(|trigger_id| !trigger_id.is_empty()),
+            "config-apply persists a generated trigger ID"
+        );
+
+        output_text(&cli(&url, &["start", "lifecycle-process"]).await);
+        let lifecycle_started = output_text(&cli(&url, &["show", "lifecycle-process"]).await);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&lifecycle_started)
+                .expect("process show returns JSON")["state"]
+                .as_str(),
+            Some("running")
+        );
+        output_text(&cli(&url, &["restart", "lifecycle-process"]).await);
+        output_text(&cli(&url, &["stop", "lifecycle-process"]).await);
+        output_text(&cli(&url, &["remove", "lifecycle-process"]).await);
+        let missing_process = cli(&url, &["remove", "lifecycle-process"]).await;
+        assert_eq!(missing_process.status.code(), Some(2));
+        assert!(missing_process.stdout.is_empty());
+        assert!(
+            String::from_utf8_lossy(&missing_process.stderr).contains("not found"),
+            "missing process keeps the documented not-found CLI error"
+        );
 
         output_text(&cli(&url, &["start", "lots-process"]).await);
-        let process_follow = start_follow(&url, &["logs", "lots-process", "--follow", "--tail", "10001"]).await;
-        wait_for_final_log_line(&url, &["logs", "lots-process", "--tail", "1"], "process-10001").await;
+        let process_follow = start_follow(
+            &url,
+            &["logs", "lots-process", "--follow", "--tail", "10001"],
+        )
+        .await;
+        wait_for_final_log_line(
+            &url,
+            &["logs", "lots-process", "--tail", "1"],
+            "process-10001",
+        )
+        .await;
         let process_follow_output = output_text(&interrupt_follow(process_follow).await);
         json_lines(&process_follow_output, 10_001, "process-1", "process-10001");
 
@@ -335,14 +482,17 @@ command = ""
         output_text(&cli(&url, &["job", "cancel", "cancel-job", &cancel_run_id]).await);
         let mut cancelled = false;
         for _ in 0..40 {
-            let runs = output_text(&cli(&url, &["job", "runs", "cancel-job", "--limit", "20"]).await);
+            let runs =
+                output_text(&cli(&url, &["job", "runs", "cancel-job", "--limit", "20"]).await);
             cancelled = serde_json::from_str::<serde_json::Value>(&runs)
                 .expect("runs result is JSON")["runs"]
                 .as_array()
                 .expect("runs list")
                 .iter()
                 .any(|run| run["run_id"] == cancel_run_id && run["state"] == "cancelled");
-            if cancelled { break; }
+            if cancelled {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         assert!(cancelled, "job cancel reaches terminal cancelled state");
@@ -353,15 +503,36 @@ command = ""
             .as_str()
             .expect("trigger returns run id")
             .to_owned();
-        let run_follow = start_follow(&url, &["job", "logs", "lots-job", &lots_run_id, "--follow", "--tail", "10001"]).await;
-        wait_for_final_log_line(&url, &["job", "logs", "lots-job", &lots_run_id, "--tail", "1"], "run-10001").await;
+        let run_follow = start_follow(
+            &url,
+            &[
+                "job",
+                "logs",
+                "lots-job",
+                &lots_run_id,
+                "--follow",
+                "--tail",
+                "10001",
+            ],
+        )
+        .await;
+        wait_for_final_log_line(
+            &url,
+            &["job", "logs", "lots-job", &lots_run_id, "--tail", "1"],
+            "run-10001",
+        )
+        .await;
         let run_follow_output = output_text(&interrupt_follow(run_follow).await);
         json_lines(&run_follow_output, 10_001, "run-1", "run-10001");
         output_text(&cli(&url, &["job", "cancel", "lots-job", &lots_run_id]).await);
 
         output_text(&cli(&url, &["start", "follow-process"]).await);
         tokio::time::sleep(Duration::from_millis(150)).await;
-        let reconnect_follow = start_follow(&url, &["logs", "follow-process", "--follow", "--tail", "10001"]).await;
+        let reconnect_follow = start_follow(
+            &url,
+            &["logs", "follow-process", "--follow", "--tail", "10001"],
+        )
+        .await;
         tokio::time::sleep(Duration::from_millis(200)).await;
         daemon.stop_transport().await;
         tokio::time::sleep(Duration::from_secs(3)).await;
@@ -370,15 +541,35 @@ command = ""
         let reconnect_output = output_text(&interrupt_follow(reconnect_follow).await);
         let reconnect_lines = reconnect_output
             .lines()
-            .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("reconnect follow emits JSON Lines"))
+            .map(|line| {
+                serde_json::from_str::<serde_json::Value>(line)
+                    .expect("reconnect follow emits JSON Lines")
+            })
             .collect::<Vec<_>>();
         let reconnect_sequences = reconnect_lines
             .iter()
-            .map(|line| line["sequence"].as_u64().expect("reconnect row has sequence"))
+            .map(|line| {
+                line["sequence"]
+                    .as_u64()
+                    .expect("reconnect row has sequence")
+            })
             .collect::<Vec<_>>();
-        assert!(reconnect_sequences.windows(2).all(|pair| pair[0] < pair[1]), "reconnect keeps cursor order unique");
-        assert_eq!(reconnect_lines.first().and_then(|line| line["line"].as_str()), Some("before-disconnect"));
-        assert_eq!(reconnect_lines.last().and_then(|line| line["line"].as_str()), Some("after-reconnect"));
+        assert!(
+            reconnect_sequences.windows(2).all(|pair| pair[0] < pair[1]),
+            "reconnect keeps cursor order unique"
+        );
+        assert_eq!(
+            reconnect_lines
+                .first()
+                .and_then(|line| line["line"].as_str()),
+            Some("before-disconnect")
+        );
+        assert_eq!(
+            reconnect_lines
+                .last()
+                .and_then(|line| line["line"].as_str()),
+            Some("after-reconnect")
+        );
 
         let event_follow = start_follow(&url, &["daemon", "events"]).await;
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -395,53 +586,100 @@ command = ""
         let mut event_reached_terminal = false;
         let mut latest_event_runs = String::new();
         for _ in 0..70 {
-            let runs = output_text(&cli(&url, &["job", "runs", "event-job", "--limit", "20"]).await);
+            let runs =
+                output_text(&cli(&url, &["job", "runs", "event-job", "--limit", "20"]).await);
             latest_event_runs = runs.clone();
             event_reached_terminal = serde_json::from_str::<serde_json::Value>(&runs)
                 .expect("event runs result is JSON")["runs"]
                 .as_array()
                 .expect("event runs list")
                 .iter()
-                .any(|run| run["run_id"] == event_run_id && run["state"] == "failed");
+                .any(|run| run["run_id"] == event_run_id && run["state"] == "succeeded");
             if event_reached_terminal {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        assert!(event_reached_terminal, "event job reaches durable terminal state: {latest_event_runs}");
+        assert!(
+            event_reached_terminal,
+            "event job reaches durable terminal state: {latest_event_runs}"
+        );
         // The durable outbox reconcile interval is five seconds. Keep the
         // follower alive across a complete retry window after the terminal
         // row is observed.
         tokio::time::sleep(Duration::from_secs(6)).await;
         let event_output = interrupt_follow(event_follow).await;
-        assert!(event_output.status.success(), "event follow exits cleanly: {}", String::from_utf8_lossy(&event_output.stderr));
-        assert!(event_output.stderr.is_empty(), "successful event follow keeps stderr empty");
+        assert!(
+            event_output.status.success(),
+            "event follow exits cleanly: {}",
+            String::from_utf8_lossy(&event_output.stderr)
+        );
+        assert!(
+            event_output.stderr.is_empty(),
+            "successful event follow keeps stderr empty"
+        );
         let terminal_events = String::from_utf8(event_output.stdout)
             .expect("event follow emits UTF-8 JSON Lines")
             .lines()
-            .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("each event line is a JSON object"))
+            .map(|line| {
+                serde_json::from_str::<serde_json::Value>(line)
+                    .expect("each event line is a JSON object")
+            })
             .filter(|event| {
                 event["payload"]["run_id"] == event_run_id
-                    && event["type"] == "job.run_failed"
+                    && event["type"] == "job.run_succeeded"
                     && event["event_id"].as_str().is_some_and(|id| !id.is_empty())
             })
             .collect::<Vec<_>>();
-        assert_eq!(terminal_events.len(), 1, "reconnect emits the terminal ID once");
+        assert_eq!(
+            terminal_events.len(),
+            1,
+            "reconnect emits the terminal ID once"
+        );
         assert!(terminal_events[0]["timestamp"].as_str().is_some());
 
         let term_tree_start = cli(&url, &["start", "term-tree"]).await;
-        assert!(term_tree_start.status.success(), "CLI starts TERM-tree: {}", String::from_utf8_lossy(&term_tree_start.stderr));
+        assert!(
+            term_tree_start.status.success(),
+            "CLI starts TERM-tree: {}",
+            String::from_utf8_lossy(&term_tree_start.stderr)
+        );
         let stopped_group = wait_for_process_group(&term_tree_pids).await;
         let term_tree_stop = cli(&url, &["stop", "term-tree"]).await;
-        assert!(term_tree_stop.status.success(), "CLI stops TERM-tree: {}", String::from_utf8_lossy(&term_tree_stop.stderr));
+        assert!(
+            term_tree_stop.status.success(),
+            "CLI stops TERM-tree: {}",
+            String::from_utf8_lossy(&term_tree_stop.stderr)
+        );
         wait_for_process_group_exit(stopped_group).await;
 
-        tokio::fs::remove_file(&term_tree_pids).await.expect("old term-tree PID record removes");
+        tokio::fs::remove_file(&term_tree_pids)
+            .await
+            .expect("old term-tree PID record removes");
         let term_tree_restart = cli(&url, &["start", "term-tree"]).await;
-        assert!(term_tree_restart.status.success(), "CLI restarts TERM-tree: {}", String::from_utf8_lossy(&term_tree_restart.stderr));
+        assert!(
+            term_tree_restart.status.success(),
+            "CLI restarts TERM-tree: {}",
+            String::from_utf8_lossy(&term_tree_restart.stderr)
+        );
         let replaced_group = wait_for_process_group(&term_tree_pids).await;
-        let replacement_apply = cli(&url, &["config", "apply", "--file", replacement.to_str().unwrap(), "--mode", "replace"]).await;
-        assert!(replacement_apply.status.success(), "CLI replaces running TERM-tree: {}", String::from_utf8_lossy(&replacement_apply.stderr));
+        let replacement_apply = cli(
+            &url,
+            &[
+                "config",
+                "apply",
+                "--file",
+                replacement.to_str().unwrap(),
+                "--mode",
+                "replace",
+            ],
+        )
+        .await;
+        assert!(
+            replacement_apply.status.success(),
+            "CLI replaces running TERM-tree: {}",
+            String::from_utf8_lossy(&replacement_apply.stderr)
+        );
         wait_for_process_group_exit(replaced_group).await;
 
         Ok::<(), String>(())

@@ -2,14 +2,14 @@
 
 본 문서는 `my-supervisor` 프로젝트의 전체 아키텍처, 컴포넌트 설계, 플랫폼별 구현 전략을 정리합니다.
 
-> **현재 구현 기준선:** 실행 가능한 제품 범위는 macOS 로컬 운영 MVP입니다. Linux/Windows adapter, Rules 자동화, 원격 운영은 이 문서의 목표 설계이며 현재 지원 기능이 아닙니다. 아래 플랫폼별 설명은 별도 표기가 없으면 구현 완료가 아니라 목표 구조를 뜻합니다.
+> **최초 출시 기준선:** 실행 가능한 제품 범위는 macOS 로컬 프로세스·작업 감독 도구입니다. 신뢰 경계는 실제 프로세스를 관리하는 `core`/`application` 엔진이며, CLI와 GUI는 같은 `OperationsFacade` 계약을 소비하는 동등한 관리 화면입니다. 최초 후보는 `arm64` 전용 unsigned app/DMG이고 Intel·universal 지원은 제공하지 않습니다. Linux/Windows adapter, Rules 자동화, 원격 운영은 이 문서의 목표 설계이며 현재 지원 기능이 아닙니다. 아래 플랫폼별 설명은 별도 표기가 없으면 구현 완료가 아니라 목표 구조를 뜻합니다.
 
 ## 1. 설계 원칙
 
 1. **GUI 호스트와 헤드리스 launcher** — `core`/`application` 과 adapter 조립을 `daemon` 런타임 라이브러리로 모으고, **GUI 가 있는 my-supervisor**(`desktop`, Tauri)는 이를 인프로세스로 재사용한다. **GUI 가 없는 my-supervisor**는 같은 런타임을 `msv-daemon` launcher로 실행한다. Tauri 는 별도 데몬 프로세스를 spawn 하지 않는다(DD-002). 데스크톱에서 창을 닫아도 tray 로 상주해 관리 중인 프로세스는 유지된다.
 2. **단일 통신 프로토콜** — Tauri WebView·브라우저·CLI가 모두 동일한 HTTP/WebSocket API를 사용한다(각 호스트가 내장 서버로 제공).
 3. **단일 런타임, 두 실행 형태** — Desktop·Server 배포는 동일한 `daemon` 런타임 조립을 공유하고, 실행 형태(`desktop` Tauri 셸 · `msv-daemon` launcher)만 다르다.
-4. **GUI 우선, CLI 동등** — 주 사용자는 데스크톱 GUI, 그러나 CLI로도 동일 기능을 수행할 수 있어야 한다.
+4. **CLI/GUI 동등 관리 표면** — GUI와 CLI는 프로세스·Job의 생성, 조회, 시작, 정지, 재시작, 삭제 및 상태·로그 확인을 동일 `OperationsFacade` 계약으로 제공한다. transport가 lifecycle 의미를 따로 정의하지 않는다.
 5. **Opt-in 시스템 통합** — 시스템 서비스 등록은 기본이 아니며 사용자가 명시적으로 활성화한다.
 6. **Hexagonal 아키텍처 (Ports & Adapters)** — 도메인 로직은 OS·DB·네트워크 세부를 모른다. 모든 외부 의존은 `core` crate 의 port trait 로 추상화되고, `platform-*` · `infra-*` crate 가 adapter 로 구현한다. `#[cfg(target_os)]` 분기는 `daemon` 런타임 조립부에만 존재한다. 근거: DD-017 ~ DD-019.
 7. **Process + Job 이원 모델** — 장시간 실행 supervisor 대상인 **Process** 와 예약/주기/의존성으로 트리거되어 실행 후 종료를 기대하는 **Job** 은 별도 도메인 엔티티로 모델링한다. Job 스케줄링은 OS cron/Task Scheduler 에 위임하지 않고 데몬이 자체 수행한다. 근거: DD-022 ~ DD-024.
@@ -31,6 +31,10 @@ PoC의 교차 검증 환경은 이 기준선에서 선정한다.
 ## 2. 배포 전략
 
 ### Desktop 배포 (본서비스)
+
+최초 출시는 배포된 이전 revision이 없는 새 설치만 대상으로 한다. 따라서 legacy migration/first-open compatibility는 release gate가 아니며, 새 Job 입력은 현재 IANA timezone, `run_once`, 새 trigger UUID를 사용한다. timezone을 해석할 수 없으면 UTC로 대체하지 않고 `invalid_config`을 반환한다.
+
+후보는 `aarch64-apple-darwin`에서 만든 `arm64` 전용 unsigned app/DMG다. signing, notarization, stapling과 외부 배포는 별도 승인과 외부 검증이 필요한 후속 경계다.
 
 단일 설치 프로그램이 두 개의 아티팩트를 설치한다 — **데스크톱은 Tauri 앱이 코어를 임베드하므로 별도 `msv-daemon` 을 설치하지 않는다** (DD-002):
 
@@ -197,6 +201,8 @@ msv ui                     # 브라우저로 WebUI 열기
 - `logs -f`는 WebSocket 구독 기반
 
 **크레이트:** `clap`, `reqwest`, `comfy-table`, `indicatif`, `serde_json`, `my-supervisor-shared`
+
+**설치된 macOS owner 경로:** native CLI는 user-only `run/owner.json`에서 endpoint/version/generation만 발견하고, 별도의 `run/control.token`을 native layer에서 읽어 모든 HTTP/WebSocket request에 bearer로 붙인다. token은 WebView·URL·metadata·CLI output에 넣지 않는다. `service rotate-token` 성공 뒤에는 token 파일을 다시 읽어 다음 request와 reconnect에 새 credential을 사용한다. user LaunchAgent lifecycle은 `service install|start|stop|status|uninstall`이며, production label `com.my-supervisor.daemon`과 `gui/<uid>`만 사용한다. `uninstall`은 registration만 제거하고 data root는 보존한다.
 
 #### 4.1.3 `desktop` (Tauri bin)
 

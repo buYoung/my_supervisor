@@ -45,6 +45,8 @@ pub enum ConflictReason {
     HasDependents,
     JobHasActiveRuns,
     RunAlreadyFinished,
+    ScheduleRevisionConflict,
+    OperationBusy,
 }
 
 impl ConflictReason {
@@ -58,6 +60,8 @@ impl ConflictReason {
             ConflictReason::HasDependents => "has_dependents",
             ConflictReason::JobHasActiveRuns => "job_has_active_runs",
             ConflictReason::RunAlreadyFinished => "run_already_finished",
+            ConflictReason::ScheduleRevisionConflict => "schedule_revision_conflict",
+            ConflictReason::OperationBusy => "operation_busy",
         }
     }
 
@@ -71,6 +75,10 @@ impl ConflictReason {
             ConflictReason::HasDependents => "job has downstream dependents",
             ConflictReason::JobHasActiveRuns => "job has active or queued runs",
             ConflictReason::RunAlreadyFinished => "run is already finished",
+            ConflictReason::ScheduleRevisionConflict => {
+                "schedule revision does not match the persisted definition"
+            }
+            ConflictReason::OperationBusy => "a higher-priority process mutation is in progress",
         }
     }
 }
@@ -140,7 +148,10 @@ impl AppError {
     pub fn http_status(&self) -> u16 {
         match self {
             AppError::NotFound { .. } => 404,
-            AppError::Conflict { .. } | AppError::UnitNameConflict(_) | AppError::ConfigRecoveryRequired(_) | AppError::JobDeletionRecoveryRequired(_) => 409,
+            AppError::Conflict { .. }
+            | AppError::UnitNameConflict(_)
+            | AppError::ConfigRecoveryRequired(_)
+            | AppError::JobDeletionRecoveryRequired(_) => 409,
             AppError::InvalidRequest(_) | AppError::InvalidConfig(_) | AppError::InvalidCron(_) => {
                 400
             }
@@ -183,6 +194,12 @@ impl From<SchedulerError> for AppError {
     fn from(e: SchedulerError) -> Self {
         match e {
             SchedulerError::InvalidCron(m) => AppError::InvalidCron(m),
+            SchedulerError::InvalidTimezone(m) => {
+                AppError::InvalidConfig(format!("invalid_timezone: {m}"))
+            }
+            SchedulerError::PreviewBounded(m) => {
+                AppError::InvalidRequest(format!("schedule_preview_bounded: {m}"))
+            }
             SchedulerError::Backend(m) => AppError::Internal(format!("scheduler: {m}")),
         }
     }

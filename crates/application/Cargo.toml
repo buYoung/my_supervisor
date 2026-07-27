@@ -9,9 +9,11 @@ my-supervisor-core = { workspace = true }
 backon = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
+chrono-tz = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+serde_json = { workspace = true }
 tokio = { version = "1", default-features = false, features = ["sync", "rt", "macros", "time"] }
 
 [dev-dependencies]

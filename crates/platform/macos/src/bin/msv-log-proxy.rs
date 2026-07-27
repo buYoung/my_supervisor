@@ -1,13 +1,17 @@
 //! Detached-process log owner.  It remains the process-group leader and
 //! serializes both target streams into one durable, sequence-numbered journal.
 
-use std::path::PathBuf;
-use std::process::Stdio;
-use std::{io::{self, Read, Write}, os::fd::{AsRawFd, FromRawFd}};
 use std::os::unix::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::{
+    io::{self, Read, Write},
+    os::fd::{AsRawFd, FromRawFd},
+};
 
 use chrono::Utc;
 use my_supervisor_platform_macos::process_identity::snapshot;
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
 
@@ -16,6 +20,137 @@ enum Stream {
     Stdout,
     Stderr,
     System,
+}
+
+const MAX_SEGMENT_BYTES: u64 = 1_048_576;
+const MAX_SEALED_SEGMENTS: usize = 32;
+
+#[derive(Serialize, Deserialize)]
+struct SegmentMeta {
+    filename: String,
+    first_sequence: u64,
+    last_sequence: u64,
+    byte_len: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct JournalManifest {
+    next_sequence: u64,
+    high_watermark: u64,
+    active_start_sequence: u64,
+    active_byte_len: u64,
+    #[serde(default)]
+    sealed_segments: Vec<SegmentMeta>,
+}
+
+struct ProxyJournal {
+    path: PathBuf,
+    file: tokio::fs::File,
+    manifest: JournalManifest,
+}
+
+fn manifest_path(path: &Path) -> PathBuf {
+    path.with_extension("manifest.json")
+}
+
+async fn write_manifest(path: &Path, manifest: &JournalManifest) -> std::io::Result<()> {
+    let temporary = path.with_extension(format!("manifest-{}.tmp", uuid::Uuid::new_v4()));
+    let encoded = serde_json::to_vec(manifest).map_err(std::io::Error::other)?;
+    let mut file = tokio::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&temporary)
+        .await?;
+    file.write_all(&encoded).await?;
+    file.flush().await?;
+    file.sync_data().await?;
+    drop(file);
+    tokio::fs::rename(temporary, path).await
+}
+
+impl ProxyJournal {
+    async fn open(path: PathBuf) -> std::io::Result<Self> {
+        let manifest_path = manifest_path(&path);
+        let existing = tokio::fs::read(&manifest_path)
+            .await
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<JournalManifest>(&bytes).ok());
+        let mut manifest = existing.unwrap_or(JournalManifest {
+            next_sequence: 1,
+            high_watermark: 0,
+            active_start_sequence: 1,
+            active_byte_len: 0,
+            sealed_segments: Vec::new(),
+        });
+        if manifest.high_watermark == 0 {
+            let contents = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+            let sequences = contents
+                .lines()
+                .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+                .filter_map(|value| value.get("sequence").and_then(|value| value.as_u64()))
+                .collect::<Vec<_>>();
+            if let Some(first) = sequences.first() {
+                manifest.active_start_sequence = *first;
+            }
+            if let Some(last) = sequences.last() {
+                manifest.high_watermark = *last;
+                manifest.next_sequence = last.saturating_add(1);
+            }
+        }
+        manifest.active_byte_len = tokio::fs::metadata(&path)
+            .await
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
+        let file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .await?;
+        write_manifest(&manifest_path, &manifest).await?;
+        Ok(Self {
+            path,
+            file,
+            manifest,
+        })
+    }
+
+    async fn rollover_if_needed(&mut self) -> std::io::Result<()> {
+        if self.manifest.active_byte_len == 0 || self.manifest.active_byte_len < MAX_SEGMENT_BYTES {
+            return Ok(());
+        }
+        self.file.sync_data().await?;
+        let stem = self
+            .path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("journal");
+        let filename = format!(
+            "{stem}.segment-{:020}.jsonl",
+            self.manifest.active_start_sequence
+        );
+        let sealed_path = self.path.with_file_name(&filename);
+        tokio::fs::rename(&self.path, &sealed_path).await?;
+        self.manifest.sealed_segments.push(SegmentMeta {
+            filename,
+            first_sequence: self.manifest.active_start_sequence,
+            last_sequence: self.manifest.high_watermark,
+            byte_len: self.manifest.active_byte_len,
+        });
+        while self.manifest.sealed_segments.len() > MAX_SEALED_SEGMENTS {
+            let removed = self.manifest.sealed_segments.remove(0);
+            let _ = tokio::fs::remove_file(self.path.with_file_name(removed.filename)).await;
+        }
+        self.file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&self.path)
+            .await?;
+        self.file.sync_data().await?;
+        self.manifest.active_start_sequence = self.manifest.next_sequence;
+        self.manifest.active_byte_len = 0;
+        write_manifest(&manifest_path(&self.path), &self.manifest).await
+    }
 }
 
 impl Stream {
@@ -61,14 +196,21 @@ impl ReaperControl {
         for stream in &mut streams {
             write_control_line(
                 stream,
-                &format!("READY {} {} {}", identity.pid, identity.pgid, identity.generation),
+                &format!(
+                    "READY {} {} {}",
+                    identity.pid, identity.pgid, identity.generation
+                ),
             )
             .map_err(|error| error.to_string())?;
         }
         for stream in &mut streams {
             match read_control_line(stream).map_err(|error| error.to_string())? {
                 Some(reply) if reply == "READY" => {}
-                Some(reply) => return Err(format!("unexpected detached reaper setup response: {reply}")),
+                Some(reply) => {
+                    return Err(format!(
+                        "unexpected detached reaper setup response: {reply}"
+                    ))
+                }
                 None => return Err("detached reaper closed its setup channel".into()),
             }
         }
@@ -89,7 +231,13 @@ impl ReaperControl {
         Ok(())
     }
 
-    fn arm_anchor(&mut self, anchor_pid: u32, pgid: u32, generation: &str, journal: &std::path::Path) -> Result<(), String> {
+    fn arm_anchor(
+        &mut self,
+        anchor_pid: u32,
+        pgid: u32,
+        generation: &str,
+        journal: &std::path::Path,
+    ) -> Result<(), String> {
         let journal = journal
             .as_os_str()
             .as_bytes()
@@ -97,8 +245,11 @@ impl ReaperControl {
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         for stream in &mut self.streams {
-            write_control_line(stream, &format!("ANCHOR {anchor_pid} {pgid} {generation} {journal}"))
-                .map_err(|error| error.to_string())?;
+            write_control_line(
+                stream,
+                &format!("ANCHOR {anchor_pid} {pgid} {generation} {journal}"),
+            )
+            .map_err(|error| error.to_string())?;
         }
         self.expect_all("ARMED", "anchor")
     }
@@ -114,8 +265,16 @@ impl ReaperControl {
         for stream in &mut self.streams {
             match read_control_line(stream).map_err(|error| error.to_string())? {
                 Some(reply) if reply == expected => {}
-                Some(reply) => return Err(format!("unexpected detached reaper {operation} response: {reply}")),
-                None => return Err(format!("detached reaper closed before {operation} confirmation")),
+                Some(reply) => {
+                    return Err(format!(
+                        "unexpected detached reaper {operation} response: {reply}"
+                    ))
+                }
+                None => {
+                    return Err(format!(
+                        "detached reaper closed before {operation} confirmation"
+                    ))
+                }
             }
         }
         Ok(())
@@ -140,17 +299,30 @@ fn read_control_line(stream: &mut std::os::unix::net::UnixStream) -> io::Result<
     loop {
         match stream.read(&mut byte) {
             Ok(0) if bytes.is_empty() => return Ok(None),
-            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "partial reaper control response")),
-            Ok(_) if byte[0] == b'\n' => return String::from_utf8(bytes)
-                .map(Some)
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid reaper control response")),
+            Ok(0) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "partial reaper control response",
+                ))
+            }
+            Ok(_) if byte[0] == b'\n' => {
+                return String::from_utf8(bytes).map(Some).map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "invalid reaper control response",
+                    )
+                })
+            }
             Ok(_) => bytes.push(byte[0]),
             Err(error) => return Err(error),
         }
     }
 }
 
-fn write_control_line(stream: &mut std::os::unix::net::UnixStream, message: &str) -> io::Result<()> {
+fn write_control_line(
+    stream: &mut std::os::unix::net::UnixStream,
+    message: &str,
+) -> io::Result<()> {
     stream.write_all(message.as_bytes())?;
     stream.write_all(b"\n")?;
     stream.flush()
@@ -169,32 +341,36 @@ where
 }
 
 async fn append(
-    file: &mut tokio::fs::File,
-    sequence: u64,
+    journal: &mut ProxyJournal,
     stream: Stream,
     line: String,
     remaining_successful_appends: &mut Option<u64>,
 ) -> std::io::Result<()> {
     if let Some(remaining) = remaining_successful_appends {
         if *remaining == 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "injected journal append failure",
-            ));
+            return Err(std::io::Error::other("injected journal append failure"));
         }
         *remaining -= 1;
     }
+    journal.rollover_if_needed().await?;
     let encoded = serde_json::json!({
-        "sequence": sequence,
+        "sequence": journal.manifest.next_sequence,
         "timestamp": Utc::now(),
         "stream": stream.name(),
         "line": line,
     })
     .to_string();
-    file.write_all(encoded.as_bytes()).await?;
-    file.write_all(b"\n").await?;
-    file.flush().await?;
-    file.sync_data().await
+    journal.file.write_all(encoded.as_bytes()).await?;
+    journal.file.write_all(b"\n").await?;
+    journal.file.flush().await?;
+    journal.file.sync_data().await?;
+    journal.manifest.high_watermark = journal.manifest.next_sequence;
+    journal.manifest.next_sequence = journal.manifest.next_sequence.saturating_add(1);
+    journal.manifest.active_byte_len = journal
+        .manifest
+        .active_byte_len
+        .saturating_add(encoded.len() as u64 + 1);
+    write_manifest(&manifest_path(&journal.path), &journal.manifest).await
 }
 
 async fn spawn_anchor() -> Result<tokio::process::Child, String> {
@@ -213,6 +389,34 @@ async fn stop_anchor(anchor: &mut tokio::process::Child) {
     let _ = anchor.wait().await;
 }
 
+#[cfg(debug_assertions)]
+fn journal_marker_and_test_limit(
+    first: Option<std::ffi::OsString>,
+    args: &mut impl Iterator<Item = std::ffi::OsString>,
+) -> (Option<std::ffi::OsString>, Option<u64>) {
+    if first.as_deref() != Some(std::ffi::OsStr::new("--test-fail-after-appends")) {
+        return (first, None);
+    }
+    let fail_after_appends = args
+        .next()
+        .and_then(|value| value.to_string_lossy().parse::<u64>().ok());
+    if fail_after_appends.is_none() {
+        usage();
+    }
+    (args.next(), fail_after_appends)
+}
+
+#[cfg(not(debug_assertions))]
+fn journal_marker_and_test_limit(
+    first: Option<std::ffi::OsString>,
+    _args: &mut impl Iterator<Item = std::ffi::OsString>,
+) -> (Option<std::ffi::OsString>, Option<u64>) {
+    if first.as_deref() == Some(std::ffi::OsStr::new("--test-fail-after-appends")) {
+        usage();
+    }
+    (first, None)
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let mut args = std::env::args_os().skip(1);
@@ -224,23 +428,7 @@ async fn main() {
         std::future::pending::<()>().await;
         return;
     }
-    let mut fail_after_appends = None;
-    let journal_marker = if first.as_deref() == Some(std::ffi::OsStr::new("--test-fail-after-appends")) {
-        #[cfg(debug_assertions)]
-        {
-            fail_after_appends = args
-                .next()
-                .and_then(|value| value.to_string_lossy().parse::<u64>().ok());
-            if fail_after_appends.is_none() {
-                usage();
-            }
-            args.next()
-        }
-        #[cfg(not(debug_assertions))]
-        usage()
-    } else {
-        first
-    };
+    let (journal_marker, fail_after_appends) = journal_marker_and_test_limit(first, &mut args);
     if journal_marker.as_deref() != Some(std::ffi::OsStr::new("--journal")) {
         usage();
     }
@@ -248,7 +436,9 @@ async fn main() {
     let remaining = args.collect::<Vec<_>>();
     let mut position = 0;
     let mut control_descriptors = Vec::new();
-    while remaining.get(position).map(std::ffi::OsString::as_os_str) == Some(std::ffi::OsStr::new("--control-fd")) {
+    while remaining.get(position).map(std::ffi::OsString::as_os_str)
+        == Some(std::ffi::OsStr::new("--control-fd"))
+    {
         position += 1;
         let descriptor = remaining
             .get(position)
@@ -258,7 +448,9 @@ async fn main() {
         control_descriptors.push(descriptor);
         position += 1;
     }
-    if remaining.get(position).map(std::ffi::OsString::as_os_str) != Some(std::ffi::OsStr::new("--")) {
+    if remaining.get(position).map(std::ffi::OsString::as_os_str)
+        != Some(std::ffi::OsStr::new("--"))
+    {
         usage();
     }
     position += 1;
@@ -278,26 +470,13 @@ async fn main() {
             std::process::exit(1);
         }
     }
-    let mut journal_file = match tokio::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&journal)
-        .await
-    {
+    let mut journal_file = match ProxyJournal::open(journal.clone()).await {
         Ok(file) => file,
         Err(error) => {
             eprintln!("opening journal failed: {error}");
             std::process::exit(1);
         }
     };
-    let existing = tokio::fs::read_to_string(&journal).await.unwrap_or_default();
-    let mut sequence = existing
-        .lines()
-        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .filter_map(|value| value.get("sequence").and_then(|value| value.as_u64()))
-        .max()
-        .unwrap_or(0)
-        .saturating_add(1);
     let mut remaining_successful_appends = fail_after_appends;
 
     let mut anchor = match spawn_anchor().await {
@@ -317,7 +496,12 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    if let Err(error) = reaper.arm_anchor(anchor_identity.pid, anchor_identity.pgid, &anchor_identity.generation, &journal) {
+    if let Err(error) = reaper.arm_anchor(
+        anchor_identity.pid,
+        anchor_identity.pgid,
+        &anchor_identity.generation,
+        &journal,
+    ) {
         eprintln!("arming detached group cleanup owners failed: {error}");
         stop_anchor(&mut anchor).await;
         std::process::exit(1);
@@ -337,7 +521,13 @@ async fn main() {
     {
         Ok(child) => child,
         Err(error) => {
-            let _ = append(&mut journal_file, sequence, Stream::System, format!("target spawn failed: {error}"), &mut remaining_successful_appends).await;
+            let _ = append(
+                &mut journal_file,
+                Stream::System,
+                format!("target spawn failed: {error}"),
+                &mut remaining_successful_appends,
+            )
+            .await;
             let _ = reaper.complete();
             stop_anchor(&mut anchor).await;
             std::process::exit(127);
@@ -356,7 +546,7 @@ async fn main() {
             line = rx.recv(), if !lines_closed => {
                 match line {
                     Some((stream, line)) => {
-                        if let Err(error) = append(&mut journal_file, sequence, stream, line, &mut remaining_successful_appends).await {
+                        if let Err(error) = append(&mut journal_file, stream, line, &mut remaining_successful_appends).await {
                             eprintln!("writing detached journal failed: {error}");
                             drop(journal_file);
                             let _ = tokio::fs::remove_file(&journal).await;
@@ -368,7 +558,6 @@ async fn main() {
                             // direct-child kill, which would leak grandchildren.
                             std::process::exit(1);
                         }
-                        sequence = sequence.saturating_add(1);
                     }
                     None => lines_closed = true,
                 }
@@ -382,17 +571,29 @@ async fn main() {
             }
         }
     }
-    let status = target_status.unwrap_or_else(|| Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "target wait did not complete",
-    )));
-    if let Some(pump) = stdout_pump { let _ = pump.await; }
-    if let Some(pump) = stderr_pump { let _ = pump.await; }
+    let status =
+        target_status.unwrap_or_else(|| Err(std::io::Error::other("target wait did not complete")));
+    if let Some(pump) = stdout_pump {
+        let _ = pump.await;
+    }
+    if let Some(pump) = stderr_pump {
+        let _ = pump.await;
+    }
     let (exit_code, terminal) = match status {
-        Ok(status) => (status.code().unwrap_or(1), format!("target exited: {status}")),
+        Ok(status) => (
+            status.code().unwrap_or(1),
+            format!("target exited: {status}"),
+        ),
         Err(error) => (1, format!("target wait failed: {error}")),
     };
-    if let Err(error) = append(&mut journal_file, sequence, Stream::System, terminal, &mut remaining_successful_appends).await {
+    if let Err(error) = append(
+        &mut journal_file,
+        Stream::System,
+        terminal,
+        &mut remaining_successful_appends,
+    )
+    .await
+    {
         eprintln!("writing detached terminal journal failed: {error}");
         drop(journal_file);
         let _ = tokio::fs::remove_file(&journal).await;

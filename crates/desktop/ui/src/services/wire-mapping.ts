@@ -14,19 +14,25 @@
 import type {
   DaemonStatus,
   JobRun,
+  JobPreview,
   JobStatus,
   LogLine,
   ManagementMode,
   ProcessStatus,
+  ProcessInstanceStatus,
+  ProcessOperation,
 } from "../shared/types";
 import type {
   DaemonStatusDto,
   EventEnvelopeDto,
   JobRunDto,
+  JobPreviewDto,
   JobStatusDto,
   LogLineDto,
   ManagementModeDto,
   ProcessStatusDto,
+  ProcessInstanceStatusDto,
+  ProcessOperationDto,
   TriggeredByDto,
 } from "./wire-types";
 import type { EventEnvelope } from "./operations-client";
@@ -81,7 +87,29 @@ export function mapProcessStatus(dto: ProcessStatusDto): ProcessStatus {
     cpuPercent: dto.cpu_percent,
     memoryBytes: dto.memory_bytes,
     uptime: formatUptime(dto.started_at),
+    guard: dto.guard
+      ? {
+          processId: dto.guard.process_id,
+          nativeGeneration: dto.guard.native_generation,
+          observedAt: dto.guard.observed_at,
+          liveness: dto.guard.liveness,
+          readiness: dto.guard.readiness,
+          memory: dto.guard.memory,
+          watch: dto.guard.watch,
+          lastRestartCause: dto.guard.last_restart_cause,
+          lastError: dto.guard.last_error,
+          isHistorical: dto.guard.is_historical,
+        }
+      : undefined,
   };
+}
+
+export function mapProcessInstanceStatus(dto: ProcessInstanceStatusDto): ProcessInstanceStatus {
+  return { instanceId: dto.instance_id, ordinal: dto.ordinal, generation: dto.generation, state: dto.state, pid: dto.pid, restartCount: dto.restart_count, startedAt: dto.started_at, cpuPercent: dto.cpu_percent, memoryBytes: dto.memory_bytes };
+}
+
+export function mapProcessOperation(dto: ProcessOperationDto): ProcessOperation {
+  return { operationId: dto.operation_id, name: dto.name, kind: dto.kind, targetInstances: dto.target_instances, phase: dto.phase, batch: dto.batch, completed: dto.completed, outcomes: dto.outcomes.map((outcome) => ({ instanceId: outcome.instance_id, ordinal: outcome.ordinal, state: outcome.state, failedStage: outcome.failed_stage, retryable: outcome.retryable })) };
 }
 
 export function mapJobStatus(dto: JobStatusDto): JobStatus {
@@ -100,6 +128,8 @@ export function mapJobStatus(dto: JobStatusDto): JobStatus {
     nextRunAt: dto.next_run_at,
     successRateRecent: dto.success_rate_recent,
     dependencies: dto.dependencies,
+    timezone: dto.timezone,
+    misfirePolicy: dto.misfire_policy,
   };
 }
 
@@ -119,6 +149,10 @@ export function mapJobRun(dto: JobRunDto): JobRun {
     exitCode: dto.exit_code,
     state: dto.state,
   };
+}
+
+export function mapJobPreview(dto: JobPreviewDto): JobPreview {
+  return { occurrences: dto.occurrences.map((occurrence) => ({ scheduledAt: occurrence.scheduled_at, localTime: occurrence.local_time, timezone: occurrence.timezone })) };
 }
 
 export function mapDaemonStatus(dto: DaemonStatusDto): DaemonStatus {

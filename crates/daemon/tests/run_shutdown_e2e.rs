@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use my_supervisor_application::{AppDeps, DaemonMeta, NullProcessServiceRegistrar, OperationsFacade};
+use my_supervisor_application::{
+    AppDeps, DaemonMeta, NullProcessServiceRegistrar, OperationsFacade,
+};
 use my_supervisor_config::TomlConfigSource;
 use my_supervisor_core::domain::{
     DependencyFailurePolicy, Job, JobId, JobRunState, JobTrigger, LogRetention, OverlapPolicy,
@@ -21,10 +23,7 @@ fn long_running_job(name: &str, overlap: OverlapPolicy) -> Job {
         id: JobId::new(),
         name: name.into(),
         command: "/bin/sh".into(),
-        args: vec![
-            "-c".into(),
-            "trap 'exit 0' TERM; sleep 30 & wait".into(),
-        ],
+        args: vec!["-c".into(), "trap 'exit 0' TERM; sleep 30 & wait".into()],
         cwd: None,
         env: BTreeMap::new(),
         trigger: JobTrigger::Interval(Duration::from_secs(60)),
@@ -32,6 +31,12 @@ fn long_running_job(name: &str, overlap: OverlapPolicy) -> Job {
         on_dependency_failure: DependencyFailurePolicy::Skip,
         timeout: None,
         log_retention: LogRetention::default(),
+        timezone: "UTC".into(),
+        schedule_revision: 0,
+        trigger_id: uuid::Uuid::new_v4(),
+        misfire_policy: Default::default(),
+        retry_policy: Default::default(),
+        admission: Default::default(),
     }
 }
 
@@ -40,7 +45,10 @@ async fn facade() -> (Arc<OperationsFacade>, PathBuf) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("my-supervisor-run-shutdown-{}-{nonce}", std::process::id()));
+    let root = std::env::temp_dir().join(format!(
+        "my-supervisor-run-shutdown-{}-{nonce}",
+        std::process::id()
+    ));
     let log_dir = root.join("logs");
     tokio::fs::create_dir_all(&log_dir).await.unwrap();
     let store = Arc::new(SqliteStore::connect(&root.join("state.db")).await.unwrap());
@@ -86,8 +94,14 @@ async fn force_delete_and_shutdown_wait_for_real_active_runs() {
     let queued = facade.trigger_job("shutdown").await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
     facade.shutdown_all().await.unwrap();
-    assert_eq!(facade.get_run("shutdown", &active).await.unwrap().state, JobRunState::Cancelled);
-    assert_eq!(facade.get_run("shutdown", &queued).await.unwrap().state, JobRunState::Cancelled);
+    assert_eq!(
+        facade.get_run("shutdown", &active).await.unwrap().state,
+        JobRunState::Cancelled
+    );
+    assert_eq!(
+        facade.get_run("shutdown", &queued).await.unwrap().state,
+        JobRunState::Cancelled
+    );
 
     tokio::fs::remove_dir_all(root).await.unwrap();
 }

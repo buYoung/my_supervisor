@@ -3,18 +3,30 @@
 //! documented exit-code convention (`0` ok, `1` general, `2` no such process,
 //! `3` daemon not running).
 
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
+
 use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use chrono::{DateTime, Utc};
+use my_supervisor_app_daemon::{
+    debug_or_canonical_root, discover_owner, load_control_token, DEFAULT_BASE_URL,
+};
 use my_supervisor_shared::api::{
-    ConfigApplyResultDto, ConvertRequestDto, DaemonStatusDto, JobListDto, JobRunListDto,
-    JobStatusDto, LogsResponseDto, ProcessListDto,
-    ProcessStatusDto, RecoveryDiagnosticsDto, RestartNoopDto,
+    AlertEpisodeDto, BackupResultDto, ConfigApplyResultDto, ConvertRequestDto, DaemonStatusDto,
+    DeliveryAttemptDto, JobListDto, JobPreviewDto, JobPreviewRequestDto, JobRunListDto,
+    JobStatusDto, LogsResponseDto, MetricSampleDto, ObservabilityPageDto, OperatorEventDto,
+    ProcessInstancesDto, ProcessListDto, ProcessOperationDto, ProcessStatusDto,
+    RecoveryDiagnosticsDto, RestartNoopDto, RollingRestartRequestDto, ScaleProcessRequestDto,
+    TokenRotationDto, UpgradeJournalDto,
 };
 use my_supervisor_shared::config::ConfigApplyRequestDto;
 use my_supervisor_shared::error::ErrorBody;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
+use tokio_tungstenite::tungstenite::http::Request;
 
 /// Error carrying the process exit code the CLI should terminate with.
 #[derive(Debug)]
@@ -23,17 +35,22 @@ pub enum CliError {
     NotFound(String),
     /// Connection refused / daemon unreachable — exit 3.
     DaemonDown,
+    Partial(String),
     /// Any other API error or local failure — exit 1.
     Failed(String),
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::Client;
 
     #[test]
     fn resource_names_are_encoded_as_one_path_segment() {
-        assert_eq!(Client::encode_path_segment("name with/slash"), "name%20with%2Fslash");
+        assert_eq!(
+            Client::encode_path_segment("name with/slash"),
+            "name%20with%2Fslash"
+        );
     }
 
     #[test]
@@ -47,6 +64,7 @@ impl CliError {
         match self {
             CliError::NotFound(_) => 2,
             CliError::DaemonDown => 3,
+            CliError::Partial(_) => 3,
             CliError::Failed(_) => 1,
         }
     }
@@ -57,6 +75,7 @@ impl CliError {
             CliError::DaemonDown => {
                 "daemon not running (connection refused at the configured URL)".to_string()
             }
+            CliError::Partial(m) => m.clone(),
             CliError::Failed(m) => m.clone(),
         }
     }
@@ -64,6 +83,8 @@ impl CliError {
 
 pub struct Client {
     base: String,
+    credential_root: PathBuf,
+    bearer_token: Arc<RwLock<String>>,
     http: reqwest::Client,
 }
 
@@ -77,6 +98,18 @@ impl Client {
                 "invalid --url: only http and https are supported".into(),
             ));
         }
+        let credential_root = debug_or_canonical_root().map_err(|error| {
+            CliError::Failed(format!("discovering daemon credentials: {error}"))
+        })?;
+        let base = if base.trim_end_matches('/') == DEFAULT_BASE_URL {
+            discover_owner(credential_root.clone())
+                .map(|owner| owner.endpoint)
+                .unwrap_or(base)
+        } else {
+            base
+        };
+        let bearer_token = load_control_token(credential_root.clone())
+            .map_err(|error| CliError::Failed(format!("reading daemon credentials: {error}")))?;
         let http = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(3))
             .timeout(std::time::Duration::from_secs(30))
@@ -84,6 +117,8 @@ impl Client {
             .map_err(|error| CliError::Failed(format!("building HTTP client: {error}")))?;
         Ok(Client {
             base: base.trim_end_matches('/').to_string(),
+            credential_root,
+            bearer_token: Arc::new(RwLock::new(bearer_token)),
             http,
         })
     }
@@ -103,7 +138,10 @@ impl Client {
         body: Option<Value>,
     ) -> Result<reqwest::Response, CliError> {
         let url = format!("{}{path}", self.base);
-        let mut req = self.http.request(method, &url);
+        let mut req = self
+            .http
+            .request(method, &url)
+            .bearer_auth(self.bearer_token());
         if let Some(body) = body {
             req = req.json(&body);
         }
@@ -141,13 +179,146 @@ impl Client {
             .map_err(|e| CliError::Failed(format!("decoding response: {e}")))
     }
 
+    async fn post_operation<T: DeserializeOwned, R: serde::Serialize>(
+        &self,
+        path: &str,
+        request: &R,
+        operation_id: Option<uuid::Uuid>,
+    ) -> Result<T, CliError> {
+        let url = format!("{}{path}", self.base);
+        let mut builder = self
+            .http
+            .post(url)
+            .bearer_auth(self.bearer_token())
+            .json(request);
+        if let Some(operation_id) = operation_id {
+            builder = builder.header("Idempotency-Key", operation_id.to_string());
+        }
+        let response = builder.send().await.map_err(|error| {
+            if error.is_connect() {
+                CliError::DaemonDown
+            } else {
+                CliError::Failed(error.to_string())
+            }
+        })?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let envelope = response.json::<ErrorBody>().await.ok();
+            return match envelope {
+                Some(body) if body.error.code.ends_with("_not_found") => {
+                    Err(CliError::NotFound(body.error.message))
+                }
+                Some(body) => Err(CliError::Failed(format!(
+                    "{} ({})",
+                    body.error.message, body.error.code
+                ))),
+                None => Err(CliError::Failed(format!("request failed: HTTP {status}"))),
+            };
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| CliError::Failed(format!("decoding response: {error}")))
+    }
+
     pub async fn list_processes(&self) -> Result<ProcessListDto, CliError> {
         self.get_json("/api/v1/processes").await
+    }
+
+    pub async fn observability_events(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<ObservabilityPageDto<OperatorEventDto>, CliError> {
+        self.get_json(&format!(
+            "/api/v1/observability/events?limit={limit}{}",
+            cursor
+                .map(|v| format!("&cursor={}", v.replace('|', "%7C")))
+                .unwrap_or_default()
+        ))
+        .await
+    }
+    pub async fn observability_metrics(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<ObservabilityPageDto<MetricSampleDto>, CliError> {
+        self.get_json(&format!(
+            "/api/v1/observability/metrics?limit={limit}{}",
+            cursor
+                .map(|v| format!("&cursor={}", v.replace('|', "%7C")))
+                .unwrap_or_default()
+        ))
+        .await
+    }
+    pub async fn observability_alerts(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<ObservabilityPageDto<AlertEpisodeDto>, CliError> {
+        self.get_json(&format!(
+            "/api/v1/observability/alerts?limit={limit}{}",
+            cursor
+                .map(|v| format!("&cursor={}", v.replace('|', "%7C")))
+                .unwrap_or_default()
+        ))
+        .await
+    }
+    pub async fn observability_deliveries(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<ObservabilityPageDto<DeliveryAttemptDto>, CliError> {
+        self.get_json(&format!(
+            "/api/v1/observability/deliveries?limit={limit}{}",
+            cursor
+                .map(|v| format!("&cursor={}", v.replace('|', "%7C")))
+                .unwrap_or_default()
+        ))
+        .await
     }
 
     pub async fn get_process(&self, name: &str) -> Result<ProcessStatusDto, CliError> {
         let name = Self::encode_path_segment(name);
         self.get_json(&format!("/api/v1/processes/{name}")).await
+    }
+
+    pub async fn process_instances(&self, name: &str) -> Result<ProcessInstancesDto, CliError> {
+        let name = Self::encode_path_segment(name);
+        self.get_json(&format!("/api/v1/processes/{name}/instances"))
+            .await
+    }
+
+    pub async fn scale_process(
+        &self,
+        name: &str,
+        instances: u16,
+        operation_id: Option<uuid::Uuid>,
+    ) -> Result<ProcessOperationDto, CliError> {
+        let name = Self::encode_path_segment(name);
+        self.post_operation(
+            &format!("/api/v1/processes/{name}/scale"),
+            &ScaleProcessRequestDto {
+                instances,
+                operation_id,
+            },
+            operation_id,
+        )
+        .await
+    }
+
+    pub async fn rolling_restart_process(
+        &self,
+        name: &str,
+        operation_id: Option<uuid::Uuid>,
+    ) -> Result<ProcessOperationDto, CliError> {
+        let name = Self::encode_path_segment(name);
+        self.post_operation(
+            &format!("/api/v1/processes/{name}/rolling-restart"),
+            &RollingRestartRequestDto { operation_id },
+            operation_id,
+        )
+        .await
     }
 
     pub async fn process_action(&self, name: &str, action: &str) -> Result<(), CliError> {
@@ -228,7 +399,7 @@ impl Client {
             since,
             after_sequence,
         ))
-            .await
+        .await
     }
 
     pub fn process_log_websocket_url(
@@ -239,7 +410,7 @@ impl Client {
         let name = Self::encode_path_segment(name);
         self.websocket_url(&log_path(
             &format!("/api/v1/processes/{name}/logs"),
-            10_000,
+            0,
             None,
             Some(after_sequence),
         ))
@@ -270,9 +441,14 @@ impl Client {
         action: &str,
         request: &ConfigApplyRequestDto,
     ) -> Result<ConfigApplyResultDto, CliError> {
-        let body = serde_json::to_value(request).map_err(|error| CliError::Failed(error.to_string()))?;
+        let body =
+            serde_json::to_value(request).map_err(|error| CliError::Failed(error.to_string()))?;
         let response = self
-            .send(Method::POST, &format!("/api/v1/daemon/config/{action}"), Some(body))
+            .send(
+                Method::POST,
+                &format!("/api/v1/daemon/config/{action}"),
+                Some(body),
+            )
             .await?;
         response
             .json::<ConfigApplyResultDto>()
@@ -286,6 +462,59 @@ impl Client {
             .map(|_| ())
     }
 
+    /// Refreshes only the native secret after a successful public rotation;
+    /// the control token never crosses a URL or renderer boundary.
+    pub fn refresh_credentials(&self) -> Result<(), CliError> {
+        let token = load_control_token(self.credential_root.clone())
+            .map_err(|error| CliError::Failed(format!("refreshing daemon credentials: {error}")))?;
+        *self
+            .bearer_token
+            .write()
+            .expect("CLI credential lock poisoned") = token;
+        Ok(())
+    }
+
+    pub async fn rotate_token(&self) -> Result<TokenRotationDto, CliError> {
+        let response = self
+            .send(Method::POST, "/api/v1/service/rotate-token", None)
+            .await?;
+        let result = response.json::<TokenRotationDto>().await.map_err(|error| {
+            CliError::Failed(format!("decoding token rotation response: {error}"))
+        })?;
+        self.refresh_credentials()?;
+        Ok(result)
+    }
+
+    pub async fn backup(&self) -> Result<BackupResultDto, CliError> {
+        let response = self
+            .send(Method::POST, "/api/v1/service/backup", None)
+            .await?;
+        response
+            .json()
+            .await
+            .map_err(|error| CliError::Failed(format!("decoding backup response: {error}")))
+    }
+
+    pub async fn upgrade(&self) -> Result<UpgradeJournalDto, CliError> {
+        let response = self
+            .send(Method::POST, "/api/v1/service/upgrade", None)
+            .await?;
+        response
+            .json()
+            .await
+            .map_err(|error| CliError::Failed(format!("decoding upgrade response: {error}")))
+    }
+
+    pub async fn rollback(&self) -> Result<UpgradeJournalDto, CliError> {
+        let response = self
+            .send(Method::POST, "/api/v1/service/rollback", None)
+            .await?;
+        response
+            .json()
+            .await
+            .map_err(|error| CliError::Failed(format!("decoding rollback response: {error}")))
+    }
+
     pub async fn daemon_status(&self) -> Result<DaemonStatusDto, CliError> {
         self.get_json("/api/v1/daemon/status").await
     }
@@ -296,6 +525,21 @@ impl Client {
 
     pub async fn list_jobs(&self) -> Result<JobListDto, CliError> {
         self.get_json("/api/v1/jobs").await
+    }
+
+    pub async fn preview_job(
+        &self,
+        request: &JobPreviewRequestDto,
+    ) -> Result<JobPreviewDto, CliError> {
+        let body =
+            serde_json::to_value(request).map_err(|error| CliError::Failed(error.to_string()))?;
+        let response = self
+            .send(Method::POST, "/api/v1/jobs/preview", Some(body))
+            .await?;
+        response
+            .json::<JobPreviewDto>()
+            .await
+            .map_err(|error| CliError::Failed(format!("decoding response: {error}")))
     }
 
     pub async fn get_job(&self, name: &str) -> Result<JobStatusDto, CliError> {
@@ -341,7 +585,8 @@ impl Client {
             tail,
             since,
             after_sequence,
-        )).await
+        ))
+        .await
     }
 
     pub fn run_log_websocket_url(
@@ -354,7 +599,7 @@ impl Client {
         let run_id = Self::encode_path_segment(run_id);
         self.websocket_url(&log_path(
             &format!("/api/v1/jobs/{name}/runs/{run_id}/logs"),
-            10_000,
+            0,
             None,
             Some(after_sequence),
         ))
@@ -365,6 +610,19 @@ impl Client {
     /// replayed with the same stable `event_id` after a transport failure.
     pub fn events_websocket_url(&self) -> Result<String, CliError> {
         self.websocket_url("/api/v1/events")
+    }
+
+    pub fn websocket_request(&self, url: &str) -> Result<Request<()>, CliError> {
+        let mut request = url.into_client_request().map_err(|error| {
+            CliError::Failed(format!("building WebSocket handshake request: {error}"))
+        })?;
+        let authorization = format!("Bearer {}", self.bearer_token())
+            .parse()
+            .map_err(|error| {
+                CliError::Failed(format!("building WebSocket authorization header: {error}"))
+            })?;
+        request.headers_mut().insert(AUTHORIZATION, authorization);
+        Ok(request)
     }
 
     pub async fn cancel_run(&self, name: &str, run_id: &str) -> Result<(), CliError> {
@@ -392,13 +650,21 @@ impl Client {
         Ok(url.to_string())
     }
 
+    fn bearer_token(&self) -> String {
+        self.bearer_token
+            .read()
+            .expect("CLI credential lock poisoned")
+            .clone()
+    }
+
     pub async fn convert_process(
         &self,
         name: &str,
         request: &ConvertRequestDto,
     ) -> Result<ProcessStatusDto, CliError> {
         let name = Self::encode_path_segment(name);
-        let body = serde_json::to_value(request).map_err(|error| CliError::Failed(error.to_string()))?;
+        let body =
+            serde_json::to_value(request).map_err(|error| CliError::Failed(error.to_string()))?;
         let response = self
             .send(
                 Method::POST,
@@ -411,7 +677,6 @@ impl Client {
             .await
             .map_err(|error| CliError::Failed(format!("decoding response: {error}")))
     }
-
 }
 
 fn log_path(

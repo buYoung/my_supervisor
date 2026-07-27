@@ -96,26 +96,44 @@ impl DetachedHelperPaths {
 }
 
 fn validate_helper_path(helper_name: &str, path: PathBuf) -> Result<PathBuf, String> {
-    let absolute_path = path
-        .canonicalize()
-        .map_err(|error| format!("{helper_name} is unavailable at {}: {error}", path.display()))?;
-    let metadata = std::fs::metadata(&absolute_path)
-        .map_err(|error| format!("reading {helper_name} at {} failed: {error}", absolute_path.display()))?;
+    let absolute_path = path.canonicalize().map_err(|error| {
+        format!(
+            "{helper_name} is unavailable at {}: {error}",
+            path.display()
+        )
+    })?;
+    let metadata = std::fs::metadata(&absolute_path).map_err(|error| {
+        format!(
+            "reading {helper_name} at {} failed: {error}",
+            absolute_path.display()
+        )
+    })?;
     if !metadata.is_file() {
-        return Err(format!("{helper_name} at {} is not a regular file", absolute_path.display()));
+        return Err(format!(
+            "{helper_name} at {} is not a regular file",
+            absolute_path.display()
+        ));
     }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
 
         if metadata.permissions().mode() & 0o111 == 0 {
-            return Err(format!("{helper_name} at {} is not executable", absolute_path.display()));
+            return Err(format!(
+                "{helper_name} at {} is not executable",
+                absolute_path.display()
+            ));
         }
     }
     Ok(absolute_path)
 }
 
-async fn pump<R>(reader: R, stream: LogStream, sink: Arc<dyn LogSink>, target: LogTarget) -> Result<(), LogError>
+async fn pump<R>(
+    reader: R,
+    stream: LogStream,
+    sink: Arc<dyn LogSink>,
+    target: LogTarget,
+) -> Result<(), LogError>
 where
     R: tokio::io::AsyncRead + Unpin,
 {
@@ -147,7 +165,12 @@ pub fn attach_pumps(
         )));
     }
     if let Some(err) = stderr {
-        pumps.push(tokio::spawn(pump(err, LogStream::Stderr, sink.clone(), target)));
+        pumps.push(tokio::spawn(pump(
+            err,
+            LogStream::Stderr,
+            sink.clone(),
+            target,
+        )));
     }
     pumps
 }
@@ -190,12 +213,15 @@ pub fn spawn_detached_child(
     let mut reaper_controls = Vec::with_capacity(2);
     let mut reapers = Vec::with_capacity(2);
     for reaper_index in 0..2 {
-        let (proxy_control, reaper_control) = std::os::unix::net::UnixStream::pair().map_err(|error| SpawnError::Io {
-            name: spec.name.clone(),
-            message: format!("creating detached reaper control channel failed: {error}"),
-        })?;
-        set_close_on_exec(&proxy_control, true).map_err(|error| control_channel_error(spec, error))?;
-        set_close_on_exec(&reaper_control, false).map_err(|error| control_channel_error(spec, error))?;
+        let (proxy_control, reaper_control) =
+            std::os::unix::net::UnixStream::pair().map_err(|error| SpawnError::Io {
+                name: spec.name.clone(),
+                message: format!("creating detached reaper control channel failed: {error}"),
+            })?;
+        set_close_on_exec(&proxy_control, true)
+            .map_err(|error| control_channel_error(spec, error))?;
+        set_close_on_exec(&reaper_control, false)
+            .map_err(|error| control_channel_error(spec, error))?;
 
         let mut reaper_command = std::process::Command::new(&helpers.group_reaper);
         reaper_command
@@ -246,7 +272,11 @@ pub fn spawn_detached_child(
         .args(detached_proxy_test_arguments(test_controls))
         .arg("--journal")
         .arg(journal_path)
-        .args(proxy_controls.iter().flat_map(|control| ["--control-fd".into(), control.as_raw_fd().to_string()]))
+        .args(
+            proxy_controls
+                .iter()
+                .flat_map(|control| ["--control-fd".into(), control.as_raw_fd().to_string()]),
+        )
         .arg("--")
         .arg(&spec.command)
         .args(&spec.args)
@@ -300,9 +330,10 @@ fn reap_helpers(reapers: &mut [std::process::Child]) {
 fn detached_proxy_test_arguments(test_controls: &DetachedTestControls) -> Vec<std::ffi::OsString> {
     #[cfg(debug_assertions)]
     {
-        return test_controls.proxy_fail_after_appends
+        test_controls
+            .proxy_fail_after_appends
             .map(|value| vec!["--test-fail-after-appends".into(), value.to_string().into()])
-            .unwrap_or_default();
+            .unwrap_or_default()
     }
     #[cfg(not(debug_assertions))]
     {
@@ -324,7 +355,7 @@ fn detached_reaper_test_arguments(
         if reaper_index == 0 && test_controls.first_reaper_crash_after_start {
             arguments.push("--test-crash-after-start".into());
         }
-        return arguments;
+        arguments
     }
     #[cfg(not(debug_assertions))]
     {

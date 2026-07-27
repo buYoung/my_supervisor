@@ -113,7 +113,7 @@ pub fn snapshot(pid: u32) -> Result<ProcessIdentity, SignalError> {
                 ),
             });
         }
-        return Err(last_error());
+        Err(last_error())
     }
     #[cfg(not(target_os = "macos"))]
     {

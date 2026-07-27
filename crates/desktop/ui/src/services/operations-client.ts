@@ -14,10 +14,13 @@ import type {
   DaemonStatus,
   JobRun,
   JobStatus,
+  JobPreview,
   LogLine,
   ProcessStatus,
+  ProcessInstanceStatus,
+  ProcessOperation,
 } from "../shared/types";
-import type { ConvertTargetDto, JobConfigDto, ProcessConfigDto } from "./wire-types";
+import type { ConvertTargetDto, JobConfigDto, JobPreviewRequestDto, ProcessConfigDto } from "./wire-types";
 
 const EVENT_DEDUP_CACHE_CAPACITY = 1_024;
 
@@ -42,12 +45,23 @@ export interface ProcessLogsTail {
   lines: LogLine[];
   truncated: boolean;
   droppedCount: number;
+  earliestRetainedSequence?: number;
+  cursorExpired: boolean;
 }
 
 /** Result of merging per-job run histories for the cross-job 실행 이력 table. */
 export interface JobRunsResult {
   runs: JobRun[];
   truncated: boolean;
+}
+
+/** Additive bounded refresh result. Cursor and watermark remain opaque. */
+export interface ResourcePage<T> {
+  records: T[];
+  nextCursor?: string;
+  highWatermark: string;
+  partial: boolean;
+  failedPartitions: string[];
 }
 
 export interface FollowLogsHandlers {
@@ -107,7 +121,11 @@ export interface OperationsClient {
 
   // Processes
   listProcesses(): Promise<ProcessStatus[]>;
+  listProcessesPage(cursor?: string, highWatermark?: string, limit?: number): Promise<ResourcePage<ProcessStatus>>;
   getProcess(name: string): Promise<ProcessStatus>;
+  processInstances(name: string): Promise<{ name: string; desiredInstances: number; instances: ProcessInstanceStatus[] }>;
+  scaleProcess(name: string, instances: number, operationId?: string): Promise<ProcessOperation>;
+  rollingRestartProcess(name: string, operationId?: string): Promise<ProcessOperation>;
   addProcess(config: ProcessConfigDto): Promise<ProcessStatus>;
   startProcess(name: string): Promise<void>;
   stopProcess(name: string, force?: boolean): Promise<void>;
@@ -130,10 +148,16 @@ export interface OperationsClient {
 
   // Jobs
   listJobs(): Promise<JobStatus[]>;
+  listJobsPage(cursor?: string, highWatermark?: string, limit?: number): Promise<ResourcePage<JobStatus>>;
+  getJob(name: string): Promise<JobStatus>;
   addJob(config: JobConfigDto): Promise<JobStatus>;
+  updateJob(name: string, config: JobConfigDto): Promise<JobStatus>;
+  previewJob(request: JobPreviewRequestDto): Promise<JobPreview>;
   removeJob(name: string, force?: boolean): Promise<void>;
   triggerJob(name: string): Promise<{ runId: string }>;
   listRuns(name: string, limit?: number): Promise<JobRunsResult>;
+  getRun(name: string, runId: string): Promise<JobRun>;
+  cancelRun(name: string, runId: string): Promise<void>;
 
   // Daemon
   daemonStatus(): Promise<DaemonStatus>;

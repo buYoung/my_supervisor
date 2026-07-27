@@ -51,3 +51,30 @@ impl ConfigSource for TomlConfigSource {
         self.path.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::TomlConfigSource;
+    use my_supervisor_core::domain::MisfirePolicy;
+
+    #[test]
+    fn omitted_job_fields_use_current_macos_defaults() {
+        let loaded = TomlConfigSource::parse(
+            r#"
+[[job]]
+name = "local-defaults"
+command = "/bin/true"
+trigger = { type = "cron", expr = "0 * * * *" }
+"#,
+        )
+        .expect("valid TOML parses");
+        let job = &loaded.jobs[0];
+
+        assert_eq!(
+            job.timezone,
+            iana_time_zone::get_timezone().expect("test host resolves an IANA timezone")
+        );
+        assert_eq!(job.misfire_policy, MisfirePolicy::RunOnce);
+        assert!(!job.trigger_id.is_nil());
+    }
+}

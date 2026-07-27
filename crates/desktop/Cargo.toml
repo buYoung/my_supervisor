@@ -8,8 +8,13 @@ license.workspace = true
 name = "my-supervisor"
 path = "src/main.rs"
 
+[package.metadata.msv-release]
+architecture = "arm64-only"
+target = "aarch64-apple-darwin"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+serde_json = { workspace = true }
 
 [dependencies]
 my-supervisor-core = { workspace = true }
@@ -24,4 +29,6 @@ tracing-subscriber = { workspace = true }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
 tokio = { workspace = true }

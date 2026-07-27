@@ -64,7 +64,10 @@ pub(crate) async fn terminate_owned_process_group(
 fn owned_group_id(target: &ChildHandle) -> Result<u32, SignalError> {
     match (target.pgid, target.generation.as_deref()) {
         (Some(pgid), Some(generation))
-            if pgid != 0 && pgid == target.pid && !generation.is_empty() => Ok(pgid),
+            if pgid != 0 && pgid == target.pid && !generation.is_empty() =>
+        {
+            Ok(pgid)
+        }
         _ => Err(SignalError::IdentityMismatch),
     }
 }

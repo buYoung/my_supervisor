@@ -19,6 +19,8 @@ fn cursor_pages_preserve_repeated_lines_without_content_deduplication() {
         dropped_count: 0,
         high_watermark: 10_001,
         next_sequence: 10_002,
+        earliest_retained_sequence: Some(1),
+        cursor_expired: false,
     };
 
     let dto = log_page_to_dto(page);

@@ -20,16 +20,22 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' asset: data:; font-src 'self' data:; connect-src 'self'"
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
     "externalBin": [
+      "binaries/msv-daemon",
+      "binaries/msv",
       "binaries/msv-log-proxy",
       "binaries/msv-group-reaper"
     ],
-    "icon": ["icons/icon.png"]
+    "icon": ["icons/icon.png"],
+    "macOS": {
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist"
+    }
   }
 }

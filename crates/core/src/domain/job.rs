@@ -63,7 +63,14 @@ pub enum JobDeletionStage {
 
 impl JobDeletionStage {
     pub fn is_irreversible(self) -> bool {
-        matches!(self, Self::CancellationStarted | Self::RunsDraining | Self::RowsDeleted | Self::LogsCleaning | Self::Completed)
+        matches!(
+            self,
+            Self::CancellationStarted
+                | Self::RunsDraining
+                | Self::RowsDeleted
+                | Self::LogsCleaning
+                | Self::Completed
+        )
     }
 }
 
@@ -100,6 +107,131 @@ pub enum OverlapPolicy {
     Parallel,
 }
 
+/// Missed timer behavior. Legacy definitions retain `Skip`; newly supplied
+/// schedules default to one bounded recovery run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum MisfirePolicy {
+    #[default]
+    Skip,
+    RunOnce,
+    CatchUp {
+        max_occurrences: u16,
+        max_age: Duration,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum QueueOverflowPolicy {
+    #[default]
+    RejectNew,
+    Skip,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RetryPolicy {
+    /// Includes the initial attempt. `1` disables retry.
+    pub max_attempts: u16,
+    pub initial_backoff: Duration,
+    pub max_backoff: Duration,
+    pub multiplier: u8,
+    /// Percentage in the inclusive range 0..=100.
+    pub jitter_percent: u8,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_attempts: 1,
+            initial_backoff: Duration::from_secs(1),
+            max_backoff: Duration::from_secs(300),
+            multiplier: 2,
+            jitter_percent: 20,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdmissionPolicy {
+    pub max_concurrency: u16,
+    pub max_queue: u16,
+    pub overflow: QueueOverflowPolicy,
+}
+
+impl AdmissionPolicy {
+    pub fn legacy(overlap: OverlapPolicy) -> Self {
+        match overlap {
+            OverlapPolicy::Skip => Self {
+                max_concurrency: 1,
+                max_queue: 0,
+                overflow: QueueOverflowPolicy::Skip,
+            },
+            OverlapPolicy::Queue => Self {
+                max_concurrency: 1,
+                max_queue: 1024,
+                overflow: QueueOverflowPolicy::RejectNew,
+            },
+            OverlapPolicy::Parallel => Self {
+                max_concurrency: 32,
+                max_queue: 1024,
+                overflow: QueueOverflowPolicy::RejectNew,
+            },
+        }
+    }
+}
+
+impl Default for AdmissionPolicy {
+    fn default() -> Self {
+        Self::legacy(OverlapPolicy::Skip)
+    }
+}
+
+/// Stable identity of one logical timer occurrence. Attempt/run IDs remain
+/// separate so retry state can be added without rewriting run history.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScheduleOccurrence {
+    pub trigger_id: Uuid,
+    pub schedule_revision: u64,
+    pub scheduled_at: DateTime<Utc>,
+    pub attempt: u16,
+}
+
+/// Persisted state for one logical scheduled occurrence.  A timer notification
+/// is only a candidate: this ledger is the restart-safe delivery authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleOccurrenceState {
+    Claimed,
+    Queued,
+    Running,
+    RetryPending,
+    Finalized,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DurableScheduleOccurrence {
+    pub job_id: JobId,
+    pub job_name: String,
+    pub occurrence: ScheduleOccurrence,
+    pub state: ScheduleOccurrenceState,
+    /// Absolute retry time calculated once and persisted with the occurrence.
+    pub next_attempt_at: DateTime<Utc>,
+    pub run_id: Option<JobRunId>,
+    pub final_state: Option<JobRunState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScheduleAdmission {
+    Start(DurableScheduleOccurrence),
+    Queued(DurableScheduleOccurrence),
+    Finalized(DurableScheduleOccurrence),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScheduleFinalization {
+    Retry(DurableScheduleOccurrence),
+    Finalized(DurableScheduleOccurrence),
+}
+
 /// What happens when an upstream dependency failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum DependencyFailurePolicy {
@@ -129,6 +261,23 @@ pub struct Job {
     pub on_dependency_failure: DependencyFailurePolicy,
     pub timeout: Option<Duration>,
     pub log_retention: LogRetention,
+    /// Explicit IANA zone for cron interpretation. Legacy rows are UTC.
+    #[serde(default = "legacy_timezone")]
+    pub timezone: String,
+    #[serde(default)]
+    pub schedule_revision: u64,
+    #[serde(default = "Uuid::new_v4")]
+    pub trigger_id: Uuid,
+    #[serde(default)]
+    pub misfire_policy: MisfirePolicy,
+    #[serde(default)]
+    pub retry_policy: RetryPolicy,
+    #[serde(default)]
+    pub admission: AdmissionPolicy,
+}
+
+fn legacy_timezone() -> String {
+    "UTC".to_string()
 }
 
 /// State machine for a single run.
@@ -160,8 +309,15 @@ impl JobRunState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TriggeredBy {
     Schedule,
+    /// New schedule dispatches retain the event identity while legacy rows
+    /// continue to deserialize as `Schedule`.
+    Scheduled {
+        occurrence: ScheduleOccurrence,
+    },
     Manual,
-    Dependency { upstream_run_id: JobRunId },
+    Dependency {
+        upstream_run_id: JobRunId,
+    },
 }
 
 /// A single execution instance of a Job.
@@ -178,4 +334,9 @@ pub struct JobRun {
     pub ended_at: Option<DateTime<Utc>>,
     pub exit_code: Option<i32>,
     pub state: JobRunState,
+    /// Absent for legacy/manual/dependency runs.
+    #[serde(default)]
+    pub occurrence: Option<ScheduleOccurrence>,
+    #[serde(default)]
+    pub original_scheduled_at: Option<DateTime<Utc>>,
 }

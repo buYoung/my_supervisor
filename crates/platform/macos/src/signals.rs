@@ -6,7 +6,9 @@ use my_supervisor_core::ports::SignalError;
 
 use crate::process_identity::{snapshot, ProcessIdentity};
 
-pub fn process_identity(pid: u32) -> Result<ProcessIdentity, SignalError> { snapshot(pid) }
+pub fn process_identity(pid: u32) -> Result<ProcessIdentity, SignalError> {
+    snapshot(pid)
+}
 
 pub fn matches_handle(handle: &ChildHandle) -> bool {
     let Some(pgid) = handle.pgid else {
@@ -38,7 +40,9 @@ pub fn signal_checked(handle: &ChildHandle, signal: i32) -> Result<(), SignalErr
         match std::io::Error::last_os_error().raw_os_error() {
             Some(libc::ESRCH) => Err(SignalError::AlreadyExited),
             Some(libc::EPERM) => Err(SignalError::PermissionDenied),
-            _ => Err(SignalError::IoFailure(std::io::Error::last_os_error().to_string())),
+            _ => Err(SignalError::IoFailure(
+                std::io::Error::last_os_error().to_string(),
+            )),
         }
     })
 }
@@ -60,8 +64,7 @@ fn dedicated_group_id(handle: &ChildHandle) -> Result<u32, SignalError> {
     let Some(pgid) = handle.pgid else {
         return Err(SignalError::IdentityMismatch);
     };
-    if pgid == 0 || pgid != handle.pid || handle.generation.as_deref().is_none_or(str::is_empty)
-    {
+    if pgid == 0 || pgid != handle.pid || handle.generation.as_deref().is_none_or(str::is_empty) {
         return Err(SignalError::IdentityMismatch);
     }
     Ok(pgid)
@@ -78,7 +81,9 @@ fn signal_group(pgid: u32, signal: i32) -> Result<(), SignalError> {
         match std::io::Error::last_os_error().raw_os_error() {
             Some(libc::ESRCH) => Err(SignalError::AlreadyExited),
             Some(libc::EPERM) => Err(SignalError::PermissionDenied),
-            _ => Err(SignalError::IoFailure(std::io::Error::last_os_error().to_string())),
+            _ => Err(SignalError::IoFailure(
+                std::io::Error::last_os_error().to_string(),
+            )),
         }
     })
 }
@@ -169,7 +174,9 @@ pub fn process_group_exists(pgid: u32) -> Result<bool, SignalError> {
     match std::io::Error::last_os_error().raw_os_error() {
         Some(libc::ESRCH) => Ok(false),
         Some(libc::EPERM) => Err(SignalError::PermissionDenied),
-        _ => Err(SignalError::IoFailure(std::io::Error::last_os_error().to_string())),
+        _ => Err(SignalError::IoFailure(
+            std::io::Error::last_os_error().to_string(),
+        )),
     }
 }
 
@@ -274,20 +281,24 @@ mod tests {
             |_, _| Err(SignalError::AlreadyExited),
         );
 
-        assert!(matches!(permission_denied, Err(SignalError::PermissionDenied)));
+        assert!(matches!(
+            permission_denied,
+            Err(SignalError::PermissionDenied)
+        ));
         assert!(matches!(missing_group, Ok(())));
     }
 
     #[test]
     fn known_group_signal_keeps_permission_and_missing_group_distinct() {
-        let permission_denied = signal_group_with(42, libc::SIGKILL, |_, _| {
-            Err(SignalError::PermissionDenied)
-        });
-        let missing_group = signal_group_with(42, libc::SIGKILL, |_, _| {
-            Err(SignalError::AlreadyExited)
-        });
+        let permission_denied =
+            signal_group_with(42, libc::SIGKILL, |_, _| Err(SignalError::PermissionDenied));
+        let missing_group =
+            signal_group_with(42, libc::SIGKILL, |_, _| Err(SignalError::AlreadyExited));
 
-        assert!(matches!(permission_denied, Err(SignalError::PermissionDenied)));
+        assert!(matches!(
+            permission_denied,
+            Err(SignalError::PermissionDenied)
+        ));
         assert!(matches!(missing_group, Err(SignalError::AlreadyExited)));
     }
 }

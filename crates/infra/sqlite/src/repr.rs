@@ -6,7 +6,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use my_supervisor_core::domain::{JobRunId, JobTrigger, TriggeredBy};
+use my_supervisor_core::domain::{JobRunId, JobTrigger, ScheduleOccurrence, TriggeredBy};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -47,14 +47,28 @@ impl From<TriggerRepr> for JobTrigger {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TriggeredByRepr {
     Schedule,
+    Scheduled {
+        trigger_id: String,
+        schedule_revision: u64,
+        scheduled_at: DateTime<Utc>,
+        attempt: u16,
+    },
     Manual,
-    Dependency { upstream_run_id: String },
+    Dependency {
+        upstream_run_id: String,
+    },
 }
 
 impl From<&TriggeredBy> for TriggeredByRepr {
     fn from(t: &TriggeredBy) -> Self {
         match t {
             TriggeredBy::Schedule => TriggeredByRepr::Schedule,
+            TriggeredBy::Scheduled { occurrence } => TriggeredByRepr::Scheduled {
+                trigger_id: occurrence.trigger_id.to_string(),
+                schedule_revision: occurrence.schedule_revision,
+                scheduled_at: occurrence.scheduled_at,
+                attempt: occurrence.attempt,
+            },
             TriggeredBy::Manual => TriggeredByRepr::Manual,
             TriggeredBy::Dependency { upstream_run_id } => TriggeredByRepr::Dependency {
                 upstream_run_id: upstream_run_id.0.to_string(),
@@ -67,6 +81,19 @@ impl TriggeredByRepr {
     pub fn into_domain(self) -> TriggeredBy {
         match self {
             TriggeredByRepr::Schedule => TriggeredBy::Schedule,
+            TriggeredByRepr::Scheduled {
+                trigger_id,
+                schedule_revision,
+                scheduled_at,
+                attempt,
+            } => TriggeredBy::Scheduled {
+                occurrence: ScheduleOccurrence {
+                    trigger_id: uuid::Uuid::parse_str(&trigger_id).unwrap_or_default(),
+                    schedule_revision,
+                    scheduled_at,
+                    attempt,
+                },
+            },
             TriggeredByRepr::Manual => TriggeredBy::Manual,
             TriggeredByRepr::Dependency { upstream_run_id } => {
                 let id = uuid::Uuid::parse_str(&upstream_run_id).unwrap_or_default();

@@ -11,20 +11,22 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 use my_supervisor_application::{
-    AppDeps, DaemonMeta, DomainEvent, NullProcessServiceRegistrar, OperationsFacade,
+    AppDeps, ConvertTarget, DaemonMeta, DomainEvent, NullProcessServiceRegistrar, OperationsFacade,
+    RestartOutcome,
 };
 use my_supervisor_core::domain::{
-    ChildHandle, Job, JobDeletionJournal, JobDeletionStage, JobId, JobRun, JobRunId, JobRunState, JobTrigger, LifecycleMode, LoadedConfig, LogLine,
-    LogRetention, LogStream, ManagementMode, OverlapPolicy, ProcessResourceUsage, ProcessSpec,
-    ProcessState, TriggeredBy,
+    ChildHandle, Job, JobDeletionJournal, JobDeletionStage, JobId, JobRun, JobRunId, JobRunState,
+    JobTrigger, LifecycleMode, LoadedConfig, LogLine, LogRetention, LogStream, ManagementMode,
+    OverlapPolicy, ProcessResourceUsage, ProcessSpec, ProcessState, TriggeredBy,
 };
 use my_supervisor_core::ports::error::RegistrarError;
+use my_supervisor_core::ports::error::RepoError;
 use my_supervisor_core::ports::{
-    Aliveness, CleanupTicket, ConfigError, ConfigSource, LifecycleController, ProbeError, RealClock, ReapError,
-    JobRepository, LogSink, ProcessServiceRegistrar, ShutdownSignaler, SignalError, SpawnError, StateRepository, TransientCleanupStage, TransientCompletion,
+    Aliveness, CleanupTicket, ConfigError, ConfigSource, JobRepository, LifecycleController,
+    LogSink, ProbeError, ProcessServiceRegistrar, RealClock, ReapError, ShutdownSignaler,
+    SignalError, SpawnError, StateRepository, TransientCleanupStage, TransientCompletion,
     TransientOutcome,
 };
-use my_supervisor_core::ports::error::RepoError;
 use my_supervisor_infra_logging::InMemoryLogSink;
 use my_supervisor_infra_scheduler::TokioScheduler;
 use my_supervisor_infra_sqlite::SqliteStore;
@@ -104,10 +106,7 @@ impl FakeLifecycle {
     }
 
     fn finish(&self, handle: &ChildHandle) {
-        self.alive
-            .lock()
-            .unwrap()
-            .insert(handle.process_id, false);
+        self.alive.lock().unwrap().insert(handle.process_id, false);
     }
 
     fn leave_unreaped_on_cancel(&self) {
@@ -126,18 +125,20 @@ impl LifecycleController for FakeLifecycle {
     }
 
     async fn probe_alive(&self, handle: &ChildHandle) -> Result<Aliveness, ProbeError> {
-        Ok(if self
-            .alive
-            .lock()
-            .unwrap()
-            .get(&handle.process_id)
-            .copied()
-            .unwrap_or(false)
-        {
-            Aliveness::Alive
-        } else {
-            Aliveness::Dead
-        })
+        Ok(
+            if self
+                .alive
+                .lock()
+                .unwrap()
+                .get(&handle.process_id)
+                .copied()
+                .unwrap_or(false)
+            {
+                Aliveness::Alive
+            } else {
+                Aliveness::Dead
+            },
+        )
     }
 
     async fn tail_detached_logs(
@@ -161,7 +162,10 @@ impl LifecycleController for FakeLifecycle {
         Ok(receiver)
     }
 
-    async fn resource_usage(&self, _handle: &ChildHandle) -> Result<ProcessResourceUsage, ProbeError> {
+    async fn resource_usage(
+        &self,
+        _handle: &ChildHandle,
+    ) -> Result<ProcessResourceUsage, ProbeError> {
         Ok(ProcessResourceUsage {
             cpu_percent: 12.5,
             memory_bytes: 8 * 1024 * 1024,
@@ -246,25 +250,45 @@ impl LifecycleController for FakeLifecycle {
 #[derive(Default)]
 struct FakeRegistrar {
     is_running: Mutex<bool>,
+    calls: Mutex<Vec<String>>,
+    fail_registration: std::sync::atomic::AtomicBool,
 }
 
 #[async_trait]
 impl ProcessServiceRegistrar for FakeRegistrar {
-    async fn register(&self, _unit_name: &str, _spec: &ProcessSpec) -> Result<(), RegistrarError> {
+    async fn register(&self, unit_name: &str, _spec: &ProcessSpec) -> Result<(), RegistrarError> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("register:{unit_name}"));
+        if self.fail_registration.load(Ordering::SeqCst) {
+            return Err(RegistrarError::RegistrationFailed(
+                "injected failure".into(),
+            ));
+        }
         Ok(())
     }
 
-    async fn unregister(&self, _unit_name: &str) -> Result<(), RegistrarError> {
+    async fn unregister(&self, unit_name: &str) -> Result<(), RegistrarError> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("unregister:{unit_name}"));
         *self.is_running.lock().unwrap() = false;
         Ok(())
     }
 
-    async fn start(&self, _unit_name: &str) -> Result<(), RegistrarError> {
+    async fn start(&self, unit_name: &str) -> Result<(), RegistrarError> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("start:{unit_name}"));
         *self.is_running.lock().unwrap() = true;
         Ok(())
     }
 
-    async fn stop(&self, _unit_name: &str) -> Result<(), RegistrarError> {
+    async fn stop(&self, unit_name: &str) -> Result<(), RegistrarError> {
+        self.calls.lock().unwrap().push(format!("stop:{unit_name}"));
         *self.is_running.lock().unwrap() = false;
         Ok(())
     }
@@ -292,6 +316,18 @@ impl ProcessServiceRegistrar for FakeRegistrar {
 
 struct FakeShutdown {
     lifecycle: Arc<FakeLifecycle>,
+    graceful_calls: AtomicUsize,
+    force_kill_calls: AtomicUsize,
+}
+
+impl FakeShutdown {
+    fn new(lifecycle: Arc<FakeLifecycle>) -> Self {
+        Self {
+            lifecycle,
+            graceful_calls: AtomicUsize::new(0),
+            force_kill_calls: AtomicUsize::new(0),
+        }
+    }
 }
 
 struct FailFirstRuntimeHandleClear {
@@ -346,7 +382,9 @@ impl StateRepository for FailFirstRuntimeHandleClear {
                 .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok()
         {
-            return Err(RepoError::Backend("injected runtime-handle clear failure".into()));
+            return Err(RepoError::Backend(
+                "injected runtime-handle clear failure".into(),
+            ));
         }
         self.inner.set_runtime_handle(name, handle).await
     }
@@ -357,7 +395,9 @@ impl StateRepository for FailFirstRuntimeHandleClear {
         handle: &ChildHandle,
         error: &str,
     ) -> Result<(), RepoError> {
-        self.inner.enqueue_runtime_handle_cleanup(name, handle, error).await
+        self.inner
+            .enqueue_runtime_handle_cleanup(name, handle, error)
+            .await
     }
 
     async fn pending_runtime_handle_cleanup(
@@ -386,11 +426,13 @@ impl ShutdownSignaler for FakeShutdown {
         target: &ChildHandle,
         _policy: &my_supervisor_core::domain::ShutdownPolicy,
     ) -> Result<(), SignalError> {
+        self.graceful_calls.fetch_add(1, Ordering::SeqCst);
         self.lifecycle.finish(target);
         Ok(())
     }
 
     async fn force_kill(&self, target: &ChildHandle) -> Result<(), SignalError> {
+        self.force_kill_calls.fetch_add(1, Ordering::SeqCst);
         self.lifecycle.finish(target);
         Ok(())
     }
@@ -418,9 +460,7 @@ async fn facade_with_store_and_config(
     let log_sink = Arc::new(InMemoryLogSink::new());
     let dependencies = AppDeps {
         lifecycle: lifecycle.clone(),
-        shutdown: Arc::new(FakeShutdown {
-            lifecycle: lifecycle.clone(),
-        }),
+        shutdown: Arc::new(FakeShutdown::new(lifecycle.clone())),
         registrar: Arc::new(NullProcessServiceRegistrar),
         state_repo: store.clone(),
         job_repo: store,
@@ -443,7 +483,7 @@ async fn facade_with_first_runtime_handle_clear_failure(
     });
     let dependencies = AppDeps {
         lifecycle: lifecycle.clone(),
-        shutdown: Arc::new(FakeShutdown { lifecycle }),
+        shutdown: Arc::new(FakeShutdown::new(lifecycle)),
         registrar: Arc::new(NullProcessServiceRegistrar),
         state_repo: state_repo.clone(),
         job_repo: store,
@@ -464,50 +504,77 @@ async fn direct_stop_emits_stopped_once_when_handle_cleanup_retries() {
     spec.lifecycle = LifecycleMode::Detached;
     facade.add_process(spec).await.unwrap();
     facade.start_process("retry-stop").await.unwrap();
-    assert!(matches!(events.recv().await.unwrap().event, DomainEvent::ProcessStateChanged {
+    assert!(
+        matches!(events.recv().await.unwrap().event, DomainEvent::ProcessStateChanged {
         name,
         from: ProcessState::Stopped,
         to: ProcessState::Running,
-    } if name == "retry-stop"));
+        ..
+    } if name == "retry-stop")
+    );
 
     state_repo.fail_next_clear();
     assert!(facade.stop_process("retry-stop", false).await.is_err());
-    assert!(matches!(events.recv().await.unwrap().event, DomainEvent::ProcessStateChanged {
+    assert!(
+        matches!(events.recv().await.unwrap().event, DomainEvent::ProcessStateChanged {
         name,
         from: ProcessState::Running,
         to: ProcessState::Stopped,
-    } if name == "retry-stop"));
-    assert_eq!(state_repo.pending_runtime_handle_cleanup(10).await.unwrap().len(), 1);
+        ..
+    } if name == "retry-stop")
+    );
+    assert_eq!(
+        state_repo
+            .pending_runtime_handle_cleanup(10)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 
     facade.bootstrap().await.unwrap();
-    assert!(state_repo.pending_runtime_handle_cleanup(10).await.unwrap().is_empty());
-    assert!(matches!(
-        tokio::time::timeout(Duration::from_millis(20), events.recv()).await,
-        Err(_)
-    ));
+    assert!(state_repo
+        .pending_runtime_handle_cleanup(10)
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(
+        tokio::time::timeout(Duration::from_millis(20), events.recv())
+            .await
+            .is_err()
+    );
 }
 
 async fn facade_with_registrar(
     transient_delay: Duration,
     registrar: Arc<dyn ProcessServiceRegistrar>,
-) -> (Arc<OperationsFacade>, Arc<FakeLifecycle>) {
+) -> (
+    Arc<OperationsFacade>,
+    Arc<FakeLifecycle>,
+    Arc<FakeShutdown>,
+    Arc<SqliteStore>,
+) {
     let lifecycle = Arc::new(FakeLifecycle::new(transient_delay));
     let store = Arc::new(SqliteStore::connect_in_memory().await.unwrap());
+    let shutdown = Arc::new(FakeShutdown::new(lifecycle.clone()));
     let dependencies = AppDeps {
         lifecycle: lifecycle.clone(),
-        shutdown: Arc::new(FakeShutdown {
-            lifecycle: lifecycle.clone(),
-        }),
+        shutdown: shutdown.clone(),
         registrar,
         state_repo: store.clone(),
-        job_repo: store,
+        job_repo: store.clone(),
         scheduler: Arc::new(TokioScheduler::new()),
         log_sink: Arc::new(InMemoryLogSink::new()),
         clock: Arc::new(RealClock),
         config: Arc::new(EmptyConfig),
         meta: DaemonMeta::new(PathBuf::from("test.toml"), PathBuf::from("logs")),
     };
-    (OperationsFacade::new(dependencies), lifecycle)
+    (
+        OperationsFacade::new(dependencies),
+        lifecycle,
+        shutdown,
+        store,
+    )
 }
 
 async fn facade_with_log_sink(
@@ -517,9 +584,7 @@ async fn facade_with_log_sink(
     let store = Arc::new(SqliteStore::connect_in_memory().await.unwrap());
     let dependencies = AppDeps {
         lifecycle: lifecycle.clone(),
-        shutdown: Arc::new(FakeShutdown {
-            lifecycle: lifecycle.clone(),
-        }),
+        shutdown: Arc::new(FakeShutdown::new(lifecycle.clone())),
         registrar: Arc::new(NullProcessServiceRegistrar),
         state_repo: store.clone(),
         job_repo: store,
@@ -545,6 +610,12 @@ fn job(name: &str, overlap: OverlapPolicy) -> Job {
         on_dependency_failure: Default::default(),
         timeout: None,
         log_retention: LogRetention::default(),
+        timezone: "UTC".into(),
+        schedule_revision: 0,
+        trigger_id: Uuid::new_v4(),
+        misfire_policy: Default::default(),
+        retry_policy: Default::default(),
+        admission: Default::default(),
     }
 }
 
@@ -559,7 +630,10 @@ async fn queued_runs_are_serial_and_parallel_runs_overlap() {
         queue_facade.trigger_job("queue").await.unwrap();
     }
     tokio::time::sleep(Duration::from_millis(220)).await;
-    assert_eq!(queue_lifecycle.max_concurrent_runs.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        queue_lifecycle.max_concurrent_runs.load(Ordering::SeqCst),
+        1
+    );
     assert!(queue_facade
         .list_runs("queue", 3)
         .await
@@ -577,7 +651,9 @@ async fn queued_runs_are_serial_and_parallel_runs_overlap() {
     }
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(
-        parallel_lifecycle.max_concurrent_runs.load(Ordering::SeqCst),
+        parallel_lifecycle
+            .max_concurrent_runs
+            .load(Ordering::SeqCst),
         3
     );
 }
@@ -585,7 +661,10 @@ async fn queued_runs_are_serial_and_parallel_runs_overlap() {
 #[tokio::test]
 async fn queued_cancellation_never_starts_the_child_and_persists_cancelled() {
     let (facade, lifecycle) = facade(Duration::from_millis(300)).await;
-    facade.add_job(job("queued-cancel", OverlapPolicy::Queue)).await.unwrap();
+    facade
+        .add_job(job("queued-cancel", OverlapPolicy::Queue))
+        .await
+        .unwrap();
     facade.trigger_job("queued-cancel").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -594,10 +673,19 @@ async fn queued_cancellation_never_starts_the_child_and_persists_cancelled() {
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     let queued_run_id = facade.trigger_job("queued-cancel").await.unwrap();
-    facade.cancel_run("queued-cancel", queued_run_id).await.unwrap();
+    facade
+        .cancel_run("queued-cancel", queued_run_id)
+        .await
+        .unwrap();
 
-    let queued_run = facade.get_run("queued-cancel", &queued_run_id).await.unwrap();
-    assert_eq!(queued_run.state, my_supervisor_core::domain::JobRunState::Cancelled);
+    let queued_run = facade
+        .get_run("queued-cancel", &queued_run_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        queued_run.state,
+        my_supervisor_core::domain::JobRunState::Cancelled
+    );
     tokio::time::sleep(Duration::from_millis(350)).await;
     assert_eq!(lifecycle.transient_started.load(Ordering::SeqCst), 1);
 }
@@ -605,7 +693,10 @@ async fn queued_cancellation_never_starts_the_child_and_persists_cancelled() {
 #[tokio::test]
 async fn active_cancellation_waits_for_controlled_completion() {
     let (facade, lifecycle) = facade(Duration::from_secs(2)).await;
-    facade.add_job(job("active-cancel", OverlapPolicy::Skip)).await.unwrap();
+    facade
+        .add_job(job("active-cancel", OverlapPolicy::Skip))
+        .await
+        .unwrap();
     let run_id = facade.trigger_job("active-cancel").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -622,7 +713,11 @@ async fn active_cancellation_waits_for_controlled_completion() {
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     assert_eq!(
-        facade.get_run("active-cancel", &run_id).await.unwrap().state,
+        facade
+            .get_run("active-cancel", &run_id)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Cancelled
     );
     assert_eq!(lifecycle.concurrent_runs.load(Ordering::SeqCst), 0);
@@ -631,7 +726,10 @@ async fn active_cancellation_waits_for_controlled_completion() {
 #[tokio::test]
 async fn parallel_runs_have_independent_cancellation() {
     let (facade, lifecycle) = facade(Duration::from_millis(180)).await;
-    facade.add_job(job("parallel-cancel", OverlapPolicy::Parallel)).await.unwrap();
+    facade
+        .add_job(job("parallel-cancel", OverlapPolicy::Parallel))
+        .await
+        .unwrap();
     let cancelled_run_id = facade.trigger_job("parallel-cancel").await.unwrap();
     let surviving_run_id = facade.trigger_job("parallel-cancel").await.unwrap();
     for _ in 0..20 {
@@ -640,14 +738,25 @@ async fn parallel_runs_have_independent_cancellation() {
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    facade.cancel_run("parallel-cancel", cancelled_run_id).await.unwrap();
+    facade
+        .cancel_run("parallel-cancel", cancelled_run_id)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(250)).await;
     assert_eq!(
-        facade.get_run("parallel-cancel", &cancelled_run_id).await.unwrap().state,
+        facade
+            .get_run("parallel-cancel", &cancelled_run_id)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Cancelled
     );
     assert_eq!(
-        facade.get_run("parallel-cancel", &surviving_run_id).await.unwrap().state,
+        facade
+            .get_run("parallel-cancel", &surviving_run_id)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Succeeded
     );
 }
@@ -655,8 +764,14 @@ async fn parallel_runs_have_independent_cancellation() {
 #[tokio::test]
 async fn cancelling_a_run_through_another_job_is_a_404_without_mutation() {
     let (facade, lifecycle) = facade(Duration::from_secs(2)).await;
-    facade.add_job(job("job-a", OverlapPolicy::Skip)).await.unwrap();
-    facade.add_job(job("job-b", OverlapPolicy::Queue)).await.unwrap();
+    facade
+        .add_job(job("job-a", OverlapPolicy::Skip))
+        .await
+        .unwrap();
+    facade
+        .add_job(job("job-b", OverlapPolicy::Queue))
+        .await
+        .unwrap();
     let active_run_id = facade.trigger_job("job-b").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -685,7 +800,10 @@ async fn cancelling_a_run_through_another_job_is_a_404_without_mutation() {
 #[tokio::test]
 async fn tombstoned_job_cannot_attach_a_late_completion_to_a_reused_name() {
     let (facade, lifecycle) = facade(Duration::from_secs(2)).await;
-    facade.add_job(job("reused-name", OverlapPolicy::Skip)).await.unwrap();
+    facade
+        .add_job(job("reused-name", OverlapPolicy::Skip))
+        .await
+        .unwrap();
     facade.trigger_job("reused-name").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -694,15 +812,25 @@ async fn tombstoned_job_cannot_attach_a_late_completion_to_a_reused_name() {
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     facade.delete_job("reused-name", true).await.unwrap();
-    facade.add_job(job("reused-name", OverlapPolicy::Skip)).await.unwrap();
+    facade
+        .add_job(job("reused-name", OverlapPolicy::Skip))
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
-    assert!(facade.list_runs("reused-name", 10).await.unwrap().is_empty());
+    assert!(facade
+        .list_runs("reused-name", 10)
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
 async fn non_force_delete_rejects_an_active_run_without_mutating_the_job() {
     let (facade, lifecycle) = facade(Duration::from_secs(2)).await;
-    facade.add_job(job("delete-active", OverlapPolicy::Skip)).await.unwrap();
+    facade
+        .add_job(job("delete-active", OverlapPolicy::Skip))
+        .await
+        .unwrap();
     let run_id = facade.trigger_job("delete-active").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -714,7 +842,11 @@ async fn non_force_delete_rejects_an_active_run_without_mutating_the_job() {
     let error = facade.delete_job("delete-active", false).await.unwrap_err();
     assert_eq!(error.code(), "job_has_active_runs");
     assert_eq!(
-        facade.get_run("delete-active", &run_id).await.unwrap().state,
+        facade
+            .get_run("delete-active", &run_id)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Running
     );
 }
@@ -722,7 +854,10 @@ async fn non_force_delete_rejects_an_active_run_without_mutating_the_job() {
 #[tokio::test]
 async fn force_delete_waits_for_parallel_run_drain_before_removing_the_job() {
     let (facade, lifecycle) = facade(Duration::from_secs(2)).await;
-    facade.add_job(job("force-drain", OverlapPolicy::Parallel)).await.unwrap();
+    facade
+        .add_job(job("force-drain", OverlapPolicy::Parallel))
+        .await
+        .unwrap();
     facade.trigger_job("force-drain").await.unwrap();
     facade.trigger_job("force-drain").await.unwrap();
     for _ in 0..20 {
@@ -740,7 +875,10 @@ async fn force_delete_waits_for_parallel_run_drain_before_removing_the_job() {
 #[tokio::test]
 async fn shutdown_drains_queued_and_active_runs_before_reaping_children() {
     let (facade, lifecycle) = facade(Duration::from_secs(2)).await;
-    facade.add_job(job("shutdown-drain", OverlapPolicy::Queue)).await.unwrap();
+    facade
+        .add_job(job("shutdown-drain", OverlapPolicy::Queue))
+        .await
+        .unwrap();
     let active_run = facade.trigger_job("shutdown-drain").await.unwrap();
     let queued_run = facade.trigger_job("shutdown-drain").await.unwrap();
     for _ in 0..20 {
@@ -753,11 +891,19 @@ async fn shutdown_drains_queued_and_active_runs_before_reaping_children() {
     facade.shutdown_all().await.unwrap();
     assert_eq!(lifecycle.concurrent_runs.load(Ordering::SeqCst), 0);
     assert_eq!(
-        facade.get_run("shutdown-drain", &active_run).await.unwrap().state,
+        facade
+            .get_run("shutdown-drain", &active_run)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Cancelled
     );
     assert_eq!(
-        facade.get_run("shutdown-drain", &queued_run).await.unwrap().state,
+        facade
+            .get_run("shutdown-drain", &queued_run)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Cancelled
     );
 }
@@ -769,7 +915,10 @@ async fn cleanup_ticket_retries_with_the_same_event_id_after_ack_failure() {
     let facade = facade_with_store(lifecycle.clone(), store.clone()).await;
     let mut events = facade.subscribe_events();
     lifecycle.leave_unreaped_on_cancel();
-    facade.add_job(job("unreaped", OverlapPolicy::Skip)).await.unwrap();
+    facade
+        .add_job(job("unreaped", OverlapPolicy::Skip))
+        .await
+        .unwrap();
     let run_id = facade.trigger_job("unreaped").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -789,7 +938,8 @@ async fn cleanup_ticket_retries_with_the_same_event_id_after_ack_failure() {
     let mut cancelled_events = 0;
     let first_event_id = loop {
         let event = events.recv().await.unwrap();
-        if matches!(&event.event, DomainEvent::JobRunCancelled { run_id: event_run_id, .. } if event_run_id == &run_id) {
+        if matches!(&event.event, DomainEvent::JobRunCancelled { run_id: event_run_id, .. } if event_run_id == &run_id)
+        {
             cancelled_events += 1;
         }
         if let Some(event_id) = event.event_id {
@@ -799,15 +949,26 @@ async fn cleanup_ticket_retries_with_the_same_event_id_after_ack_failure() {
     };
     assert!(first_shutdown.await.unwrap().is_err());
     assert_eq!(store.pending_transient_cleanup(10).await.unwrap().len(), 1);
-    assert_eq!(store.pending_transient_terminal_events(10).await.unwrap().len(), 1);
+    assert_eq!(
+        store
+            .pending_transient_terminal_events(10)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 
     let restarted_facade = facade_with_store_and_config(
         Arc::new(FakeLifecycle::new(Duration::ZERO)),
         store.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![job("unreaped", OverlapPolicy::Skip)] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![job("unreaped", OverlapPolicy::Skip)],
+            },
         }),
-    ).await;
+    )
+    .await;
     let mut restarted_events = restarted_facade.subscribe_events();
     let bootstrap_facade = restarted_facade.clone();
     let mut bootstrap = tokio::spawn(async move { bootstrap_facade.bootstrap().await });
@@ -830,12 +991,24 @@ async fn cleanup_ticket_retries_with_the_same_event_id_after_ack_failure() {
         }
     }
     assert_eq!(
-        restarted_facade.get_run("unreaped", &run_id).await.unwrap().state,
+        restarted_facade
+            .get_run("unreaped", &run_id)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Cancelled
     );
     assert_eq!(cancelled_events, 2);
-    assert!(store.pending_transient_cleanup(10).await.unwrap().is_empty());
-    assert!(store.pending_transient_terminal_events(10).await.unwrap().is_empty());
+    assert!(store
+        .pending_transient_cleanup(10)
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(store
+        .pending_transient_terminal_events(10)
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -844,7 +1017,10 @@ async fn terminal_outbox_stays_durable_when_no_external_transport_receives_it() 
     let lifecycle = Arc::new(FakeLifecycle::new(Duration::from_secs(2)));
     lifecycle.leave_unreaped_on_cancel();
     let facade = facade_with_store(lifecycle.clone(), store.clone()).await;
-    facade.add_job(job("no-terminal-receiver", OverlapPolicy::Skip)).await.unwrap();
+    facade
+        .add_job(job("no-terminal-receiver", OverlapPolicy::Skip))
+        .await
+        .unwrap();
     let run_id = facade.trigger_job("no-terminal-receiver").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -852,21 +1028,38 @@ async fn terminal_outbox_stays_durable_when_no_external_transport_receives_it() 
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    facade.cancel_run("no-terminal-receiver", run_id).await.unwrap();
+    facade
+        .cancel_run("no-terminal-receiver", run_id)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(facade.shutdown_all().await.is_err());
     assert_eq!(
-        facade.get_run("no-terminal-receiver", &run_id).await.unwrap().state,
+        facade
+            .get_run("no-terminal-receiver", &run_id)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Cancelled
     );
     assert_eq!(store.pending_transient_cleanup(10).await.unwrap().len(), 1);
-    assert_eq!(store.pending_transient_terminal_events(10).await.unwrap().len(), 1);
+    assert_eq!(
+        store
+            .pending_transient_terminal_events(10)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[tokio::test]
 async fn bootstrap_cancellation_retries_terminal_outbox_commit_after_file_reopen() {
-    let directory = std::env::temp_dir().join(format!("my-supervisor-bootstrap-terminal-outbox-{}", Uuid::new_v4()));
+    let directory = std::env::temp_dir().join(format!(
+        "my-supervisor-bootstrap-terminal-outbox-{}",
+        Uuid::new_v4()
+    ));
     std::fs::create_dir_all(&directory).unwrap();
     let database = directory.join("state.db");
     let persisted_job = job("bootstrap-terminal-outbox", OverlapPolicy::Skip);
@@ -878,30 +1071,48 @@ async fn bootstrap_cancellation_retries_terminal_outbox_commit_after_file_reopen
         (pending_run_id, JobRunState::Pending, None),
         (running_run_id, JobRunState::Running, Some(Utc::now())),
     ] {
-        store.save_run(&JobRun {
-            run_id,
-            job_name: persisted_job.name.clone(),
-            job_id: persisted_job.id,
-            triggered_by: TriggeredBy::Manual,
-            scheduled_at: Utc::now(),
-            started_at,
-            ended_at: None,
-            exit_code: None,
-            state,
-        }).await.unwrap();
+        store
+            .save_run(&JobRun {
+                run_id,
+                job_name: persisted_job.name.clone(),
+                job_id: persisted_job.id,
+                triggered_by: TriggeredBy::Manual,
+                scheduled_at: Utc::now(),
+                started_at,
+                ended_at: None,
+                exit_code: None,
+                state,
+                occurrence: None,
+                original_scheduled_at: None,
+            })
+            .await
+            .unwrap();
     }
     store.fail_next_terminal_run_commits(1);
     let interrupted = facade_with_store_and_config(
         Arc::new(FakeLifecycle::new(Duration::ZERO)),
         store.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![persisted_job.clone()] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![persisted_job.clone()],
+            },
         }),
-    ).await;
+    )
+    .await;
     assert!(interrupted.bootstrap().await.is_err());
-    assert!(store.pending_transient_terminal_events(10).await.unwrap().is_empty());
+    assert!(store
+        .pending_transient_terminal_events(10)
+        .await
+        .unwrap()
+        .is_empty());
     assert!(matches!(
-        store.get_run(&persisted_job.name, &pending_run_id).await.unwrap().unwrap().state,
+        store
+            .get_run(&persisted_job.name, &pending_run_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .state,
         JobRunState::Pending | JobRunState::Running,
     ));
     drop(interrupted);
@@ -912,27 +1123,50 @@ async fn bootstrap_cancellation_retries_terminal_outbox_commit_after_file_reopen
         Arc::new(FakeLifecycle::new(Duration::ZERO)),
         reopened.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![persisted_job.clone()] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![persisted_job.clone()],
+            },
         }),
-    ).await;
+    )
+    .await;
     restarted.bootstrap().await.unwrap();
     for run_id in [pending_run_id, running_run_id] {
-        let run = reopened.get_run(&persisted_job.name, &run_id).await.unwrap().unwrap();
+        let run = reopened
+            .get_run(&persisted_job.name, &run_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(run.state, JobRunState::Cancelled);
         assert!(run.ended_at.is_some());
     }
-    let terminal_events = reopened.pending_transient_terminal_events(10).await.unwrap();
+    let terminal_events = reopened
+        .pending_transient_terminal_events(10)
+        .await
+        .unwrap();
     assert_eq!(terminal_events.len(), 2);
-    assert!(terminal_events.iter().all(|event| event.state == JobRunState::Cancelled));
+    assert!(terminal_events
+        .iter()
+        .all(|event| event.state == JobRunState::Cancelled));
     assert_eq!(
-        terminal_events.iter().map(|event| event.event_id).collect::<std::collections::HashSet<_>>().len(),
+        terminal_events
+            .iter()
+            .map(|event| event.event_id)
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
         2,
     );
     drop(restarted);
     drop(reopened);
 
     let reopened_again = SqliteStore::connect(&database).await.unwrap();
-    assert_eq!(reopened_again.pending_transient_terminal_events(10).await.unwrap(), terminal_events);
+    assert_eq!(
+        reopened_again
+            .pending_transient_terminal_events(10)
+            .await
+            .unwrap(),
+        terminal_events
+    );
     drop(reopened_again);
     std::fs::remove_dir_all(directory).unwrap();
 }
@@ -943,13 +1177,21 @@ async fn bootstrap_resumes_durable_cleanup_after_daemon_restart() {
     let first_lifecycle = Arc::new(FakeLifecycle::new(Duration::from_secs(2)));
     first_lifecycle.leave_unreaped_on_cancel();
     let first_facade = facade_with_store(first_lifecycle.clone(), store.clone()).await;
-    first_facade.add_job(job("restart-cleanup", OverlapPolicy::Skip)).await.unwrap();
+    first_facade
+        .add_job(job("restart-cleanup", OverlapPolicy::Skip))
+        .await
+        .unwrap();
     let run_id = first_facade.trigger_job("restart-cleanup").await.unwrap();
     for _ in 0..20 {
-        if first_lifecycle.transient_started.load(Ordering::SeqCst) == 1 { break; }
+        if first_lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    first_facade.cancel_run("restart-cleanup", run_id).await.unwrap();
+    first_facade
+        .cancel_run("restart-cleanup", run_id)
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(30)).await;
     assert_eq!(store.pending_transient_cleanup(10).await.unwrap().len(), 1);
 
@@ -957,9 +1199,13 @@ async fn bootstrap_resumes_durable_cleanup_after_daemon_restart() {
         Arc::new(FakeLifecycle::new(Duration::ZERO)),
         store.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![job("restart-cleanup", OverlapPolicy::Skip)] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![job("restart-cleanup", OverlapPolicy::Skip)],
+            },
         }),
-    ).await;
+    )
+    .await;
     let mut events = restarted_facade.subscribe_events();
     let bootstrap_facade = restarted_facade.clone();
     let mut bootstrap = tokio::spawn(async move { bootstrap_facade.bootstrap().await });
@@ -979,11 +1225,26 @@ async fn bootstrap_resumes_durable_cleanup_after_daemon_restart() {
     }
 
     assert_eq!(
-        restarted_facade.get_run("restart-cleanup", &run_id).await.unwrap().state,
+        restarted_facade
+            .get_run("restart-cleanup", &run_id)
+            .await
+            .unwrap()
+            .state,
         my_supervisor_core::domain::JobRunState::Cancelled
     );
-    assert_eq!(restarted_facade.get_run("restart-cleanup", &run_id).await.unwrap().exit_code, Some(0));
-    assert!(store.pending_transient_cleanup(10).await.unwrap().is_empty());
+    assert_eq!(
+        restarted_facade
+            .get_run("restart-cleanup", &run_id)
+            .await
+            .unwrap()
+            .exit_code,
+        Some(0)
+    );
+    assert!(store
+        .pending_transient_cleanup(10)
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -993,11 +1254,16 @@ async fn cleanup_handoff_enqueue_failure_keeps_the_active_owner_until_storage_re
     let lifecycle = Arc::new(FakeLifecycle::new(Duration::from_secs(2)));
     lifecycle.leave_unreaped_on_cancel();
     let facade = facade_with_store(lifecycle.clone(), store.clone()).await;
-    facade.add_job(job("handoff-owner", OverlapPolicy::Queue)).await.unwrap();
+    facade
+        .add_job(job("handoff-owner", OverlapPolicy::Queue))
+        .await
+        .unwrap();
     let first_run = facade.trigger_job("handoff-owner").await.unwrap();
     let _queued_run = facade.trigger_job("handoff-owner").await.unwrap();
     for _ in 0..20 {
-        if lifecycle.transient_started.load(Ordering::SeqCst) == 1 { break; }
+        if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     facade.cancel_run("handoff-owner", first_run).await.unwrap();
@@ -1005,7 +1271,11 @@ async fn cleanup_handoff_enqueue_failure_keeps_the_active_owner_until_storage_re
     // The injected enqueue failure leaves the first runner and overlap slot
     // owned; no durable ticket or queued replacement is allowed yet.
     assert_eq!(lifecycle.transient_started.load(Ordering::SeqCst), 1);
-    assert!(store.pending_transient_cleanup(10).await.unwrap().is_empty());
+    assert!(store
+        .pending_transient_cleanup(10)
+        .await
+        .unwrap()
+        .is_empty());
     tokio::time::sleep(Duration::from_millis(120)).await;
     assert_eq!(store.pending_transient_cleanup(10).await.unwrap().len(), 1);
     assert_eq!(lifecycle.transient_started.load(Ordering::SeqCst), 2);
@@ -1016,21 +1286,29 @@ async fn unreaped_cleanup_releases_the_overlap_slot_and_force_delete_drains_retr
     let (facade, lifecycle) = facade(Duration::from_millis(40)).await;
     let mut events = facade.subscribe_events();
     lifecycle.leave_unreaped_on_cancel();
-    facade.add_job(job("unreaped-queue", OverlapPolicy::Queue)).await.unwrap();
+    facade
+        .add_job(job("unreaped-queue", OverlapPolicy::Queue))
+        .await
+        .unwrap();
     let first = facade.trigger_job("unreaped-queue").await.unwrap();
     let second = facade.trigger_job("unreaped-queue").await.unwrap();
     for _ in 0..20 {
-        if lifecycle.transient_started.load(Ordering::SeqCst) == 1 { break; }
+        if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     facade.cancel_run("unreaped-queue", first).await.unwrap();
     for _ in 0..20 {
-        if lifecycle.transient_started.load(Ordering::SeqCst) == 2 { break; }
+        if lifecycle.transient_started.load(Ordering::SeqCst) == 2 {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     assert_eq!(lifecycle.transient_started.load(Ordering::SeqCst), 2);
     let delete_facade = facade.clone();
-    let mut deletion = tokio::spawn(async move { delete_facade.delete_job("unreaped-queue", true).await });
+    let mut deletion =
+        tokio::spawn(async move { delete_facade.delete_job("unreaped-queue", true).await });
     loop {
         tokio::select! {
             result = &mut deletion => {
@@ -1110,7 +1388,7 @@ async fn completed_runs_are_pruned_to_the_configured_count() {
 #[tokio::test]
 async fn system_registered_status_reports_pid_and_resource_usage() {
     let registrar = Arc::new(FakeRegistrar::default());
-    let (facade, _) = facade_with_registrar(Duration::ZERO, registrar).await;
+    let (facade, _, _, _) = facade_with_registrar(Duration::ZERO, registrar).await;
     let mut spec = ProcessSpec::new("system-service", "fake");
     spec.management_mode = ManagementMode::SystemRegistered {
         unit_name: "com.example.system-service".to_string(),
@@ -1124,6 +1402,139 @@ async fn system_registered_status_reports_pid_and_resource_usage() {
 }
 
 #[tokio::test]
+async fn representative_process_management() {
+    let registrar = Arc::new(FakeRegistrar::default());
+    let (facade, lifecycle, shutdown, store) =
+        facade_with_registrar(Duration::ZERO, registrar.clone()).await;
+
+    let added = facade
+        .add_process(ProcessSpec::new("direct", "fake"))
+        .await
+        .unwrap();
+    assert_eq!(added.state, ProcessState::Stopped);
+    assert_eq!(facade.list_processes().await.unwrap().len(), 1);
+
+    facade.start_process("direct").await.unwrap();
+    let started = facade.get_process("direct").await.unwrap();
+    assert_eq!(started.state, ProcessState::Running);
+    let first_pid = started.pid;
+    assert_eq!(lifecycle.spawn_count.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        facade
+            .remove_process("direct", false)
+            .await
+            .unwrap_err()
+            .code(),
+        "already_running"
+    );
+    assert_eq!(
+        facade.get_process("direct").await.unwrap().state,
+        ProcessState::Running
+    );
+    store.set_restart_count("direct", 3).await.unwrap();
+
+    assert_eq!(
+        facade.restart_process("direct").await.unwrap(),
+        RestartOutcome::Accepted
+    );
+    let restarted = facade.get_process("direct").await.unwrap();
+    assert_eq!(restarted.state, ProcessState::Running);
+    assert_ne!(restarted.pid, first_pid);
+    assert_eq!(restarted.restart_count, 0);
+    assert_eq!(lifecycle.spawn_count.load(Ordering::SeqCst), 2);
+    assert_eq!(shutdown.graceful_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(shutdown.force_kill_calls.load(Ordering::SeqCst), 0);
+    facade.stop_process("direct", false).await.unwrap();
+    assert_eq!(
+        facade.get_process("direct").await.unwrap().state,
+        ProcessState::Stopped
+    );
+    assert_eq!(shutdown.graceful_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(shutdown.force_kill_calls.load(Ordering::SeqCst), 0);
+    facade.remove_process("direct", false).await.unwrap();
+    assert_eq!(
+        facade.get_process("direct").await.unwrap_err().code(),
+        "process_not_found"
+    );
+
+    facade
+        .add_process(ProcessSpec::new("force-removal", "fake"))
+        .await
+        .unwrap();
+    facade.start_process("force-removal").await.unwrap();
+    facade.remove_process("force-removal", true).await.unwrap();
+    assert_eq!(shutdown.graceful_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(shutdown.force_kill_calls.load(Ordering::SeqCst), 1);
+
+    facade
+        .add_process(ProcessSpec::new("convertible", "fake"))
+        .await
+        .unwrap();
+    facade.start_process("convertible").await.unwrap();
+    registrar.fail_registration.store(true, Ordering::SeqCst);
+    assert_eq!(
+        facade
+            .convert_process(
+                "convertible",
+                ConvertTarget::SystemRegistered,
+                Some("com.example.convertible".into()),
+                true,
+            )
+            .await
+            .unwrap_err()
+            .code(),
+        "service_registration_failed"
+    );
+    let restored = facade.get_process("convertible").await.unwrap();
+    assert_eq!(restored.management_mode, ManagementMode::Direct);
+    assert_eq!(restored.state, ProcessState::Running);
+
+    registrar.fail_registration.store(false, Ordering::SeqCst);
+    let converted = facade
+        .convert_process(
+            "convertible",
+            ConvertTarget::SystemRegistered,
+            Some("com.example.convertible".into()),
+            true,
+        )
+        .await
+        .unwrap();
+    assert_eq!(converted.state, ProcessState::Running);
+    assert_eq!(converted.pid, Some(4242));
+    assert!(matches!(
+        converted.management_mode,
+        ManagementMode::SystemRegistered { ref unit_name } if unit_name == "com.example.convertible"
+    ));
+    facade.stop_process("convertible", false).await.unwrap();
+    facade.start_process("convertible").await.unwrap();
+    assert_eq!(
+        facade.restart_process("convertible").await.unwrap(),
+        RestartOutcome::Noop {
+            reason: "managed_by_system".into()
+        }
+    );
+    let direct = facade
+        .convert_process("convertible", ConvertTarget::Direct, None, false)
+        .await
+        .unwrap();
+    assert_eq!(direct.management_mode, ManagementMode::Direct);
+    assert_eq!(direct.state, ProcessState::Stopped);
+    let calls = registrar.calls.lock().unwrap();
+    assert!(calls
+        .iter()
+        .any(|call| call == "register:com.example.convertible"));
+    assert!(calls
+        .iter()
+        .any(|call| call == "start:com.example.convertible"));
+    assert!(calls
+        .iter()
+        .any(|call| call == "stop:com.example.convertible"));
+    assert!(calls
+        .iter()
+        .any(|call| call == "unregister:com.example.convertible"));
+}
+
+#[tokio::test]
 async fn detached_log_subscription_uses_the_file_follower_boundary() {
     let (facade, lifecycle) = facade(Duration::ZERO).await;
     let mut spec = ProcessSpec::new("detached", "fake");
@@ -1131,9 +1542,7 @@ async fn detached_log_subscription_uses_the_file_follower_boundary() {
     facade.add_process(spec).await.unwrap();
     let _receiver = facade.subscribe_process_logs("detached").await.unwrap();
     assert_eq!(
-        lifecycle
-            .detached_subscription_count
-            .load(Ordering::SeqCst),
+        lifecycle.detached_subscription_count.load(Ordering::SeqCst),
         1
     );
 }
@@ -1177,20 +1586,45 @@ async fn bootstrap_finishes_an_atomically_committed_job_deletion_after_restart()
     store.save_job(&deleting_job).await.unwrap();
     let run_id = JobRunId::new();
     let journal = JobDeletionJournal {
-        deletion_id: Uuid::new_v4(), job: deleting_job.clone(),
-        stage: JobDeletionStage::RunsDraining, run_ids: Vec::new(), last_error: None,
+        deletion_id: Uuid::new_v4(),
+        job: deleting_job.clone(),
+        stage: JobDeletionStage::RunsDraining,
+        run_ids: Vec::new(),
+        last_error: None,
     };
     store.create_job_deletion_journal(&journal).await.unwrap();
-    store.save_run(&JobRun {
-        run_id, job_name: deleting_job.name.clone(), job_id: deleting_job.id,
-        triggered_by: TriggeredBy::Manual, scheduled_at: Utc::now(), started_at: Some(Utc::now()),
-        ended_at: Some(Utc::now()), exit_code: Some(0), state: JobRunState::Succeeded,
-    }).await.unwrap();
-    let deleted_runs = store.commit_job_deletion_rows(journal.deletion_id, &deleting_job.name).await.unwrap();
-    assert!(store.get_job_deletion_journal(&deleting_job.name).await.unwrap().is_some());
+    store
+        .save_run(&JobRun {
+            run_id,
+            job_name: deleting_job.name.clone(),
+            job_id: deleting_job.id,
+            triggered_by: TriggeredBy::Manual,
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            ended_at: Some(Utc::now()),
+            exit_code: Some(0),
+            state: JobRunState::Succeeded,
+            occurrence: None,
+            original_scheduled_at: None,
+        })
+        .await
+        .unwrap();
+    let deleted_runs = store
+        .commit_job_deletion_rows(journal.deletion_id, &deleting_job.name)
+        .await
+        .unwrap();
+    assert!(store
+        .get_job_deletion_journal(&deleting_job.name)
+        .await
+        .unwrap()
+        .is_some());
     let restarted = facade_with_store(lifecycle, store.clone()).await;
     restarted.bootstrap().await.unwrap();
-    assert!(store.get_job_deletion_journal(&deleting_job.name).await.unwrap().is_none());
+    assert!(store
+        .get_job_deletion_journal(&deleting_job.name)
+        .await
+        .unwrap()
+        .is_none());
     assert!(store.get_job(&deleting_job.name).await.unwrap().is_none());
     assert_eq!(deleted_runs, vec![run_id]);
 }
@@ -1202,17 +1636,22 @@ async fn restart_retries_a_failed_atomic_job_row_deletion_without_losing_runs() 
     let deleting_job = job("retry-row-delete", OverlapPolicy::Skip);
     let run_id = JobRunId::new();
     store.save_job(&deleting_job).await.unwrap();
-    store.save_run(&JobRun {
-        run_id,
-        job_name: deleting_job.name.clone(),
-        job_id: deleting_job.id,
-        triggered_by: TriggeredBy::Manual,
-        scheduled_at: Utc::now(),
-        started_at: Some(Utc::now()),
-        ended_at: Some(Utc::now()),
-        exit_code: Some(0),
-        state: JobRunState::Succeeded,
-    }).await.unwrap();
+    store
+        .save_run(&JobRun {
+            run_id,
+            job_name: deleting_job.name.clone(),
+            job_id: deleting_job.id,
+            triggered_by: TriggeredBy::Manual,
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            ended_at: Some(Utc::now()),
+            exit_code: Some(0),
+            state: JobRunState::Succeeded,
+            occurrence: None,
+            original_scheduled_at: None,
+        })
+        .await
+        .unwrap();
     let journal = JobDeletionJournal {
         deletion_id: Uuid::new_v4(),
         job: deleting_job.clone(),
@@ -1224,20 +1663,40 @@ async fn restart_retries_a_failed_atomic_job_row_deletion_without_losing_runs() 
     store.fail_next_job_deletion_row_commits(1);
 
     let interrupted = facade_with_store(lifecycle.clone(), store.clone()).await;
-    assert!(interrupted.delete_job(&deleting_job.name, true).await.is_err());
+    assert!(interrupted
+        .delete_job(&deleting_job.name, true)
+        .await
+        .is_err());
     assert!(store.get_job(&deleting_job.name).await.unwrap().is_some());
-    assert!(store.get_run(&deleting_job.name, &run_id).await.unwrap().is_some());
+    assert!(store
+        .get_run(&deleting_job.name, &run_id)
+        .await
+        .unwrap()
+        .is_some());
     assert_eq!(
-        store.get_job_deletion_journal(&deleting_job.name).await.unwrap().unwrap().stage,
+        store
+            .get_job_deletion_journal(&deleting_job.name)
+            .await
+            .unwrap()
+            .unwrap()
+            .stage,
         JobDeletionStage::RunsDraining,
     );
 
     let restarted = facade_with_store(lifecycle, store.clone()).await;
     restarted.bootstrap().await.unwrap();
     assert!(store.get_job(&deleting_job.name).await.unwrap().is_none());
-    assert!(store.get_run(&deleting_job.name, &run_id).await.unwrap().is_none());
+    assert!(store
+        .get_run(&deleting_job.name, &run_id)
+        .await
+        .unwrap()
+        .is_none());
     assert!(store.pending_run_log_cleanup(10).await.unwrap().is_empty());
-    assert!(store.get_job_deletion_journal(&deleting_job.name).await.unwrap().is_none());
+    assert!(store
+        .get_job_deletion_journal(&deleting_job.name)
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -1245,7 +1704,10 @@ async fn failed_queued_cancellation_rolls_back_without_cancelling_any_run() {
     let lifecycle = Arc::new(FakeLifecycle::new(Duration::from_millis(100)));
     let store = Arc::new(SqliteStore::connect_in_memory().await.unwrap());
     let facade = facade_with_store(lifecycle.clone(), store.clone()).await;
-    facade.add_job(job("rollback-queued", OverlapPolicy::Queue)).await.unwrap();
+    facade
+        .add_job(job("rollback-queued", OverlapPolicy::Queue))
+        .await
+        .unwrap();
     facade.trigger_job("rollback-queued").await.unwrap();
     for _ in 0..20 {
         if lifecycle.transient_started.load(Ordering::SeqCst) == 1 {
@@ -1257,15 +1719,27 @@ async fn failed_queued_cancellation_rolls_back_without_cancelling_any_run() {
     store.fail_next_job_deletion_cancellations(1);
 
     assert!(facade.delete_job("rollback-queued", true).await.is_err());
-    assert!(store.get_job_deletion_journal("rollback-queued").await.unwrap().is_none());
+    assert!(store
+        .get_job_deletion_journal("rollback-queued")
+        .await
+        .unwrap()
+        .is_none());
     assert_eq!(
-        facade.get_run("rollback-queued", &queued_run_id).await.unwrap().state,
+        facade
+            .get_run("rollback-queued", &queued_run_id)
+            .await
+            .unwrap()
+            .state,
         JobRunState::Pending,
     );
     tokio::time::sleep(Duration::from_millis(250)).await;
     assert_eq!(lifecycle.transient_started.load(Ordering::SeqCst), 2);
     assert_eq!(
-        facade.get_run("rollback-queued", &queued_run_id).await.unwrap().state,
+        facade
+            .get_run("rollback-queued", &queued_run_id)
+            .await
+            .unwrap()
+            .state,
         JobRunState::Succeeded,
     );
 }
@@ -1277,17 +1751,22 @@ async fn restart_only_completes_rollback_required_deletion_recovery() {
     let preserved_job = job("restart-rollback", OverlapPolicy::Queue);
     let queued_run_id = JobRunId::new();
     store.save_job(&preserved_job).await.unwrap();
-    store.save_run(&JobRun {
-        run_id: queued_run_id,
-        job_name: preserved_job.name.clone(),
-        job_id: preserved_job.id,
-        triggered_by: TriggeredBy::Manual,
-        scheduled_at: Utc::now(),
-        started_at: None,
-        ended_at: None,
-        exit_code: None,
-        state: JobRunState::Pending,
-    }).await.unwrap();
+    store
+        .save_run(&JobRun {
+            run_id: queued_run_id,
+            job_name: preserved_job.name.clone(),
+            job_id: preserved_job.id,
+            triggered_by: TriggeredBy::Manual,
+            scheduled_at: Utc::now(),
+            started_at: None,
+            ended_at: None,
+            exit_code: None,
+            state: JobRunState::Pending,
+            occurrence: None,
+            original_scheduled_at: None,
+        })
+        .await
+        .unwrap();
     let journal = JobDeletionJournal {
         deletion_id: Uuid::new_v4(),
         job: preserved_job.clone(),
@@ -1302,16 +1781,30 @@ async fn restart_only_completes_rollback_required_deletion_recovery() {
         lifecycle.clone(),
         store.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![preserved_job.clone()] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![preserved_job.clone()],
+            },
         }),
-    ).await;
+    )
+    .await;
     assert!(interrupted.bootstrap().await.is_ok());
     assert_eq!(
-        store.get_job_deletion_journal(&preserved_job.name).await.unwrap().unwrap().stage,
+        store
+            .get_job_deletion_journal(&preserved_job.name)
+            .await
+            .unwrap()
+            .unwrap()
+            .stage,
         JobDeletionStage::RollbackRequired,
     );
     assert_eq!(
-        store.get_run(&preserved_job.name, &queued_run_id).await.unwrap().unwrap().state,
+        store
+            .get_run(&preserved_job.name, &queued_run_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .state,
         JobRunState::Pending,
     );
 
@@ -1319,21 +1812,37 @@ async fn restart_only_completes_rollback_required_deletion_recovery() {
         lifecycle,
         store.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![preserved_job.clone()] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![preserved_job.clone()],
+            },
         }),
-    ).await;
+    )
+    .await;
     restarted.bootstrap().await.unwrap();
-    assert!(store.get_job_deletion_journal(&preserved_job.name).await.unwrap().is_none());
+    assert!(store
+        .get_job_deletion_journal(&preserved_job.name)
+        .await
+        .unwrap()
+        .is_none());
     assert!(store.get_job(&preserved_job.name).await.unwrap().is_some());
     assert_eq!(
-        store.get_run(&preserved_job.name, &queued_run_id).await.unwrap().unwrap().state,
+        store
+            .get_run(&preserved_job.name, &queued_run_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .state,
         JobRunState::Pending,
     );
 }
 
 #[tokio::test]
 async fn rollback_direction_write_failure_reopens_as_rollback_only() {
-    let directory = std::env::temp_dir().join(format!("my-supervisor-rollback-direction-{}", Uuid::new_v4()));
+    let directory = std::env::temp_dir().join(format!(
+        "my-supervisor-rollback-direction-{}",
+        Uuid::new_v4()
+    ));
     std::fs::create_dir_all(&directory).unwrap();
     let database = directory.join("state.db");
     let preserved_job = job("rollback-direction-reopen", OverlapPolicy::Queue);
@@ -1347,17 +1856,22 @@ async fn rollback_direction_write_failure_reopens_as_rollback_only() {
     };
     let store = Arc::new(SqliteStore::connect(&database).await.unwrap());
     store.save_job(&preserved_job).await.unwrap();
-    store.save_run(&JobRun {
-        run_id: queued_run_id,
-        job_name: preserved_job.name.clone(),
-        job_id: preserved_job.id,
-        triggered_by: TriggeredBy::Manual,
-        scheduled_at: Utc::now(),
-        started_at: None,
-        ended_at: None,
-        exit_code: None,
-        state: JobRunState::Pending,
-    }).await.unwrap();
+    store
+        .save_run(&JobRun {
+            run_id: queued_run_id,
+            job_name: preserved_job.name.clone(),
+            job_id: preserved_job.id,
+            triggered_by: TriggeredBy::Manual,
+            scheduled_at: Utc::now(),
+            started_at: None,
+            ended_at: None,
+            exit_code: None,
+            state: JobRunState::Pending,
+            occurrence: None,
+            original_scheduled_at: None,
+        })
+        .await
+        .unwrap();
     store.create_job_deletion_journal(&journal).await.unwrap();
     store.fail_next_job_deletion_cancellations(1);
     store.fail_next_job_deletion_rollback_direction_updates(1);
@@ -1367,16 +1881,33 @@ async fn rollback_direction_write_failure_reopens_as_rollback_only() {
         Arc::new(FakeLifecycle::new(Duration::ZERO)),
         store.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![preserved_job.clone()] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![preserved_job.clone()],
+            },
         }),
-    ).await;
-    assert!(interrupted.delete_job(&preserved_job.name, true).await.is_err());
+    )
+    .await;
+    assert!(interrupted
+        .delete_job(&preserved_job.name, true)
+        .await
+        .is_err());
     assert_eq!(
-        store.get_job_deletion_journal(&preserved_job.name).await.unwrap().unwrap().stage,
+        store
+            .get_job_deletion_journal(&preserved_job.name)
+            .await
+            .unwrap()
+            .unwrap()
+            .stage,
         JobDeletionStage::SchedulerUnregistered,
     );
     assert_eq!(
-        store.get_run(&preserved_job.name, &queued_run_id).await.unwrap().unwrap().state,
+        store
+            .get_run(&preserved_job.name, &queued_run_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .state,
         JobRunState::Pending,
     );
 
@@ -1388,15 +1919,32 @@ async fn rollback_direction_write_failure_reopens_as_rollback_only() {
         Arc::new(FakeLifecycle::new(Duration::ZERO)),
         reopened.clone(),
         Arc::new(FixedConfig {
-            loaded: LoadedConfig { processes: Vec::new(), jobs: vec![preserved_job.clone()] },
+            loaded: LoadedConfig {
+                processes: Vec::new(),
+                jobs: vec![preserved_job.clone()],
+            },
         }),
-    ).await;
+    )
+    .await;
     restarted.bootstrap().await.unwrap();
 
-    assert!(reopened.get_job_deletion_journal(&preserved_job.name).await.unwrap().is_none());
-    assert!(reopened.get_job(&preserved_job.name).await.unwrap().is_some());
+    assert!(reopened
+        .get_job_deletion_journal(&preserved_job.name)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(reopened
+        .get_job(&preserved_job.name)
+        .await
+        .unwrap()
+        .is_some());
     assert_eq!(
-        reopened.get_run(&preserved_job.name, &queued_run_id).await.unwrap().unwrap().state,
+        reopened
+            .get_run(&preserved_job.name, &queued_run_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .state,
         JobRunState::Pending,
     );
     assert!(restarted.trigger_job(&preserved_job.name).await.is_ok());

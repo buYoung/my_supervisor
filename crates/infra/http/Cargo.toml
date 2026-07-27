@@ -10,6 +10,7 @@ my-supervisor-application = { workspace = true }
 my-supervisor-shared = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
+iana-time-zone = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -17,4 +18,5 @@ tracing = { workspace = true }
 futures-util = { workspace = true }
 axum = { workspace = true }
 tower-http = { workspace = true }
+subtle = { workspace = true }
 tokio = { version = "1", default-features = false, features = ["rt", "sync", "macros"] }
