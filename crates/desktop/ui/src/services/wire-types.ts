@@ -6,7 +6,13 @@
  * camelCase onto the wire.
  */
 
-import type { JobRunState, JobTrigger, ProcessState } from "../shared/types";
+import type { JobRunState, ProcessState } from "../shared/types";
+
+export type JobTriggerDto =
+  | { type: "cron"; expr: string }
+  | { type: "interval"; every_sec: number }
+  | { type: "one_shot"; at: string }
+  | { type: "depends_on"; jobs: string[] };
 
 export type ManagementModeDto =
   | { type: "direct" }
@@ -87,7 +93,7 @@ export interface JobRunSummaryDto {
 
 export interface JobStatusDto {
   name: string;
-  trigger: JobTrigger;
+  trigger: JobTriggerDto;
   on_overlap: "skip" | "queue" | "parallel";
   last_run?: JobRunSummaryDto;
   next_run_at?: string;
@@ -150,6 +156,7 @@ export interface EventEnvelopeDto {
 
 /** A single wire log line, shared by REST `/logs` and the per-process WS stream. */
 export interface LogLineDto {
+  sequence?: number;
   timestamp: string;
   stream: "stdout" | "stderr" | "system";
   line: string;
@@ -166,14 +173,26 @@ export interface LogDroppedFrameDto {
  * minimal subset; the daemon fills defaults. Kept open-ended on purpose.
  */
 export interface ProcessConfigDto {
+  definition_id?: string;
   name: string;
   command: string;
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
   management_mode?: ManagementModeDto;
+  lifecycle?: "tied"|"detached";
+  autostart?: boolean;
+  instances?: number;
+  restart?: {enabled?:boolean;max_retries?:number;backoff_initial_ms?:number;backoff_max_ms?:number;backoff_multiplier?:number;jitter?:boolean;reset_after_ms?:number};
+  shutdown?: {signal?:"term"|"int"|"kill";grace_period_ms?:number};
+  watch?: {roots:string[];recursive?:boolean;exclusions:string[];follow_symlinks?:boolean;debounce_ms:number}|null;
+  memory?: {ceiling_bytes:number;sample_interval_ms:number;consecutive_breaches:number}|null;
+  liveness?: CheckPolicyInput|null;
+  readiness?: CheckPolicyInput|null;
+  rolling?: {max_surge:number;max_unavailable:number;readiness_timeout_ms:number;routability?:boolean}|null;
   [key: string]: unknown;
 }
+export interface CheckPolicyInput {kind:{type:"http";url:string;expected_status:number}|{type:"tcp";host:string;port:number}|{type:"exec";command:string;args:string[]};interval_ms:number;timeout_ms:number;consecutive_successes:number;consecutive_failures:number}
 
 /** A snake_case JobConfig body (docs/API.md §4.4). The add-job form supplies a subset. */
 export interface JobConfigDto {
@@ -182,7 +201,7 @@ export interface JobConfigDto {
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
-  trigger: JobTrigger;
+  trigger: JobTriggerDto;
   on_overlap?: "skip" | "queue" | "parallel";
   timeout_sec?: number;
   [key: string]: unknown;

@@ -1,121 +1,44 @@
-import { Play, RotateCcw, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, DataTable, EmptyState, Field, IconButton, Panel, PanelHeader, TableCell } from "../../components/ui/primitives";
-import { useOperationsClient, usePolledResource, toErrorMessage } from "../../services/use-operations";
-import type { ResourcePage } from "../../services/operations-client";
-import type { JobConfigDto } from "../../services/wire-types";
-import type { JobRun, JobRunState, JobStatus, JobTrigger } from "../../shared/types";
+import {useCallback,useEffect,useState} from "react";
+import {ReactFlow,Background,Controls,ReactFlowProvider,type Connection} from "@xyflow/react";
+import {GitBranch,Plus,Play,Trash2,Search,ArrowRight,FileText} from "lucide-react";
+import {Button,IconButton,EmptyState} from "../../components/ui/primitives";
+import {useOperationsClient,usePolledResource,toErrorMessage} from "../../services/use-operations";
+import type {JobConfigInput} from "../../services/operations-client";
+import type {JobStatus,JobRun} from "../../shared/types";
+import {JobEditor} from "./JobEditor";
+import {WorkflowEditor} from "./WorkflowEditor";
+import {stateLabels} from "./workflow-model";
+import type {WorkflowHistoryEntry} from "../../services/workspace-types";
 
-const JOBS_POLL_INTERVAL_MS = 2000;
-const PAGE_LIMIT = 50;
-const RUN_HISTORY_LIMIT = 50;
-
-const runTone: Record<JobRunState, "success" | "warning" | "danger" | "info" | "neutral"> = {
-  pending: "warning", running: "info", succeeded: "success", failed: "danger", timed_out: "danger", cancelled: "neutral", skipped: "neutral",
-};
-
-function describeTrigger(trigger: JobTrigger) {
-  if (trigger.type === "cron") return `cron ${trigger.expr}`;
-  if (trigger.type === "interval") return `${trigger.everySec}s interval`;
-  if (trigger.type === "one_shot") return trigger.at;
-  return `depends on ${trigger.jobs.join(", ")}`;
-}
-
-export function JobsView() {
-  const client = useOperationsClient();
-  const [nextCursor, setNextCursor] = useState<string | undefined>();
-  const [displayedPage, setDisplayedPage] = useState<ResourcePage<JobStatus> | null>(null);
-  const [selectedJob, setSelectedJob] = useState<JobStatus | null>(null);
-  const [jobRuns, setJobRuns] = useState<JobRun[]>([]);
-  const [runsError, setRunsError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [pendingJob, setPendingJob] = useState<string | null>(null);
-  const [formName, setFormName] = useState("nightly-backup");
-  const [formCommand, setFormCommand] = useState("/usr/local/bin/backup");
-  const [triggerType, setTriggerType] = useState<JobTrigger["type"]>("cron");
-  const [triggerValue, setTriggerValue] = useState("0 2 * * *");
-  const [formOverlap, setFormOverlap] = useState<"skip" | "queue" | "parallel">("skip");
-
-  const listFirstPage = useCallback(() => client.listJobsPage(undefined, undefined, PAGE_LIMIT), [client]);
-  const { data: page, isLoading, errorMessage, refresh } = usePolledResource(listFirstPage, JOBS_POLL_INTERVAL_MS);
-  const jobs = displayedPage?.records ?? [];
-
-  useEffect(() => {
-    setNextCursor(page?.nextCursor);
-    setDisplayedPage(page ?? null);
-    setSelectedJob((current) => current && jobs.find((job) => job.name === current.name) ? jobs.find((job) => job.name === current.name) ?? null : null);
-  }, [page]);
-
-  useEffect(() => {
-    if (!selectedJob) {
-      setJobRuns([]);
-      setRunsError(null);
-      return;
-    }
-    let cancelled = false;
-    setRunsError(null);
-    void client.listRuns(selectedJob.name, RUN_HISTORY_LIMIT).then((result) => {
-      if (!cancelled) setJobRuns(result.runs);
-    }).catch((error) => {
-      if (!cancelled) setRunsError(toErrorMessage(error));
-    });
-    return () => { cancelled = true; };
-  }, [client, selectedJob?.name]);
-
-  const runJobAction = useCallback(async (name: string, action: () => Promise<unknown>) => {
-    setActionError(null); setPendingJob(name);
-    try { await action(); await refresh(); } catch (error) { setActionError(toErrorMessage(error)); } finally { setPendingJob(null); }
-  }, [refresh]);
-
-  const buildTrigger = (): JobTrigger | null => {
-    const value = triggerValue.trim();
-    if (!value) return null;
-    if (triggerType === "cron") return { type: "cron", expr: value };
-    if (triggerType === "interval") {
-      const everySec = Number(value);
-      return Number.isInteger(everySec) && everySec > 0 ? { type: "interval", everySec } : null;
-    }
-    if (triggerType === "one_shot") return { type: "one_shot", at: value };
-    const jobs = value.split(",").map((name) => name.trim()).filter(Boolean);
-    return jobs.length > 0 ? { type: "depends_on", jobs } : null;
-  };
-
-  const handleSaveJob = useCallback(async () => {
-    const trigger = buildTrigger();
-    if (!formName.trim() || !formCommand.trim() || !trigger) { setActionError("이름, 명령과 유효한 트리거 값은 필수입니다."); return; }
-    const config: JobConfigDto = { name: formName.trim(), command: formCommand.trim(), trigger, on_overlap: formOverlap };
-    await runJobAction(config.name, () => selectedJob?.name === config.name ? client.updateJob(config.name, config) : client.addJob(config));
-  }, [client, formCommand, formName, formOverlap, selectedJob?.name, triggerType, triggerValue, runJobAction]);
-
-  const selectJob = (job: JobStatus) => {
-    setSelectedJob(job); setFormName(job.name); setFormOverlap(job.onOverlap); setTriggerType(job.trigger.type);
-    setTriggerValue(job.trigger.type === "cron" ? job.trigger.expr : job.trigger.type === "interval" ? String(job.trigger.everySec) : job.trigger.type === "one_shot" ? job.trigger.at : job.trigger.jobs.join(", "));
-  };
-
-  const loadNextPage = async () => {
-    if (!nextCursor || !displayedPage) return;
-    setActionError(null);
-    try {
-      const next = await client.listJobsPage(nextCursor, displayedPage.highWatermark, PAGE_LIMIT);
-      setDisplayedPage(next);
-      setNextCursor(next.nextCursor);
-      // Keep the existing page visible when the next bounded request fails; the UI deliberately does not fan out.
-      if (next.partial) setActionError(`일부 파티션을 읽지 못했습니다: ${next.failedPartitions.join(", ")}`);
-    } catch (error) { setActionError(toErrorMessage(error)); }
-  };
-
-  return <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-    <div className="grid gap-5">
-      <Panel>
-        <PanelHeader action={<Button variant="primary" disabled={pendingJob !== null} onClick={() => { setSelectedJob(null); setJobRuns([]); }}>새 작업</Button>} description="한 번의 50개 page 요청만 사용하며, 실행 이력은 선택한 작업에서만 조회합니다." title="작업" />
-        {actionError || errorMessage || displayedPage?.partial ? <div className="border-b border-border bg-danger/10 px-4 py-2 text-xs font-medium text-danger">{actionError ?? errorMessage ?? `일부 파티션을 읽지 못했습니다: ${displayedPage?.failedPartitions.join(", ")}`}</div> : null}
-        {isLoading ? <div className="px-4 py-6 text-sm text-muted">불러오는 중…</div> : jobs.length === 0 ? <div className="p-4"><EmptyState title="등록된 작업이 없습니다" description="오른쪽 폼에서 새 작업을 추가해 보세요." /></div> : <DataTable columns={["이름", "트리거", "동시성", "시간대·누락 실행", "마지막 실행", "동작"]}>{jobs.map((job) => <tr className="cursor-pointer transition-colors hover:bg-surface" key={job.name} onClick={() => selectJob(job)}><TableCell><div className="font-medium text-foreground">{job.name}</div><div className="text-xs text-muted">upstream {job.dependencies.upstream.length} · downstream {job.dependencies.downstream.length}</div></TableCell><TableCell><span className="font-mono text-xs text-muted">{describeTrigger(job.trigger)}</span></TableCell><TableCell><Badge tone={job.onOverlap === "skip" ? "neutral" : "info"}>{job.onOverlap}</Badge></TableCell><TableCell><span className="font-mono text-xs text-muted">{job.timezone ?? "-"} · {job.misfirePolicy ?? "-"}</span></TableCell><TableCell>{job.lastRun ? <Badge tone={runTone[job.lastRun.state]}>{job.lastRun.state}</Badge> : "-"}</TableCell><TableCell><div className="flex gap-2"><IconButton label="즉시 실행" disabled={pendingJob === job.name} onClick={(event) => { event.stopPropagation(); void runJobAction(job.name, () => client.triggerJob(job.name)); }}><Play aria-hidden="true" size={15} /></IconButton><IconButton label="삭제" disabled={pendingJob === job.name} onClick={(event) => { event.stopPropagation(); void runJobAction(job.name, () => client.removeJob(job.name, true)); }}><Trash2 aria-hidden="true" size={15} /></IconButton></div></TableCell></tr>)}</DataTable>}
-        {nextCursor ? <div className="border-t border-border p-3"><Button onClick={() => void loadNextPage()}>다음 50개</Button></div> : null}
-      </Panel>
-      <Panel><PanelHeader description={selectedJob ? `${selectedJob.name}의 최근 ${RUN_HISTORY_LIMIT}개 이력입니다.` : "목록에서 작업 하나를 선택하면 bounded 이력을 조회합니다."} title="실행 이력" />
-        {runsError ? <div className="p-4"><EmptyState title="실행 이력을 불러오지 못했습니다" description={runsError} /></div> : !selectedJob ? <div className="p-4"><EmptyState title="작업을 선택하세요" description="다른 작업의 이력을 병렬로 요청하지 않습니다." /></div> : jobRuns.length === 0 ? <div className="p-4"><EmptyState title="실행 이력이 없습니다" description="작업을 실행하면 여기에 표시됩니다." /></div> : <DataTable columns={["Run", "상태", "트리거", "예정", "종료", "취소"]}>{jobRuns.map((run) => <tr key={run.runId}><TableCell><span className="font-mono text-xs text-muted">{run.runId}</span></TableCell><TableCell><Badge tone={runTone[run.state]}>{run.state}</Badge></TableCell><TableCell>{run.triggeredBy}</TableCell><TableCell>{run.scheduledAt}</TableCell><TableCell>{run.endedAt ?? "-"}</TableCell><TableCell>{run.state === "pending" || run.state === "running" ? <IconButton label="실행 취소" disabled={pendingJob === selectedJob.name} onClick={() => void runJobAction(selectedJob.name, () => client.cancelRun(selectedJob.name, run.runId))}><X aria-hidden="true" size={15} /></IconButton> : "-"}</TableCell></tr>)}</DataTable>}
-      </Panel>
-    </div>
-    <aside className="grid content-start gap-5"><Panel><PanelHeader title={selectedJob ? "작업 수정" : "작업 추가"} description="backend가 지원하는 트리거와 overlap 정책만 전송합니다." /><div className="grid gap-3 p-4"><Field label="이름"><input className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground" onChange={(event) => setFormName(event.target.value)} value={formName} /></Field><Field label="명령"><input className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground" onChange={(event) => setFormCommand(event.target.value)} value={formCommand} /></Field><label className="grid gap-1 text-xs font-medium text-muted"><span>트리거</span><select className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground" onChange={(event) => setTriggerType(event.target.value as JobTrigger["type"])} value={triggerType}><option value="cron">cron</option><option value="interval">interval</option><option value="one_shot">one-shot</option><option value="depends_on">depends_on</option></select></label><Field label={triggerType === "interval" ? "초" : triggerType === "depends_on" ? "의존 작업(쉼표 구분)" : "값"}><input className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground" onChange={(event) => setTriggerValue(event.target.value)} value={triggerValue} /></Field><label className="grid gap-1 text-xs font-medium text-muted"><span>동시성 정책</span><select className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground" onChange={(event) => setFormOverlap(event.target.value as "skip" | "queue" | "parallel")} value={formOverlap}><option value="skip">skip</option><option value="queue">queue</option><option value="parallel">parallel</option></select></label><Button variant="primary" disabled={pendingJob !== null} onClick={() => void handleSaveJob()}>{selectedJob ? <><RotateCcw aria-hidden="true" size={16} />저장</> : "저장"}</Button></div></Panel></aside>
-  </div>;
+function triggerLabel(job:JobStatus){const trigger=job.trigger;return trigger.type==="cron"?trigger.expr:trigger.type==="interval"?`${trigger.everySec}초마다`:trigger.type==="one_shot"?new Date(trigger.at).toLocaleString():`선행 ${trigger.jobs.length}개 완료 후`;}
+export function JobsView(){
+  const client=useOperationsClient();const resource=usePolledResource(useCallback(()=>client.listJobs(),[client]),2000);const jobs=resource.data||[];
+  const params=new URLSearchParams(location.search);const [selected,setSelected]=useState(params.get("selected")||"");const [view,setView]=useState(params.get("view")||"list");const [runId,setRunId]=useState<string|undefined>(params.get("run")||undefined);const [query,setQuery]=useState("");const [error,setError]=useState("");const [editor,setEditor]=useState<JobConfigInput>();const [isNew,setIsNew]=useState(false);const [runs,setRuns]=useState<JobRun[]>([]);const [busy,setBusy]=useState(false);const [historyItems,setHistoryItems]=useState<WorkflowHistoryEntry[]>([]);
+  const job=jobs.find(item=>item.name===selected);
+  const [jobPositions,setJobPositions]=useState<Record<string,{x:number;y:number}>>({});
+  const [groupMetadata,setGroupMetadata]=useState<Record<string,{name:string;members:string[]}>>({});const namesKey=jobs.map(job=>job.name).join("\n");
+  useEffect(()=>{let stale=false;async function load(){
+    const entries:Array<readonly [string,import("../../services/workspace-types").Workflow["group"]]>=[];
+    for(let offset=0;offset<jobs.length&&!stale;offset+=4)entries.push(...await Promise.all(jobs.slice(offset,offset+4).map(async item=>[item.name,(await client.getWorkflow(item.name)).definition.group] as const)));
+    if(stale)return;
+    setJobPositions(previous=>({...Object.fromEntries(entries.filter(([,group])=>group?.position).map(([name,group])=>[name,group!.position!])),...previous}));
+    setGroupMetadata(Object.fromEntries(entries.filter((entry):entry is readonly [string,{name:string;members:string[]}]=>Boolean(entry[1]))));
+  }void load().catch(e=>{if(!stale)setError(toErrorMessage(e));});return()=>{stale=true;};},[client,namesKey,view]);
+  useEffect(()=>{if(!selected){setRuns([]);return;}let stale=false;Promise.all([client.listRuns(selected,30),client.workflowHistory(selected)]).then(([result,items])=>{if(!stale){setRuns(result.runs);setHistoryItems(items);}}).catch(e=>setError(toErrorMessage(e)));return()=>{stale=true;};},[client,selected,job?.lastRun?.state,job?.lastRun?.runId]);
+  async function action(fn:()=>Promise<unknown>){setError("");setBusy(true);try{await fn();await resource.refresh();}catch(e){setError(toErrorMessage(e));}finally{setBusy(false);}}
+  function navigate(next:string,name=selected,id?:string){setView(next);setSelected(name);setRunId(id);const url=new URL(location.href);url.searchParams.set("view",next);if(name)url.searchParams.set("selected",name);else url.searchParams.delete("selected");if(id)url.searchParams.set("run",id);else url.searchParams.delete("run");history.replaceState(null,"",url);}
+  const editJob=()=>{if(job)void client.getJobConfig(job.name).then(config=>{setIsNew(false);setEditor(config);}).catch(e=>setError(toErrorMessage(e)));};
+  async function connect(connection:Connection){if(!connection.source||!connection.target||connection.source===connection.target)return;await action(async()=>{const config=await client.getJobConfig(connection.target!);if(config.trigger.type!=="depends_on"&& !window.confirm(`${connection.target}의 기존 일정을 선행 작업 완료 조건으로 바꿉니다. 계속할까요?`))return;const upstream=config.trigger.type==="depends_on"?config.trigger.jobs:[];await client.updateJob(connection.target!,{...config,trigger:{type:"depends_on",jobs:[...new Set([...upstream,connection.source!])]}});});}
+  const groupFor=(name:string)=>{const members=new Set([name]);let changed=true;while(changed){changed=false;for(const item of jobs){const adjacent=[item.name,...item.dependencies.upstream,...item.dependencies.downstream,...groupMetadata[item.name]?.members||[]];if(adjacent.some(member=>members.has(member)))for(const member of adjacent)if(!members.has(member)){members.add(member);changed=true;}}}return [...members].sort();};
+  return <div className="jobs-workspace">{view==="workflow"&&job?<WorkflowEditor key={job.name} job={job} jobs={jobs} onBack={()=>navigate("list")} onSettings={editJob} initialRunId={runId}/>:<>
+    <header className="workspace-heading"><div><h1>작업</h1><p>{jobs.length}개 등록 · 일정과 실행 흐름 관리</p></div><Button variant="primary" onClick={()=>{setIsNew(true);setEditor({name:"",command:"/bin/sh",args:["-c","echo hello"],trigger:{type:"interval",everySec:3600},on_overlap:"skip"});}}><Plus size={15}/>작업 추가</Button></header>
+    {(error||resource.errorMessage)&&<p className="workspace-error" role="alert">{error||resource.errorMessage}</p>}
+    <div className="workspace-toolbar"><label className="search-box"><Search size={15}/><input aria-label="작업 검색" placeholder="작업 검색" value={query} onChange={e=>setQuery(e.target.value)}/></label><div className="segmented-control"><button className={view==="list"?"active":""} onClick={()=>navigate("list")}>목록</button><button className={view==="flow"?"active":""} onClick={()=>navigate("flow")}>작업 간 연결</button></div></div>
+    <div className={`jobs-split ${job?"has-detail":""}`}><section className="workspace-panel">
+    {view==="flow"?<div className="job-dependency-canvas"><ReactFlowProvider><ReactFlow key={Object.keys(groupMetadata).sort().join("|")} fitView maxZoom={1.15} nodes={jobs.map((item,index)=>({id:item.name,width:230,height:94,style:{width:230},position:jobPositions[item.name]||{x:(index%3)*290,y:Math.floor(index/3)*180},data:{label:<div className="dependency-label"><strong>{item.name}</strong><small>{triggerLabel(item)}</small><span>{item.lastRun?stateLabels[item.lastRun.state]:"실행 전"}</span></div>}}))} edges={jobs.flatMap(item=>item.dependencies.upstream.map(upstream=>({id:`${upstream}-${item.name}`,source:upstream,target:item.name,animated:true})))} onNodesChange={changes=>{for(const change of changes)if(change.type==="position"&&change.position)setJobPositions(previous=>({...previous,[change.id]:change.position!}));}} onNodeDragStop={(_,node)=>void action(async()=>{const saved=await client.getWorkflow(node.id);await client.saveWorkflow(node.id,{...saved.definition,group:{name:saved.definition.group?.name||`${node.id} 그룹`,members:saved.definition.group?.members||[],...saved.definition.group,position:node.position}},saved.revision);})} onConnect={connection=>void connect(connection)} onNodeClick={(_,node)=>setSelected(node.id)} onNodeDoubleClick={(_,node)=>navigate("workflow",node.id)}><Background gap={24}/><Controls showInteractive={false}/></ReactFlow></ReactFlowProvider><p>노드를 더블클릭해 내부 흐름을 편집하세요. 작업 간 연결은 선행 작업 완료 조건입니다.</p></div>:<>
+    <div className="job-table-head"><span>작업 / 연결</span><span>실행 조건</span><span>최근 실행</span><span/></div>
+    {jobs.filter(item=>item.name.toLowerCase().includes(query.toLowerCase())).map(item=>{const group=groupFor(item.name);return <div className={`job-table-row ${item.name===selected?"is-selected":""}`} key={item.name} role="button" tabIndex={0} onClick={()=>setSelected(item.name)} onDoubleClick={()=>navigate("workflow",item.name)} onKeyDown={e=>{if(e.key==="Enter")navigate("workflow",item.name);}}><div><strong>{item.name}</strong>{group.length>1?<small className="connection-tag"><GitBranch size={12}/>{groupMetadata[item.name]?.name||`${group[0]} 그룹`} · {group.length}개 연결</small>:<small>독립 작업</small>}</div><div><code>{triggerLabel(item)}</code><small>다음 {item.nextRunAt?new Date(item.nextRunAt).toLocaleString():"—"}</small></div><div><span className={`run-badge state-${item.lastRun?.state||"pending"}`}>{item.lastRun?stateLabels[item.lastRun.state]:"실행 전"}</span><small>{item.lastRun?.endedAt?new Date(item.lastRun.endedAt).toLocaleString():"—"}</small></div><div className="process-actions"><IconButton label="이 작업만 실행" disabled={busy} onClick={e=>{e.stopPropagation();void action(()=>client.triggerWorkflow(item.name,{single_job:true}));}}><Play size={15}/></IconButton><IconButton label="작업 삭제" disabled={busy} onClick={e=>{e.stopPropagation();if(window.confirm(`${item.name} 작업과 실행 기록을 삭제할까요?`))void action(()=>client.removeJob(item.name,true));}}><Trash2 size={15}/></IconButton></div></div>;})}
+    {!jobs.length&&<div className="p-5"><EmptyState title="등록된 작업이 없습니다" description="작업을 추가하고 실행 조건과 흐름을 구성하세요."/></div>}</>}
+    </section>{job&&<aside className="workspace-panel job-detail"><header><div><h2>{job.name}</h2><p>{triggerLabel(job)}</p></div><Button variant="primary" onClick={()=>navigate("workflow",job.name)}><GitBranch size={15}/>흐름 편집</Button></header><div className="job-detail-body"><dl className="detail-values"><dt>연결된 작업</dt><dd>{groupFor(job.name).filter(name=>name!==job.name).join(", ")||"없음"}</dd><dt>중복 실행</dt><dd>{({skip:"건너뛰기",queue:"대기열",parallel:"동시 실행"})[job.onOverlap]}</dd><dt>최근 성공률</dt><dd>{job.successRateRecent==null?"—":`${(job.successRateRecent*100).toFixed(0)}%`}</dd></dl><h3>최근 실행 <small>흐름 · 결과 · 로그</small></h3>{runs.map(run=><button key={run.runId} className="recent-run" onClick={()=>navigate("workflow",job.name,run.runId)}><div><span className={`run-badge state-${run.state}`}>{stateLabels[run.state]}</span><time>{new Date(run.startedAt||run.scheduledAt).toLocaleString()}</time></div><small>{historyItems.find(item=>item.id===run.runId)?.version!=null?`v${historyItems.find(item=>item.id===run.runId)!.version} · `:""}{run.runId.slice(0,8)} · 종료 코드 {run.exitCode??"—"}<ArrowRight size={13}/></small><span className="run-path-summary">{historyItems.find(item=>item.id===run.runId)?.path.map(step=>step.label+(step.state==="cancelled"?" (취소)":"")).join(" · ")||"이전 단일 명령 실행"}</span></button>)}{!runs.length&&<p className="text-muted text-sm">아직 실행 이력이 없습니다.</p>}<a href={`?page=logs&kind=job&source=${encodeURIComponent(job.name)}`} className="inline-flex gap-2 items-center mt-4 text-primary text-sm"><FileText size={14}/>모든 로그</a></div></aside>}</div>
+    </>}{editor&&<JobEditor initial={editor} isNew={isNew} onClose={()=>setEditor(undefined)} onSave={async value=>{if(isNew){await client.addJob(value);setSelected(value.name);}else await client.updateJob(editor.name,value);await resource.refresh();}}/>}</div>;
 }

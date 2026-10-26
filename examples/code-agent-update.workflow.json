@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start",
+      "position": { "x": 300, "y": 40 },
+      "data": { "kind": "trigger", "label": "매일 08:30 · Asia/Seoul" }
+    },
+    {
+      "id": "update-agents",
+      "position": { "x": 300, "y": 190 },
+      "data": { "kind": "parallel", "label": "Code Agent 업데이트", "branchCount": 2 }
+    },
+    {
+      "id": "update-codex",
+      "position": { "x": 100, "y": 370 },
+      "data": {
+        "kind": "command",
+        "label": "Codex 업데이트",
+        "program": "/bin/zsh",
+        "args": ["-lc", "source \"$HOME/.zshrc\" || exit $?; exec pnpm i -g @openai/codex"],
+        "maxAttempts": 1,
+        "timeoutSeconds": 3500
+      }
+    },
+    {
+      "id": "update-claude",
+      "position": { "x": 510, "y": 370 },
+      "data": {
+        "kind": "command",
+        "label": "Claude Code 업데이트",
+        "program": "/bin/zsh",
+        "args": ["-lc", "source \"$HOME/.zshrc\" || exit $?; exec claude update"],
+        "maxAttempts": 1,
+        "timeoutSeconds": 3500
+      }
+    },
+    {
+      "id": "updates-completed",
+      "position": { "x": 300, "y": 570 },
+      "data": { "kind": "join", "label": "두 업데이트 결과 확인", "joinMode": "all", "failurePolicy": "fail" }
+    },
+    {
+      "id": "complete",
+      "position": { "x": 300, "y": 730 },
+      "data": { "kind": "finish", "label": "업데이트 완료", "result": "succeeded" }
+    }
+  ],
+  "edges": [
+    { "id": "start-updates", "source": "start", "target": "update-agents", "sourceHandle": "out" },
+    { "id": "updates-codex", "source": "update-agents", "target": "update-codex", "sourceHandle": "branch-1" },
+    { "id": "updates-claude", "source": "update-agents", "target": "update-claude", "sourceHandle": "branch-2" },
+    { "id": "codex-completed", "source": "update-codex", "target": "updates-completed", "sourceHandle": "out" },
+    { "id": "claude-completed", "source": "update-claude", "target": "updates-completed", "sourceHandle": "out" },
+    { "id": "updates-complete", "source": "updates-completed", "target": "complete", "sourceHandle": "out" }
+  ]
+}

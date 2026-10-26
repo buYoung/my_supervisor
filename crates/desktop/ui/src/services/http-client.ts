@@ -6,6 +6,7 @@
  */
 
 import type { JobStatus, ProcessStatus } from "../shared/types";
+import { logQueryToWire, mapLogQueryResult, type LogQueryResultDto } from "./log-mapping";
 import {
   createEventDeduper,
   type EventEnvelope,
@@ -23,6 +24,8 @@ import {
   mapJobRun,
   mapJobPreview,
   mapJobStatus,
+  mapJobConfig,
+  jobConfigToWire,
   mapLogLine,
   mapProcessStatus,
   mapProcessInstanceStatus,
@@ -54,6 +57,7 @@ import type {
 const DEFAULT_BASE_URL = "http://127.0.0.1:9876";
 
 function resolveBaseUrl(): string {
+  if (import.meta.env.DEV && import.meta.env.VITE_NATIVE_PROXY) return window.location.origin;
   const configured = import.meta.env.VITE_API_BASE_URL;
   return (configured ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
@@ -133,6 +137,25 @@ export function createHttpClient(): OperationsClient {
 
   return {
     transport: "http",
+    getProcessConfig(name) {return requestJson(`/api/v1/processes/${encode(name)}/config`);},
+    async updateProcessConfig(name,config,expected) {return mapProcessStatus(await requestJson(`/api/v1/processes/${encode(name)}/config`,{method:"PATCH",body:JSON.stringify({config,expected})}));},
+    developerTool<T>(request:Record<string,unknown>) {return requestJson<T>("/api/v1/tools",{method:"POST",body:JSON.stringify(request)});},
+    getWorkflow(name,revision) {return requestJson(`/api/v1/jobs/${encode(name)}/workflow${revision===undefined?"":`?revision=${revision}`}`);},
+    saveWorkflow(name,definition,expectedRevision) {return requestJson(`/api/v1/jobs/${encode(name)}/workflow`,{method:"PUT",body:JSON.stringify({definition,expected_revision:expectedRevision})});},
+    workflowVersions(name) {return requestJson(`/api/v1/jobs/${encode(name)}/workflow/versions`);},
+    workflowHistory(name) {return requestJson(`/api/v1/jobs/${encode(name)}/workflow/history`);},
+    triggerWorkflow(name,options={}) {return requestJson(`/api/v1/jobs/${encode(name)}/workflow/run`,{method:"POST",body:JSON.stringify(options)});},
+    workflowRun(name,id) {return requestJson(`/api/v1/jobs/${encode(name)}/workflow/runs/${encode(id)}`);},
+    resetStepCircuit(name,id) {return requestNoContent(`/api/v1/jobs/${encode(name)}/workflow/circuits/${encode(id)}/reset`,{method:"POST"});},
+    exportWorkflow(name,shell,definition) {return requestJson(`/api/v1/jobs/${encode(name)}/workflow/export`,{method:"POST",body:JSON.stringify({shell,definition})});},
+
+    async queryLogs(request) {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(logQueryToWire(request))) {
+        if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+      }
+      return mapLogQueryResult(await requestJson<LogQueryResultDto>(`/api/v1/logs?${query}`));
+    },
 
     async listProcesses() {
       const dto = await requestJson<ListProcessesDto>("/api/v1/processes");
@@ -337,16 +360,20 @@ export function createHttpClient(): OperationsClient {
       return mapJobStatus(await requestJson<JobStatusDto>(`/api/v1/jobs/${encode(name)}`));
     },
 
-    async addJob(config: JobConfigDto) {
+    async getJobConfig(name) {
+      return mapJobConfig(await requestJson<JobConfigDto>(`/api/v1/jobs/${encode(name)}/config`));
+    },
+
+    async addJob(config) {
       const dto = await requestJson<JobStatusDto>("/api/v1/jobs", {
         method: "POST",
-        body: JSON.stringify(config),
+        body: JSON.stringify(jobConfigToWire(config)),
       });
       return mapJobStatus(dto);
     },
 
     async updateJob(name, config) {
-      return mapJobStatus(await requestJson<JobStatusDto>(`/api/v1/jobs/${encode(name)}`, { method: "PATCH", body: JSON.stringify(config) }));
+      return mapJobStatus(await requestJson<JobStatusDto>(`/api/v1/jobs/${encode(name)}`, { method: "PATCH", body: JSON.stringify(jobConfigToWire(config)) }));
     },
 
     async previewJob(request: JobPreviewRequestDto) {

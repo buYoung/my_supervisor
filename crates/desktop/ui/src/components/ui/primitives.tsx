@@ -17,7 +17,7 @@ export function Panel({
 }: HTMLAttributes<HTMLElement> & { children: ReactNode }) {
   return (
     <section
-      className={`min-w-0 rounded-lg border border-border bg-panel shadow-panel ${className}`}
+      className={`min-w-0 rounded-lg border border-border bg-panel ${className}`}
       {...props}
     >
       {children}

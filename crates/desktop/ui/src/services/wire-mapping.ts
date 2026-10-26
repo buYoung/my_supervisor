@@ -16,6 +16,7 @@ import type {
   JobRun,
   JobPreview,
   JobStatus,
+  JobTrigger,
   LogLine,
   ManagementMode,
   ProcessStatus,
@@ -28,6 +29,8 @@ import type {
   JobRunDto,
   JobPreviewDto,
   JobStatusDto,
+  JobConfigDto,
+  JobTriggerDto,
   LogLineDto,
   ManagementModeDto,
   ProcessStatusDto,
@@ -36,6 +39,21 @@ import type {
   TriggeredByDto,
 } from "./wire-types";
 import type { EventEnvelope } from "./operations-client";
+import type { JobConfigInput } from "./operations-client";
+
+function mapJobTrigger(trigger: JobTriggerDto): JobTrigger {
+  return trigger.type === "interval" ? { type: "interval", everySec: trigger.every_sec } : trigger;
+}
+
+export function mapJobConfig(config: JobConfigDto): JobConfigInput {
+  return { ...config, trigger: mapJobTrigger(config.trigger) };
+}
+
+export function jobConfigToWire(config: JobConfigInput): JobConfigDto {
+  const trigger: JobTriggerDto = config.trigger.type === "interval"
+    ? { type: "interval", every_sec: config.trigger.everySec } : config.trigger;
+  return { ...config, trigger };
+}
 
 /** Derive a compact human uptime string from an RFC3339 start timestamp. "-" when null. */
 export function formatUptime(startedAt: string | null, nowMs: number = Date.now()): string {
@@ -115,7 +133,7 @@ export function mapProcessOperation(dto: ProcessOperationDto): ProcessOperation 
 export function mapJobStatus(dto: JobStatusDto): JobStatus {
   return {
     name: dto.name,
-    trigger: dto.trigger,
+    trigger: mapJobTrigger(dto.trigger),
     onOverlap: dto.on_overlap,
     lastRun: dto.last_run
       ? {

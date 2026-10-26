@@ -8,6 +8,7 @@
  * hard-fail when the package is absent — this adapter is only selected inside Tauri.
  */
 
+import { logQueryToWire, mapLogQueryResult, type LogQueryResultDto } from "./log-mapping";
 import {
   createEventDeduper,
   type FollowEventsHandlers,
@@ -24,6 +25,8 @@ import {
   mapJobRun,
   mapJobPreview,
   mapJobStatus,
+  mapJobConfig,
+  jobConfigToWire,
   mapLogLine,
   mapProcessStatus,
   mapProcessInstanceStatus,
@@ -115,6 +118,21 @@ export function createInvokeClient(
 ): OperationsClient {
   return {
     transport: "invoke",
+    getProcessConfig(name) {return invokeCommand("cmd_get_process_config",{name});},
+    async updateProcessConfig(name,config,expected) {return mapProcessStatus(await invokeCommand("cmd_update_process_config",{name,request:{config,expected}}));},
+    developerTool<T>(request:Record<string,unknown>) {return invokeCommand<T>("cmd_developer_tool",{request});},
+    getWorkflow(name,revision) {return invokeCommand("cmd_get_workflow",{name,revision});},
+    saveWorkflow(name,definition,expectedRevision) {return invokeCommand("cmd_save_workflow",{name,request:{definition,expected_revision:expectedRevision}});},
+    workflowVersions(name) {return invokeCommand("cmd_workflow_versions",{name});},
+    workflowHistory(name) {return invokeCommand("cmd_workflow_history",{name});},
+    triggerWorkflow(name,options={}) {return invokeCommand("cmd_trigger_workflow",{name,request:options});},
+    workflowRun(name,id) {return invokeCommand("cmd_workflow_run",{name,id});},
+    resetStepCircuit(name,id) {return invokeCommand("cmd_reset_step_circuit",{name,id});},
+    exportWorkflow(name,shell,definition) {return invokeCommand("cmd_export_workflow",{name,request:{shell,definition}});},
+
+    async queryLogs(request) {
+      return mapLogQueryResult(await invokeCommand<LogQueryResultDto>("cmd_query_logs", { request: logQueryToWire(request) }));
+    },
 
     async listProcesses() {
       const dto = await invokeCommand<ListProcessesDto>("cmd_list_processes");
@@ -277,13 +295,17 @@ export function createInvokeClient(
       return mapJobStatus(await invokeCommand<JobStatusDto>("cmd_get_job", { name }));
     },
 
-    async addJob(config: JobConfigDto) {
-      const dto = await invokeCommand<JobStatusDto>("cmd_add_job", { config });
+    async getJobConfig(name) {
+      return mapJobConfig(await invokeCommand<JobConfigDto>("cmd_get_job_config", { name }));
+    },
+
+    async addJob(config) {
+      const dto = await invokeCommand<JobStatusDto>("cmd_add_job", { config: jobConfigToWire(config) });
       return mapJobStatus(dto);
     },
 
     async updateJob(name, config) {
-      return mapJobStatus(await invokeCommand<JobStatusDto>("cmd_update_job", { name, config }));
+      return mapJobStatus(await invokeCommand<JobStatusDto>("cmd_update_job", { name, config: jobConfigToWire(config) }));
     },
 
     async previewJob(request: JobPreviewRequestDto) {

@@ -1,6 +1,5 @@
 import {
   Activity,
-  Bell,
   BriefcaseBusiness,
   CheckCircle2,
   CircleDot,
@@ -14,9 +13,9 @@ import {
   TerminalSquare,
   XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { lazy,Suspense,useCallback, useEffect, useState } from "react";
 import { DaemonView } from "./features/daemon/DaemonView";
-import { JobsView } from "./features/jobs/JobsView";
+const JobsView=lazy(()=>import("./features/jobs/JobsView").then(module=>({default:module.JobsView})));
 import { LogsView } from "./features/logs/LogsView";
 import { ProcessesView } from "./features/processes/ProcessesView";
 import { SettingsView } from "./features/settings/SettingsView";
@@ -30,11 +29,11 @@ const navigationItems: Array<{
   label: string;
   icon: typeof Activity;
 }> = [
-  { key: "processes", label: "Processes", icon: Activity },
-  { key: "jobs", label: "Jobs", icon: BriefcaseBusiness },
-  { key: "logs", label: "Logs", icon: TerminalSquare },
-  { key: "daemon", label: "Daemon", icon: MonitorCog },
-  { key: "settings", label: "Settings", icon: Settings },
+  { key: "processes", label: "프로세스", icon: Activity },
+  { key: "jobs", label: "작업", icon: BriefcaseBusiness },
+  { key: "logs", label: "로그", icon: TerminalSquare },
+  { key: "daemon", label: "데몬", icon: MonitorCog },
+  { key: "settings", label: "설정", icon: Settings },
 ];
 
 const themeLabels: Record<ThemePreference, string> = {
@@ -49,8 +48,29 @@ function resolveSystemTheme() {
 
 function App() {
   const client = useOperationsClient();
-  const [activeNavigationKey, setActiveNavigationKey] = useState<NavigationKey>("processes");
-  const [themePreference, setThemePreference] = useState<ThemePreference>("auto");
+  const [activeNavigationKey, setActiveNavigationKey] = useState<NavigationKey>(() => {
+    const page = new URLSearchParams(window.location.search).get("page");
+    return navigationItems.some(item => item.key === page) ? page as NavigationKey : "processes";
+  });
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
+    const value = localStorage.getItem("theme");
+    return value === "dark" || value === "light" ? value : "auto";
+  });
+
+  useEffect(() => {
+    const onPopState = () => {
+      const page = new URLSearchParams(window.location.search).get("page");
+      setActiveNavigationKey(navigationItems.some(item => item.key === page) ? page as NavigationKey : "processes");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  function navigate(page: NavigationKey) {
+    setActiveNavigationKey(page);
+    const url = new URL(window.location.href); url.search = ""; url.searchParams.set("page", page);
+    window.history.pushState({}, "", url);
+  }
 
   const fetchDaemonStatus = useCallback(() => client.daemonStatus(), [client]);
   const {
@@ -82,6 +102,7 @@ function App() {
   }, [refreshDaemonStatus, refreshProcesses]);
 
   useEffect(() => {
+    localStorage.setItem("theme", themePreference);
     const rootElement = document.documentElement;
     const applyTheme = () => {
       const resolvedTheme = themePreference === "auto" ? resolveSystemTheme() : themePreference;
@@ -118,8 +139,8 @@ function App() {
       >
         본문으로 이동
       </a>
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)]">
-        <aside className="min-w-0 border-b border-border bg-surface lg:border-b-0 lg:border-r">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[188px_minmax(0,1fr)]">
+        <aside className="app-sidebar min-w-0 border-b border-border bg-surface lg:border-b-0 lg:border-r">
           <div className="flex h-full flex-col">
             <div className="flex h-16 items-center gap-3 border-b border-border px-4">
               <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-white">
@@ -139,11 +160,11 @@ function App() {
                     aria-current={isActive ? "page" : undefined}
                     className={`inline-flex h-10 shrink-0 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:w-full ${
                       isActive
-                        ? "bg-primary text-white"
+                        ? "bg-primary/10 text-primary"
                         : "text-muted hover:bg-panel hover:text-foreground"
                     }`}
                     key={item.key}
-                    onClick={() => setActiveNavigationKey(item.key)}
+                    onClick={() => navigate(item.key)}
                     type="button"
                   >
                     <Icon aria-hidden="true" size={18} />
@@ -162,7 +183,7 @@ function App() {
                   )}
                   {isDaemonConnected ? "데몬 연결됨" : "데몬 연결 안 됨"}
                 </div>
-                <p className="mt-2 font-mono text-xs text-muted">127.0.0.1:9876</p>
+                <p className="mt-2 font-mono text-xs text-muted">PID {daemonStatus?.pid ?? "—"}</p>
               </div>
             </div>
           </div>
@@ -179,11 +200,9 @@ function App() {
                     size={14}
                   />
                   {isDaemonConnected ? "로컬 데몬" : "데몬 연결 끊김"}
-                  <span className="font-mono">127.0.0.1:9876</span>
+                  <span className="font-mono">PID {daemonStatus?.pid ?? "—"}</span>
                 </div>
-                <h1 className="mt-1 truncate text-lg font-semibold text-foreground">
-                  데스크톱 운영 콘솔
-                </h1>
+                <p className="mt-1 truncate text-sm font-semibold text-foreground">{navigationItems.find(item => item.key === activeNavigationKey)?.label}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="hidden items-center gap-2 rounded-md border border-border bg-panel px-3 py-2 text-xs text-muted sm:flex">
@@ -198,15 +217,6 @@ function App() {
                 >
                   <RefreshCw aria-hidden="true" className={isRefreshing ? "animate-spin" : undefined} size={16} />
                   새로고침
-                </button>
-                <button
-                  className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md border border-border bg-panel px-3 text-sm text-muted opacity-60"
-                  disabled
-                  title="이벤트 알림 UI는 아직 지원하지 않습니다."
-                  type="button"
-                >
-                  <Bell aria-hidden="true" size={16} />
-                  이벤트 미지원
                 </button>
                 <label className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-panel px-2 text-sm text-muted">
                   {themePreference === "dark" ? (
@@ -231,7 +241,7 @@ function App() {
             </div>
           </header>
           <main className="px-4 py-5 md:px-6" id="main-content">
-            {content}
+            <Suspense fallback={<div className="editor-loading">작업 화면을 불러오는 중…</div>}>{content}</Suspense>
           </main>
         </div>
       </div>

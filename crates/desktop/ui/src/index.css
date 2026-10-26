@@ -1,4 +1,5 @@
 @import "./shared/theme.css";
+@import "./shared/workspace.css";
 
 @tailwind base;
 @tailwind components;
@@ -19,7 +20,7 @@
     margin: 0;
     background: rgb(var(--color-background));
     color: rgb(var(--color-foreground));
-    font-family: Inter, "Fira Sans", system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   }
 
   button,
@@ -33,6 +34,11 @@
     background: rgb(var(--color-primary) / 0.24);
   }
 }
+
+button:not(:disabled), summary, select { cursor: pointer; }
+button, input, select, textarea, summary { outline-offset: 3px; }
+button:focus-visible, summary:focus-visible { outline: 2px solid rgb(var(--color-primary)); }
+@media(min-width:1024px) { .app-sidebar { position:sticky; top:0; height:100vh; } }
 
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -15,12 +15,17 @@ import type {
   JobRun,
   JobStatus,
   JobPreview,
+  JobTrigger,
   LogLine,
   ProcessStatus,
   ProcessInstanceStatus,
   ProcessOperation,
 } from "../shared/types";
 import type { ConvertTargetDto, JobConfigDto, JobPreviewRequestDto, ProcessConfigDto } from "./wire-types";
+import type { LogQuery, LogQueryResult } from "./log-mapping";
+import type { Workflow, WorkflowDocument, WorkflowRun } from "./workspace-types";
+
+export type JobConfigInput = Omit<JobConfigDto, "trigger"> & Pick<JobConfigDto,"args"|"cwd"|"env"|"on_overlap"|"timeout_sec"> & { name: string; command: string; trigger: JobTrigger };
 
 const EVENT_DEDUP_CACHE_CAPACITY = 1_024;
 
@@ -118,6 +123,18 @@ export function createEventDeduper(capacity = EVENT_DEDUP_CACHE_CAPACITY): (even
 export interface OperationsClient {
   /** Identifies which transport is active (for diagnostics / handoff visibility). */
   readonly transport: "invoke" | "http";
+  getProcessConfig(name:string):Promise<ProcessConfigDto>;
+  updateProcessConfig(name:string,config:ProcessConfigDto,expected?:ProcessConfigDto):Promise<ProcessStatus>;
+  developerTool<T=unknown>(request:Record<string,unknown>):Promise<T>;
+  getWorkflow(name:string,revision?:number):Promise<WorkflowDocument>;
+  saveWorkflow(name:string,definition:Workflow,expectedRevision:number):Promise<WorkflowDocument>;
+  workflowVersions(name:string):Promise<WorkflowDocument[]>;
+  workflowHistory(name:string):Promise<import("./workspace-types").WorkflowHistoryEntry[]>;
+  triggerWorkflow(name:string,options?:{definition?:Workflow;only_node?:string;single_job?:boolean}):Promise<{run_id:string}>;
+  workflowRun(name:string,id:string):Promise<WorkflowRun>;
+  resetStepCircuit(name:string,id:string):Promise<void>;
+  exportWorkflow(name:string,shell:"bash"|"zsh",definition?:Workflow):Promise<{script:string}>;
+  queryLogs(query: LogQuery): Promise<LogQueryResult>;
 
   // Processes
   listProcesses(): Promise<ProcessStatus[]>;
@@ -150,8 +167,9 @@ export interface OperationsClient {
   listJobs(): Promise<JobStatus[]>;
   listJobsPage(cursor?: string, highWatermark?: string, limit?: number): Promise<ResourcePage<JobStatus>>;
   getJob(name: string): Promise<JobStatus>;
-  addJob(config: JobConfigDto): Promise<JobStatus>;
-  updateJob(name: string, config: JobConfigDto): Promise<JobStatus>;
+  getJobConfig(name: string): Promise<JobConfigInput>;
+  addJob(config: JobConfigInput): Promise<JobStatus>;
+  updateJob(name: string, config: JobConfigInput): Promise<JobStatus>;
   previewJob(request: JobPreviewRequestDto): Promise<JobPreview>;
   removeJob(name: string, force?: boolean): Promise<void>;
   triggerJob(name: string): Promise<{ runId: string }>;

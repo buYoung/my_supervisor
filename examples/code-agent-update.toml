@@ -1,0 +1,27 @@
+# Register: msv add --config examples/code-agent-update.toml
+# Save the editable flow afterwards:
+# msv job workflow save code-agent-update --file examples/code-agent-update.workflow.json --expected-revision 0
+[[job]]
+name = "code-agent-update"
+command = "/bin/zsh"
+args = ["-lc", 'source "$HOME/.zshrc" || exit $?; pnpm i -g @openai/codex; codex_status=$?; claude update; claude_status=$?; (( codex_status == 0 && claude_status == 0 ))']
+timezone = "Asia/Seoul"
+on_overlap = "skip"
+misfire_policy = "run_once"
+timeout_sec = 3600
+
+[job.trigger]
+type = "cron"
+expr = "30 8 * * *"
+
+[job.retry_policy]
+max_attempts = 1
+
+[job.admission]
+max_concurrency = 1
+max_queue = 0
+overflow = "skip"
+
+[job.log_retention]
+max_runs = 240
+max_age_days = 210

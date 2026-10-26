@@ -1,93 +1,12 @@
-import { Monitor, Moon, Save, Sun } from "lucide-react";
-import { Button, Field, Panel, PanelHeader } from "../../components/ui/primitives";
-import type { ThemePreference } from "../../shared/types";
-
-const themeOptions: Array<{ value: ThemePreference; label: string; icon: typeof Monitor }> = [
-  { value: "auto", label: "자동", icon: Monitor },
-  { value: "dark", label: "다크", icon: Moon },
-  { value: "light", label: "라이트", icon: Sun },
-];
-
-export function SettingsView({
-  themePreference,
-  onThemePreferenceChange,
-}: {
-  themePreference: ThemePreference;
-  onThemePreferenceChange: (themePreference: ThemePreference) => void;
-}) {
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <Panel>
-        <PanelHeader description="Tauri와 외부 브라우저에서 공통으로 쓰는 UI 설정입니다." title="설정" />
-        <div className="grid gap-5 p-4">
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="API 기준 주소" value="http://127.0.0.1:9876" />
-            <Field label="로그 tail 기본 줄 수" value="100" />
-          </div>
-
-          <fieldset className="grid gap-3 rounded-lg border border-border p-4">
-            <legend className="px-1 text-sm font-semibold text-foreground">테마</legend>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {themeOptions.map((option) => {
-                const Icon = option.icon;
-                const isActive = option.value === themePreference;
-                return (
-                  <button
-                    className={`flex h-20 items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      isActive
-                        ? "border-primary bg-primary text-white"
-                        : "border-border bg-surface text-muted hover:bg-background hover:text-foreground"
-                    }`}
-                    key={option.value}
-                    onClick={() => onThemePreferenceChange(option.value)}
-                    type="button"
-                  >
-                    <Icon aria-hidden="true" size={18} />
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <fieldset className="grid gap-3 rounded-lg border border-border p-4">
-            <legend className="px-1 text-sm font-semibold text-foreground">데스크톱</legend>
-            <label className="flex items-start gap-3 text-sm text-foreground">
-              <input className="mt-1" disabled type="checkbox" />
-              <span>
-                로그인 시 데몬 자동 시작
-                <span className="mt-1 block text-xs text-muted">
-                  아직 지원하지 않아 변경할 수 없습니다.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-3 text-sm text-foreground">
-              <input className="mt-1" disabled type="checkbox" />
-              <span>
-                충돌 감지 시 네이티브 알림 표시
-                <span className="mt-1 block text-xs text-muted">
-                  아직 지원하지 않아 변경할 수 없습니다.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-        </div>
-      </Panel>
-
-      <aside className="grid content-start gap-5">
-        <Panel>
-          <PanelHeader title="변경 사항" description="테마는 즉시 적용되며 데몬 설정 저장은 아직 지원하지 않습니다." />
-          <div className="grid gap-3 p-4">
-            <Button disabled variant="primary">
-              <Save aria-hidden="true" size={16} />
-              데몬 설정 저장 미지원
-            </Button>
-            <p className="text-xs text-muted">
-              지원되지 않는 설정은 성공한 것처럼 표시하지 않습니다.
-            </p>
-          </div>
-        </Panel>
-      </aside>
-    </div>
-  );
+import {Monitor,Moon,Sun,ArrowUpRight} from "lucide-react";
+import {useCallback} from "react";
+import {useOperationsClient,usePolledResource} from "../../services/use-operations";
+import type {ThemePreference} from "../../shared/types";
+export function SettingsView({themePreference,onThemePreferenceChange}:{themePreference:ThemePreference;onThemePreferenceChange:(value:ThemePreference)=>void}){
+  const client=useOperationsClient();const status=usePolledResource(useCallback(()=>client.daemonStatus(),[client]),10000);
+  return <div className="settings-workspace"><header className="workspace-heading"><div><h1>설정</h1><p>화면 모양과 데스크톱 실행 정보를 확인합니다.</p></div></header><div className="workspace-panel settings-list">
+    <section><header><h2>화면 모양</h2><p>변경하면 바로 적용됩니다.</p></header><div className="theme-choices">{([{value:"light",label:"라이트",Icon:Sun},{value:"dark",label:"다크",Icon:Moon},{value:"auto",label:"시스템",Icon:Monitor}] as const).map(({value,label,Icon})=><button className={themePreference===value?"selected":""} key={value} aria-pressed={themePreference===value} onClick={()=>onThemePreferenceChange(value)}><div className={`theme-preview theme-${value}`}><span/><span/><span/></div><span><Icon size={14}/>{label}</span></button>)}<p className="editor-note">시스템을 선택하면 운영체제의 화면 모양을 따릅니다.</p></div></section>
+    <section><header><h2>실행과 창</h2><p>프로세스의 실행 수명</p></header><div><p className="text-sm leading-7">프로세스별로 앱과 함께 종료할지, 앱 종료 후에도 유지할지 선택할 수 있습니다.</p><p className="editor-note">프로세스 → 설정 수정 → 실행 수명에서 변경하세요. 데스크톱 창을 닫아도 메뉴 막대에 남아 실행을 유지합니다. 메뉴 막대에서 앱을 종료할 수 있습니다.</p></div></section>
+    <section><header><h2>이 앱에 관하여</h2><p>현재 연결과 실행 정보</p></header><dl className="detail-values"><dt>my-supervisor</dt><dd>{status.data?.version||"—"}</dd><dt>연결 방식</dt><dd>{client.transport==="invoke"?"데스크톱 로컬 런타임":"로컬 HTTP 연결"}</dd><dt>데몬 PID</dt><dd>{status.data?.pid||"—"}</dd><dt>연결 상태</dt><dd><a href="?page=daemon" className="inline-flex items-center gap-1 text-primary">데몬 상태 확인<ArrowUpRight size={13}/></a></dd></dl></section>
+  </div></div>;
 }
