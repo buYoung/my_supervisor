@@ -1,0 +1,16 @@
+import React,{useEffect,useMemo,useRef,useState} from 'react';
+const logTime=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZone:'Asia/Seoul'});
+
+export function RunLogTimeline({run,selectedStepId,onSelectStep,onShowFlow}){
+  const [query,setQuery]=useState(''),[stepId,setStepId]=useState('all'),[stream,setStream]=useState('all'),[isFollowing,setIsFollowing]=useState(run?.state==='running');
+  const viewport=useRef(null),entries=useMemo(()=>window.SupervisorRunPresentation.logs(run),[run]);
+  const visible=entries.filter(entry=>(stepId==='all'||entry.stepId===stepId)&&(stream==='all'||entry.stream===stream)&&`${entry.message} ${entry.stepLabel}`.toLowerCase().includes(query.toLowerCase()));
+  useEffect(()=>{if(isFollowing&&viewport.current)viewport.current.scrollTop=viewport.current.scrollHeight;},[entries.length,isFollowing]);
+  if(!run)return <section className="run-log-timeline"><p>선택한 실행 기록이 없습니다.</p></section>;
+  return <section className="run-log-timeline" aria-label="실행 상세 로그"><header><div><strong>상세 로그</strong><span>실행 #{String(run.sequence).padStart(3,'0')} · {run.versionLabel}</span></div><button className="text-button" type="button" onClick={onShowFlow}>실행 흐름에서 보기 →</button></header>
+    <div className="run-log-filters"><input aria-label="실행 로그 검색" placeholder="메시지·단계 검색" value={query} onChange={event=>setQuery(event.target.value)}/><select aria-label="로그 단계 필터" value={stepId} onChange={event=>setStepId(event.target.value)}><option value="all">모든 단계</option>{run.workflow.nodes.map(node=><option key={node.id} value={node.id}>{node.data.label}</option>)}</select><select aria-label="로그 출력 필터" value={stream} onChange={event=>setStream(event.target.value)}><option value="all">모든 출력</option><option value="stdout">stdout</option><option value="stderr">stderr</option><option value="system">시스템</option></select></div>
+    <div className="run-log-count"><span>{visible.length} / {entries.length}줄</span><span>시간순 · 단계 이름을 누르면 실행 결과 표시</span>{(query||stepId!=='all'||stream!=='all')&&<button type="button" className="text-button" onClick={()=>{setQuery('');setStepId('all');setStream('all');}}>필터 초기화</button>}</div>
+    <div className="run-log-scroll" ref={viewport} role="log" aria-label="선택한 실행의 전체 로그" aria-live={run.state==='running'?'polite':'off'}>{visible.length?visible.map(entry=><div key={entry.key} className={`run-log-row ${entry.stream} ${selectedStepId===entry.stepId?'is-selected':''}`}><time dateTime={entry.time}>{logTime.format(new Date(entry.time))}</time><span className="run-log-stream">{entry.stream==='system'?'시스템':entry.stream}</span><button type="button" className="run-log-stage" onClick={()=>onSelectStep(entry.stepId)} title={`${entry.stepLabel} 실행 결과 보기`}>{entry.stepLabel}</button><code>{entry.message}</code></div>):<div className="run-log-empty"><strong>{entries.length?'검색 결과가 없습니다.':'저장된 로그가 없습니다.'}</strong><p>{entries.length?'검색어 또는 단계·출력 필터를 변경하세요.':'이 실행에서 기록된 출력이 없습니다.'}</p></div>}</div>
+    <footer><span>{run.state==='running'?'실행 중인 로그를 표시합니다.':'실행 당시 기록 · 읽기 전용'}</span><label><input type="checkbox" checked={isFollowing} onChange={event=>setIsFollowing(event.target.checked)}/>새 로그 따라가기</label></footer>
+  </section>;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "my-supervisor-job-flow-mockup",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild job-flow.jsx --bundle --format=esm --minify --target=es2022 --define:process.env.NODE_ENV=\"\\\"production\\\"\" --outfile=../assets/job-flow.js --legal-comments=eof"
+  },
+  "dependencies": {
+    "@xyflow/react": "12.12.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
