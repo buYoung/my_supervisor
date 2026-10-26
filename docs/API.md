@@ -28,6 +28,8 @@
 | `GET` | `/api/v1/processes` | 관리 중인 프로세스 목록 |
 | `POST` | `/api/v1/processes` | 프로세스 등록 (body: `ProcessConfig`) |
 | `GET` | `/api/v1/processes/{name}` | 프로세스 상세 |
+| `GET` | `/api/v1/processes/{name}/config` | 저장된 `ProcessConfigDto` 전체 |
+| `PATCH` | `/api/v1/processes/{name}/config` | 이름·명령·환경변수·운영 정책 변경 |
 | `DELETE` | `/api/v1/processes/{name}` | 프로세스 등록 해제 (실행 중이면 409) |
 | `POST` | `/api/v1/processes/{name}/start` | 시작 |
 | `POST` | `/api/v1/processes/{name}/stop` | 중지 (graceful → force) |
@@ -71,6 +73,10 @@
 응답: `ProcessStatus` (§4.1).
 
 - `200 OK` / `404 process_not_found`.
+
+#### GET/PATCH /api/v1/processes/{name}/config
+
+프로세스 설정 변경은 `PATCH /api/v1/processes/{name}/config`에 `{ "config": ProcessConfigDto, "expected"?: ProcessConfigDto }`를 보낸다. `expected`가 현재 저장값과 다르면 충돌로 거부한다. 이름을 변경해도 `definition_id`와 인스턴스 ID는 유지되며, 실행 중인 프로세스는 새 설정으로 재시작한다. 응답은 변경된 이름의 `ProcessStatusDto`다. CLI는 `msv process config <name>`과 `msv process update <name> --file <config.json> [--expected <previous.json>]`을 사용한다.
 
 #### DELETE /api/v1/processes/{name}
 
@@ -208,7 +214,7 @@
 
 - `202 Accepted` — 리로드 시작.
 - `400 invalid_config` — 리로드 대상 설정이 유효하지 않음. 데몬은 기존 설정 유지.
-- 파일 리로드는 선언 파일을 권위로 하는 `replace` 적용이다. 명시적 `merge`는 `/daemon/config/apply` 요청에서만 선택한다.
+- 명시적인 파일 리로드는 선언 파일을 권위로 하는 `replace` 적용이다. 데몬 시작 시에는 파일을 `merge`로 불러와 GUI·CLI에서 등록한 항목을 보존한다. 설정 적용 API에서도 `/daemon/config/apply`의 `mode`로 두 방식을 선택할 수 있다.
 
 #### POST /api/v1/daemon/config/validate · /apply
 
@@ -345,6 +351,121 @@
 - `409 run_already_finished` — 이미 종료된 Run
 
 ---
+
+### 2.3.1 저장된 작업 설정
+
+`GET /api/v1/jobs/{name}/config`는 `JobConfigDto` 전체를 반환한다. 명령, 인수, 작업 디렉터리, 환경변수, 트리거, 재시도·동시성·보존 정책과 `schedule_revision`을 포함한다. 데스크톱 수정 폼은 이 값을 불러온 뒤 편집한 필드만 덮어 `PATCH /api/v1/jobs/{name}`으로 보낸다. interval 트리거의 wire 키는 `every_sec`이며 화면의 `everySec`와 매핑한다.
+
+CLI에서 `msv job config <name>`으로 JSON 설정을 읽고, `msv job update <name> --file <config.json>`으로 적용한다. 경로의 작업 이름과 서버에 저장된 작업 ID가 유지된다.
+
+### 2.3.2 통합 로그 조회
+
+`GET /api/v1/logs`는 저장된 프로세스·작업 실행 로그를 조회한다. Tauri의 `cmd_query_logs`와 CLI `msv log`도 같은 조회를 사용한다. 기존 소스별 tail/WebSocket 경로는 유지한다.
+
+| 파라미터 | 기본값 | 의미 |
+|---|---|---|
+| `kind` | `process` | `process` 또는 `job` |
+| `source` | 전체 | 등록된 프로세스 또는 작업 이름 |
+| `run_id` | 전체 실행 | `kind=job`과 `source`를 함께 지정 |
+| `level` | `attention` | `attention`, `all`, `without_info` 또는 쉼표로 구분한 수준 |
+| `stream` | 전체 | `stdout`, `stderr`, `system` |
+| `search` | 없음 | 원문 대소문자를 구분하지 않는 부분 검색 |
+| `message`, `instance` | 없음 | 반복 묶음의 정확한 메시지 또는 인스턴스 조회 |
+| `step` | 전체 단계 | 작업 흐름의 정확한 단계 ID로 필터링 |
+| `since`, `until` | 보관된 전체 / 조회 시각 | RFC3339, 양쪽 경계 포함 |
+| `grouping` | `repeat` | `repeat` 또는 `none` |
+| `ascending` | `false` | 최초 발생 오름차순, 기본은 최근 발생 내림차순 |
+| `offset`, `limit` | `0`, `50` | 결과 항목 페이지. `limit` 최대 5000 |
+
+지원 수준은 `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `unknown`이다. `attention`은 WARN·ERROR·FATAL·미분류를 포함한다. JSON의 `level`/`severity`/`levelname`/`log.level`, Pino/Bunyan 숫자 수준과 텍스트 접두사를 해석하며, 출력 스트림만으로 오류 수준을 추측하지 않는다.
+
+응답 `records` 항목에는 `entry`, `count`, `first_seen`, `last_seen`, `preview`가 있다. `entry.raw`에는 수집된 `sequence`, `timestamp`, `stream`, `line`을 제공한다. 흐름 실행 로그는 원래 메시지와 `step_id`를 JSON으로 감싸 기록한다. 같은 종류·소스·실행 ID·단계·인스턴스·수준·스트림·메시지만 묶고, 필터를 적용한 뒤 전체 조회 범위에서 집계하고 페이지를 나눈다. `grouping=none`은 모든 개별 기록을 반환한다.
+
+`total_lines`, `total_groups`, `scanned_lines`, `level_counts`, `daily_counts`, `snapshot_at`, `next_offset`, `partial_sources`를 함께 반환한다. 후속 페이지와 묶음 펼치기에서는 `until=snapshot_at`을 유지한다. 요청당 200,000개 로그, 작업별 2,000개 실행을 조회하며, 한도 초과·읽기 실패·OS 서비스 로그의 제한은 `partial_sources`에 표시한다. 수준별·일자별 발생량은 수준 필터 적용 전의 검색 범위 기준이다.
+
+저장 로그는 1 MiB 또는 24시간마다 회전하며 보존 기간은 210일, 소스별 용량은 512 MiB/512개 분할 파일로 제한한다. 용량 한도가 먼저 적용될 수 있고 기존에 삭제된 기록은 복원하지 않는다. 작업에 지정된 별도 실행/기간 보존 정책도 적용된다.
+
+```sh
+msv log --kind process --source api-server --level attention
+msv log --kind process --source api-server --follow
+msv log --kind job --source nightly-backup --run-id <UUID> --grouping none
+msv log --since 2026-04-01T00:00:00Z --until 2026-10-26T23:59:59Z -o json
+msv log --kind job --grouping none --export job-logs.jsonl
+```
+
+`--follow`는 5초 간격으로 조회하고 표시된 묶음·건수에 변화가 있을 때 새 스냅샷을 출력한다. JSON 모드에서는 스냅샷 하나를 한 줄로 출력한다. 기존 `msv logs <name> -f`는 줄 단위 스트리밍을 유지한다. 내보내기는 필터에 맞는 개별 원본 기록을 JSONL로 저장하며, 기존 파일을 덮어쓰지 않는다. 잘못된 필터·기간·페이지 값은 `400 invalid_request`로 거부한다.
+
+### 2.3.3 작업 흐름과 버전
+
+| 메서드 | 경로 | 의미 |
+|---|---|---|
+| `GET` | `/api/v1/jobs/{name}/workflow?revision=<number>` | 현재 흐름 또는 특정 저장 버전 |
+| `PUT` | `/api/v1/jobs/{name}/workflow` | `{ definition, expected_revision }` 저장 |
+| `GET` | `/api/v1/jobs/{name}/workflow/versions` | 최근 100개 버전, 최신순 |
+| `GET` | `/api/v1/jobs/{name}/workflow/history` | 최근 100개 실행의 버전·단계 경로·상태 요약 |
+| `POST` | `/api/v1/jobs/{name}/workflow/run` | `{ definition?, only_node?, single_job? }` 실행 |
+| `GET` | `/api/v1/jobs/{name}/workflow/runs/{UUID}` | 실행 당시 흐름·단계 상태·결과·최근 로그 |
+| `POST` | `/api/v1/jobs/{name}/workflow/circuits/{step}/reset` | 단계의 누적 실패·차단 상태 초기화 |
+| `POST` | `/api/v1/jobs/{name}/workflow/export` | `{ shell: "bash" \| "zsh", definition?, include_environment?: false }`를 독립 스크립트로 변환 |
+
+저장 응답은 `{ revision, saved_at, definition }`이다. 최초 저장 전에는 작업 명령에서 만든 기본 흐름과 `revision: 0`을 반환한다. 낙관적 버전 검사로 오래된 편집 결과의 덮어쓰기를 거부한다. 작업 설정 변경도 흐름의 `settings` 스냅샷과 함께 새 버전을 만든다. 실행은 저장 당시 버전 또는 입력한 초안 전체를 별도로 보관하며, 나중에 정의를 수정해도 이전 실행의 흐름은 바뀌지 않는다. 저장된 정의와 다른 초안을 실행하면 실행 버전은 `0`으로 표시한다.
+
+`definition`은 자체 `version: 1`을 가진 JSON이며 `nodes`, `edges`, 선택적 `group`, `settings`로 구성된다. 노드는 `{ id, position: { x, y }, data }`, 연결은 `{ id, source, target, sourceHandle }`이다. 편집 데이터의 키(`resultRoutes`, `maxAttempts` 등)는 이 버전 안에서 camelCase를 유지한다. 최대 200단계·500연결·1 MiB이며 시작 단계는 정확히 하나다. 순환 연결·알 수 없는 출력 핸들·중복 ID·잘못된 정책 값은 거부한다.
+
+| `data.kind` | 핵심 설정 |
+|---|---|
+| `trigger` | 작업 일정 또는 수동 실행에서 시작 |
+| `command` | `program`, `args`, `cwd`, `environment`; 또는 셸 `command` |
+| `process` | `processName`, `operation`: `start`, `stop`, `restart` |
+| `condition` | `source`: `exit_code`, `stdout`, `stderr`, `outcome`, `file_exists`; `operator`, `value`, `path`; 출력은 `true`/`false` |
+| `wait` | `seconds` |
+| `health` | `checkType`: `http`, `tcp`, `process`; URL·상태 코드 또는 호스트·포트 |
+| `job` | `jobId`: 호출할 등록 작업 이름; 호출 순환은 거부 |
+| `parallel` | `branchCount`; `branch-1`부터 출력 연결 |
+| `join` | `joinMode`: `all`, `first_success`, `race`; `failurePolicy`: `fail`, `collect` |
+| `finish` | `result`: `succeeded`, `failed`; `message` |
+
+일반 출력은 `out`이다. `resultRoutes`는 `{ id, label, source, operator, value }` 배열이며 첫 일치 경로를 사용한다. 조건 미일치 시 `out`으로 진행한다. 비교 연산은 `equals`, `not_equals`, `includes`/`contains`, `not_includes`, `gte`, `lte`다. 오류 결과에 연결된 경로가 없으면 중단하며 `onError: "continue"`로 다음 경로 진행을 지정할 수 있다.
+
+실행 정책은 `maxAttempts`(1..10), `timeoutSeconds`(1..86400), `retryStrategy`(`fixed`, `linear`, `exponential`), `retryDelaySeconds`, `retryIncrementSeconds`, `retryMultiplier`, `retryMaxDelaySeconds`, `retryJitter`, `retryOn`을 지원한다. `circuitBreaker`는 `{ enabled, failureThreshold, openSeconds, recoverySuccesses }`다. 차단 상태는 재시작 후에도 유지한다. 첫 성공·race는 결과 결정 후 나머지 경로를 취소하고 자식 정리를 기다린다.
+
+`single_job` 기본값은 `true`이며 후속 의존 작업을 자동 시작하지 않는다. `only_node`는 이전·다음 단계 없이 해당 단계만 실행한다. 전체 실행 취소는 기존 `/runs/{UUID}/cancel`을 사용한다. 단계별 기록에는 `state`, `attempt`, `exitCode`, `stdout`, `stderr`, `selectedPort`, 최대 최근 200개 `logs`가 있다. 전체 원본은 로그 조회 API를 사용한다. 흐름 기능 도입 이전의 실행은 `workflow: null`을 반환한다.
+
+```sh
+msv job workflow get backup
+msv job workflow save backup --file flow.json --expected-revision 0
+msv job workflow run backup --wait
+msv job workflow run backup --step verify
+msv job workflow result backup <UUID>
+msv job workflow diff backup --from 1 --to 2
+msv job workflow export backup --shell zsh --file backup.zsh
+msv log --kind job --source backup --run-id <UUID> --step verify --level all
+```
+
+추출 스크립트는 한 번 실행할 동작·분기·정책을 포함하며 일정을 등록하지 않는다. 기본적으로 환경변수 값은 제외하고 실행 환경의 같은 키를 요구한다. `include_environment: true` 또는 CLI `--include-environment`만 값을 포함한다. 프로세스 제어에는 설치된 `msv`와 데몬이 필요하다. `--dry-run`으로 포함 단계를 확인할 수 있으며, CLI `--file`은 기존 파일을 덮어쓰지 않는다.
+
+### 2.3.4 실행자와 도움말
+
+`POST /api/v1/tools`는 인증된 로컬 개발 도구 요청이다. Tauri `cmd_developer_tool`과 CLI `msv runtime`도 같은 처리를 사용한다.
+
+| `operation` | 입력 | 응답 |
+|---|---|---|
+| `executables` | `name` | PATH와 앱에서 설치한 실행자의 `name`, `version`, `path`, `is_default` 배열 |
+| `help` | `program`, `args?`, `cwd?` | `program`, `text`, `supported`, `cached` |
+| `versions` | `name`, `all?` | 공식 배포본의 `version`, `label`, `url`, `sha256` 배열 |
+| `install` | `name`, `version`, `directory` | 설치한 실행자 정보 |
+| `paths` | 없음 | `runtime_root` |
+| `read_text` | `path` | 최대 2 MiB UTF-8 파일 |
+| `open_folder` | `path` | 폴더 열기 요청 |
+
+macOS 자동 설치 대상은 Node.js·Go·Eclipse Temurin Java·Bun이다. 지정 경로는 절대 경로이며 비어 있어야 한다. 공식 배포의 SHA-256을 검증하며 전역 PATH는 변경하지 않는다. 도움말은 실행자·인수·작업 경로·파일 수정 시각별로 1시간 캐시하고 4초 실행 제한을 적용한다. 도움말 미지원은 `supported: false`로 반환하며 직접 인수 입력은 계속 가능하다. 네이티브 파일·폴더 선택창은 데스크톱 앱에서 제공한다.
+
+```sh
+msv runtime list node
+msv runtime help node --arg dist/server.js --cwd /absolute/project
+msv runtime versions go
+msv runtime install node --version <available-version> --directory /absolute/empty/path
+```
 
 ### 2.4 Rules 리소스 (자동화)
 

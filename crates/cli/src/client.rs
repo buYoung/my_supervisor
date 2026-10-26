@@ -89,6 +89,77 @@ pub struct Client {
 }
 
 impl Client {
+    pub async fn workspace_request(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<Value>,
+    ) -> Result<Value, CliError> {
+        let response = self.send(method, path, body).await?;
+        if response.status() == reqwest::StatusCode::NO_CONTENT {
+            return Ok(Value::Null);
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| CliError::Failed(error.to_string()))
+    }
+    pub async fn get_job_config(
+        &self,
+        name: &str,
+    ) -> Result<my_supervisor_shared::api::JobConfigDto, CliError> {
+        self.get_json(&format!(
+            "/api/v1/jobs/{}/config",
+            Self::encode_path_segment(name)
+        ))
+        .await
+    }
+
+    pub async fn update_job(
+        &self,
+        name: &str,
+        config: &my_supervisor_shared::api::JobConfigDto,
+    ) -> Result<JobStatusDto, CliError> {
+        let response = self
+            .send(
+                Method::PATCH,
+                &format!("/api/v1/jobs/{}", Self::encode_path_segment(name)),
+                Some(
+                    serde_json::to_value(config)
+                        .map_err(|error| CliError::Failed(error.to_string()))?,
+                ),
+            )
+            .await?;
+        response
+            .json()
+            .await
+            .map_err(|error| CliError::Failed(error.to_string()))
+    }
+    pub async fn query_logs(
+        &self,
+        query: &my_supervisor_shared::logs::LogQueryDto,
+    ) -> Result<my_supervisor_shared::logs::LogQueryResultDto, CliError> {
+        let mut url = reqwest::Url::parse("http://localhost/api/v1/logs")
+            .map_err(|error| CliError::Failed(error.to_string()))?;
+        let value =
+            serde_json::to_value(query).map_err(|error| CliError::Failed(error.to_string()))?;
+        for (key, value) in value.as_object().expect("query object") {
+            if value.is_null() {
+                continue;
+            }
+            let value = value
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| value.to_string());
+            url.query_pairs_mut().append_pair(key, &value);
+        }
+        self.get_json(&format!(
+            "{}?{}",
+            url.path(),
+            url.query().unwrap_or_default()
+        ))
+        .await
+    }
     pub fn new(base: impl Into<String>) -> Result<Self, CliError> {
         let base = base.into();
         let parsed = reqwest::Url::parse(&base)
@@ -142,6 +213,13 @@ impl Client {
             .http
             .request(method, &url)
             .bearer_auth(self.bearer_token());
+        if path == "/api/v1/tools"
+            && body
+                .as_ref()
+                .is_some_and(|value| value["operation"] == "install")
+        {
+            req = req.timeout(std::time::Duration::from_secs(600));
+        }
         if let Some(body) = body {
             req = req.json(&body);
         }

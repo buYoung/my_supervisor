@@ -497,6 +497,8 @@ impl SqliteStore {
         self.migrate_job_runs_to_job_identity(&mut transaction)
             .await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS workspace_documents (key TEXT NOT NULL, revision INTEGER NOT NULL, saved_at TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(key, revision))",
+            "CREATE TABLE IF NOT EXISTS workspace_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS schedule_cursors (job_id TEXT NOT NULL, trigger_id TEXT NOT NULL, schedule_revision INTEGER NOT NULL, cursor_at TEXT NOT NULL, PRIMARY KEY(job_id, trigger_id, schedule_revision))",
             "CREATE TABLE IF NOT EXISTS schedule_occurrences (job_id TEXT NOT NULL, job_name TEXT NOT NULL, trigger_id TEXT NOT NULL, schedule_revision INTEGER NOT NULL, scheduled_at TEXT NOT NULL, occurrence TEXT NOT NULL, state TEXT NOT NULL, next_attempt_at TEXT NOT NULL, run_id TEXT, final_state TEXT, PRIMARY KEY(job_id, trigger_id, schedule_revision, scheduled_at), FOREIGN KEY(job_name, job_id) REFERENCES jobs(name, id) ON DELETE CASCADE)",
             "CREATE INDEX IF NOT EXISTS idx_schedule_occurrences_due ON schedule_occurrences(state, next_attempt_at)",
@@ -1262,6 +1264,41 @@ fn durable_occurrence_from_row(
 
 #[async_trait]
 impl StateRepository for SqliteStore {
+    async fn workspace_document(
+        &self,
+        key: &str,
+        revision: Option<u64>,
+    ) -> Result<Option<my_supervisor_core::domain::WorkspaceDocument>, RepoError> {
+        self.read_workspace_document(key, revision).await
+    }
+    async fn workspace_versions(
+        &self,
+        key: &str,
+    ) -> Result<Vec<my_supervisor_core::domain::WorkspaceDocument>, RepoError> {
+        self.read_workspace_versions(key).await
+    }
+    async fn save_workspace_document(
+        &self,
+        key: &str,
+        value: &str,
+        expected_revision: u64,
+    ) -> Result<my_supervisor_core::domain::WorkspaceDocument, RepoError> {
+        self.write_workspace_document(key, value, expected_revision)
+            .await
+    }
+    async fn workspace_state(&self, key: &str) -> Result<Option<String>, RepoError> {
+        Ok(
+            sqlx::query_scalar("SELECT value FROM workspace_state WHERE key = ?")
+                .bind(key)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(backend)?,
+        )
+    }
+    async fn save_workspace_state(&self, key: &str, value: &str) -> Result<(), RepoError> {
+        sqlx::query("INSERT INTO workspace_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key).bind(value).execute(&self.pool).await.map_err(backend)?;
+        Ok(())
+    }
     async fn list_specs(&self) -> Result<Vec<ProcessSpec>, RepoError> {
         let rows = sqlx::query("SELECT * FROM process_specs ORDER BY name")
             .fetch_all(&self.pool)
@@ -2284,6 +2321,7 @@ impl JobRepository for SqliteStore {
                 .await
                 .map_err(backend)?;
         }
+        Self::delete_job_workspace(&mut transaction, name).await?;
         sqlx::query("DELETE FROM job_runs WHERE job_name = ?")
             .bind(name)
             .execute(&mut *transaction)
@@ -2361,6 +2399,7 @@ impl JobRepository for SqliteStore {
                 .await
                 .map_err(backend)?;
         }
+        Self::delete_job_workspace(&mut transaction, job_name).await?;
         sqlx::query("DELETE FROM job_runs WHERE job_name = ?")
             .bind(job_name)
             .execute(&mut *transaction)
@@ -3104,6 +3143,12 @@ impl JobRepository for SqliteStore {
                 uuid::Uuid::parse_str(row.try_get::<&str, _>("run_id").map_err(backend)?)
                     .map_err(backend)?,
             );
+            sqlx::query("DELETE FROM workspace_state WHERE key=? OR key=?")
+                .bind(format!("workflow-run/{}", run_id.0))
+                .bind(format!("workflow-override/{}", run_id.0))
+                .execute(&mut *transaction)
+                .await
+                .map_err(backend)?;
             sqlx::query("DELETE FROM job_runs WHERE run_id = ?")
                 .bind(run_id.0.to_string())
                 .execute(&mut *transaction)
@@ -3473,6 +3518,13 @@ impl JobRepository for SqliteStore {
             ));
         }
         let mut transaction = self.pool.begin().await.map_err(backend)?;
+        // Rename by durable identity before pruning names, preserving instance
+        // IDs, generations and counters through an editor rename.
+        for spec in &snapshot.processes {
+            sqlx::query("UPDATE process_specs SET name=? WHERE definition_id=? AND name<>? AND NOT EXISTS (SELECT 1 FROM process_specs WHERE name=?)")
+                .bind(&spec.name).bind(spec.definition_id.0.to_string()).bind(&spec.name).bind(&spec.name)
+                .execute(&mut *transaction).await.map_err(backend)?;
+        }
         let process_names: Vec<String> = sqlx::query("SELECT name FROM process_specs")
             .fetch_all(&mut *transaction)
             .await
@@ -3522,6 +3574,7 @@ impl JobRepository for SqliteStore {
                 sqlx::query("INSERT INTO run_log_cleanup(run_id, attempts, last_error) VALUES (?, 0, NULL) ON CONFLICT(run_id) DO NOTHING")
                     .bind(run_id).execute(&mut *transaction).await.map_err(backend)?;
             }
+            Self::delete_job_workspace(&mut transaction, &name).await?;
             sqlx::query("DELETE FROM job_runs WHERE job_name = ?")
                 .bind(&name)
                 .execute(&mut *transaction)
@@ -3787,3 +3840,4 @@ mod tests {
             .is_none());
     }
 }
+mod workspace;

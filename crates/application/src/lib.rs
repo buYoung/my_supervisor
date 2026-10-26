@@ -4,13 +4,18 @@
 
 pub mod config_apply;
 pub mod deps;
+mod developer_tools;
 pub mod error;
 pub mod events;
 pub mod facade;
+pub mod log_explorer;
 pub mod observability;
 pub mod registrar_null;
 pub mod runner;
 pub mod views;
+pub mod workflow;
+mod workflow_engine;
+mod workflow_export;
 
 pub use deps::{AppDeps, DaemonMeta};
 pub use error::{AppError, AppResult, ConflictReason, ResourceKind};

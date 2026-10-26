@@ -33,6 +33,117 @@ use crate::mapping::{
 
 pub type Facade = Arc<OperationsFacade>;
 
+pub async fn get_process_config(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+) -> Result<Json<ProcessConfigDto>, HttpError> {
+    Ok(Json(crate::mapping::process_config_to_dto(
+        &facade.process_config(&name).await?,
+    )))
+}
+pub async fn update_process_config(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+    Json(request): Json<my_supervisor_shared::workspace::ProcessUpdateRequestDto>,
+) -> Result<Json<my_supervisor_shared::api::ProcessStatusDto>, HttpError> {
+    Ok(Json(crate::mapping::process_status_to_dto(
+        facade
+            .update_process_config(
+                &name,
+                process_config_to_spec(request.config),
+                request.expected.map(process_config_to_spec),
+            )
+            .await?,
+    )))
+}
+pub async fn developer_tool(
+    State(facade): State<Facade>,
+    Json(request): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, HttpError> {
+    Ok(Json(facade.developer_tool(request).await?))
+}
+#[derive(Deserialize)]
+pub struct WorkflowQuery {
+    pub revision: Option<u64>,
+}
+pub async fn get_workflow(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+    Query(query): Query<WorkflowQuery>,
+) -> Result<Json<serde_json::Value>, HttpError> {
+    Ok(Json(facade.get_workflow(&name, query.revision).await?))
+}
+pub async fn save_workflow(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+    Json(request): Json<my_supervisor_shared::workspace::DocumentSaveRequestDto>,
+) -> Result<Json<serde_json::Value>, HttpError> {
+    Ok(Json(
+        facade
+            .save_workflow(&name, request.definition, request.expected_revision)
+            .await?,
+    ))
+}
+pub async fn workflow_versions(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+) -> Result<Json<Vec<serde_json::Value>>, HttpError> {
+    Ok(Json(facade.workflow_versions(&name).await?))
+}
+pub async fn workflow_history(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+) -> Result<Json<Vec<serde_json::Value>>, HttpError> {
+    Ok(Json(facade.workflow_history(&name, 100).await?))
+}
+pub async fn trigger_workflow(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+    Json(request): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, HttpError> {
+    Ok(Json(
+        json!({"run_id":facade.trigger_workflow(&name,request.get("definition").filter(|v|!v.is_null()).cloned(),request["only_node"].as_str().map(str::to_owned),request["single_job"].as_bool().unwrap_or(true)).await?.0}),
+    ))
+}
+pub async fn workflow_run(
+    State(facade): State<Facade>,
+    Path((name, id)): Path<(String, uuid::Uuid)>,
+) -> Result<Json<serde_json::Value>, HttpError> {
+    Ok(Json(facade.workflow_run(&name, JobRunId(id)).await?))
+}
+pub async fn reset_step_circuit(
+    State(facade): State<Facade>,
+    Path((name, id)): Path<(String, String)>,
+) -> Result<StatusCode, HttpError> {
+    facade.reset_step_circuit(&name, &id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+pub async fn export_workflow(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+    Json(request): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, HttpError> {
+    Ok(Json(facade.export_workflow(&name, request).await?))
+}
+
+pub async fn query_logs(
+    State(facade): State<Facade>,
+    Query(request): Query<my_supervisor_shared::logs::LogQueryDto>,
+) -> Result<Json<my_supervisor_shared::logs::LogQueryResultDto>, HttpError> {
+    let result = facade
+        .query_logs(crate::mapping::log_query_to_domain(request))
+        .await?;
+    Ok(Json(crate::mapping::log_query_result_to_dto(result)))
+}
+
+pub async fn get_job_config(
+    State(facade): State<Facade>,
+    Path(name): Path<String>,
+) -> Result<Json<JobConfigDto>, HttpError> {
+    let view = facade.get_job(&name).await?;
+    Ok(Json(crate::mapping::job_config_to_dto(&view.job)))
+}
+
 /// Native-only bootstrap endpoint. The bearer is accepted by middleware but
 /// never copied into the response; the renderer receives only a CSRF nonce
 /// while the opaque id is set as an HttpOnly loopback cookie.

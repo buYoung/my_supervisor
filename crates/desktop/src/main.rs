@@ -60,6 +60,125 @@ impl From<AppError> for CmdError {
 type CmdResult<T> = Result<T, CmdError>;
 type Facade<'a> = State<'a, Arc<OperationsFacade>>;
 
+#[tauri::command]
+async fn cmd_developer_tool(
+    facade: Facade<'_>,
+    request: serde_json::Value,
+) -> CmdResult<serde_json::Value> {
+    Ok(facade.developer_tool(request).await?)
+}
+#[tauri::command]
+async fn cmd_get_process_config(facade: Facade<'_>, name: String) -> CmdResult<ProcessConfigDto> {
+    Ok(my_supervisor_infra_http::mapping::process_config_to_dto(
+        &facade.process_config(&name).await?,
+    ))
+}
+#[tauri::command]
+async fn cmd_update_process_config(
+    facade: Facade<'_>,
+    name: String,
+    request: my_supervisor_shared::workspace::ProcessUpdateRequestDto,
+) -> CmdResult<ProcessStatusDto> {
+    Ok(process_status_to_dto(
+        facade
+            .update_process_config(
+                &name,
+                process_config_to_spec(request.config),
+                request.expected.map(process_config_to_spec),
+            )
+            .await?,
+    ))
+}
+#[tauri::command]
+async fn cmd_get_workflow(
+    facade: Facade<'_>,
+    name: String,
+    revision: Option<u64>,
+) -> CmdResult<serde_json::Value> {
+    Ok(facade.get_workflow(&name, revision).await?)
+}
+#[tauri::command]
+async fn cmd_save_workflow(
+    facade: Facade<'_>,
+    name: String,
+    request: my_supervisor_shared::workspace::DocumentSaveRequestDto,
+) -> CmdResult<serde_json::Value> {
+    Ok(facade
+        .save_workflow(&name, request.definition, request.expected_revision)
+        .await?)
+}
+#[tauri::command]
+async fn cmd_workflow_versions(
+    facade: Facade<'_>,
+    name: String,
+) -> CmdResult<Vec<serde_json::Value>> {
+    Ok(facade.workflow_versions(&name).await?)
+}
+#[tauri::command]
+async fn cmd_workflow_history(
+    facade: Facade<'_>,
+    name: String,
+) -> CmdResult<Vec<serde_json::Value>> {
+    Ok(facade.workflow_history(&name, 100).await?)
+}
+#[tauri::command]
+async fn cmd_trigger_workflow(
+    facade: Facade<'_>,
+    name: String,
+    request: serde_json::Value,
+) -> CmdResult<serde_json::Value> {
+    Ok(
+        serde_json::json!({"run_id":facade.trigger_workflow(&name,request.get("definition").filter(|v|!v.is_null()).cloned(),request["only_node"].as_str().map(str::to_owned),request["single_job"].as_bool().unwrap_or(true)).await?.0}),
+    )
+}
+#[tauri::command]
+async fn cmd_workflow_run(
+    facade: Facade<'_>,
+    name: String,
+    id: String,
+) -> CmdResult<serde_json::Value> {
+    let id = id.parse().map_err(|_| CmdError {
+        code: "invalid_request".into(),
+        message: "invalid run id".into(),
+    })?;
+    Ok(facade.workflow_run(&name, JobRunId(id)).await?)
+}
+#[tauri::command]
+async fn cmd_reset_step_circuit(facade: Facade<'_>, name: String, id: String) -> CmdResult<()> {
+    Ok(facade.reset_step_circuit(&name, &id).await?)
+}
+#[tauri::command]
+async fn cmd_export_workflow(
+    facade: Facade<'_>,
+    name: String,
+    request: serde_json::Value,
+) -> CmdResult<serde_json::Value> {
+    Ok(facade.export_workflow(&name, request).await?)
+}
+
+#[tauri::command]
+async fn cmd_get_job_config(facade: Facade<'_>, name: String) -> CmdResult<JobConfigDto> {
+    let view = facade.get_job(&name).await?;
+    Ok(my_supervisor_infra_http::mapping::job_config_to_dto(
+        &view.job,
+    ))
+}
+
+#[tauri::command]
+async fn cmd_query_logs(
+    facade: Facade<'_>,
+    request: my_supervisor_shared::logs::LogQueryDto,
+) -> CmdResult<my_supervisor_shared::logs::LogQueryResultDto> {
+    let result = facade
+        .query_logs(my_supervisor_infra_http::mapping::log_query_to_domain(
+            request,
+        ))
+        .await?;
+    Ok(my_supervisor_infra_http::mapping::log_query_result_to_dto(
+        result,
+    ))
+}
+
 // --- invoke handlers (production UI transport) ------------------------------
 // Each is a thin adapter over the shared facade + the infra/http mapping — the
 // SAME facade the devBridge routes call. No domain logic here (parity).
@@ -499,6 +618,7 @@ fn main() {
         .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Build the wired core in-process, mount the test-only devBridge,
             // and manage the facade for the invoke handlers.
@@ -535,6 +655,19 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            cmd_developer_tool,
+            cmd_get_process_config,
+            cmd_update_process_config,
+            cmd_get_workflow,
+            cmd_save_workflow,
+            cmd_workflow_versions,
+            cmd_workflow_history,
+            cmd_trigger_workflow,
+            cmd_workflow_run,
+            cmd_reset_step_circuit,
+            cmd_export_workflow,
+            cmd_get_job_config,
+            cmd_query_logs,
             cmd_list_processes,
             cmd_list_processes_page,
             cmd_get_process,

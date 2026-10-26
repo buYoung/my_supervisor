@@ -29,3 +29,5 @@ pub use process::{
     ProcessState, ProcessStatus, RestartPolicy, RollingPolicy, ShutdownPolicy, ShutdownSignal,
     WatchPolicy,
 };
+pub mod workspace;
+pub use workspace::WorkspaceDocument;

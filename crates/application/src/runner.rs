@@ -2,7 +2,7 @@
 //! `LifecycleController` controlled transient execution + `JobRepository` (DD: application
 //! composition, no new crate).
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock, Weak};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -21,7 +21,7 @@ use my_supervisor_core::ports::{
 use crate::events::{DomainEvent, PublishedEvent};
 
 /// Build a transient Direct/detached `ProcessSpec` from a Job definition.
-fn job_to_spec(job: &Job) -> ProcessSpec {
+pub(crate) fn job_to_spec(job: &Job) -> ProcessSpec {
     ProcessSpec {
         definition_id: my_supervisor_core::domain::ProcessDefinitionId::new(),
         name: format!("job:{}", job.name),
@@ -47,6 +47,7 @@ fn job_to_spec(job: &Job) -> ProcessSpec {
 }
 
 pub struct ProcessJobRunner {
+    facade: OnceLock<Weak<crate::OperationsFacade>>,
     lifecycle: Arc<dyn LifecycleController>,
     job_repo: Arc<dyn JobRepository>,
     log_sink: Arc<dyn LogSink>,
@@ -65,6 +66,7 @@ impl ProcessJobRunner {
         internal_events: broadcast::Sender<PublishedEvent>,
     ) -> Self {
         ProcessJobRunner {
+            facade: OnceLock::new(),
             lifecycle,
             job_repo,
             log_sink,
@@ -72,6 +74,10 @@ impl ProcessJobRunner {
             events,
             internal_events,
         }
+    }
+
+    pub(crate) fn set_facade(&self, facade: Weak<crate::OperationsFacade>) {
+        let _ = self.facade.set(facade);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -158,16 +164,69 @@ impl JobRunner for ProcessJobRunner {
                 run_id,
             }));
 
-        let spec = job_to_spec(job);
-        let execution_result = async {
-            let child = self.lifecycle.start_transient(&spec, run_id).await?;
-            control.publish_child(child.clone()).await;
-            let mut cancellation = control.cancellation();
-            self.lifecycle
-                .complete_transient(&child, job.timeout, &mut cancellation)
+        let facade = self.facade.get().and_then(Weak::upgrade);
+        let mut skip_dependencies = false;
+        let workflow = if let Some(facade) = &facade {
+            let store = &facade.workspace_deps().state_repo;
+            let override_value = store
+                .workspace_state(&format!("workflow-override/{}", run_id.0))
                 .await
+                .map_err(|e| RunnerError::Backend(e.to_string()))?;
+            if let Some(value) = override_value {
+                let value: serde_json::Value = serde_json::from_str(&value)
+                    .map_err(|e| RunnerError::Backend(e.to_string()))?;
+                skip_dependencies = value["singleJob"].as_bool().unwrap_or(true);
+                Some((
+                    serde_json::from_value::<crate::workflow::Workflow>(
+                        value["definition"].clone(),
+                    )
+                    .map_err(|e| RunnerError::Backend(e.to_string()))?,
+                    value["revision"].as_u64().unwrap_or(0),
+                    value["onlyNode"].as_str().map(str::to_owned),
+                ))
+            } else {
+                store
+                    .workspace_document(&crate::workflow::key(job), None)
+                    .await
+                    .map_err(|e| RunnerError::Backend(e.to_string()))?
+                    .map(|value| {
+                        serde_json::from_str::<crate::workflow::Workflow>(&value.value)
+                            .map(|flow| (flow, value.revision, None))
+                    })
+                    .transpose()
+                    .map_err(|e| RunnerError::Backend(e.to_string()))?
+            }
+        } else {
+            None
+        };
+        let execution_result = if let Some((flow, revision, only)) = workflow {
+            crate::workflow_engine::execute(
+                facade.unwrap(),
+                job,
+                run_id,
+                control.clone(),
+                flow,
+                revision,
+                only,
+            )
+            .await
+        } else {
+            let spec = job_to_spec(job);
+            async {
+                let child = self.lifecycle.start_transient(&spec, run_id).await?;
+                control.publish_child(child.clone()).await;
+                let mut cancellation = control.cancellation();
+                self.lifecycle
+                    .complete_transient(&child, job.timeout, &mut cancellation)
+                    .await
+            }
+            .await
+            .map_err(|e: my_supervisor_core::ports::SpawnError| RunnerError::Backend(e.to_string()))
+        };
+
+        if let Err(RunnerError::Unreaped(cause)) = &execution_result {
+            return Err(RunnerError::Unreaped(cause.clone()));
         }
-        .await;
 
         match execution_result {
             Ok(TransientCompletion::Exited(outcome)) => {
@@ -321,7 +380,9 @@ impl JobRunner for ProcessJobRunner {
         // Scheduler dependency handling must advance once the Run row is
         // durable; external transports receive the matching stable-ID event
         // exclusively through the outbox worker.
-        let _ = self.internal_events.send(PublishedEvent::ordinary(event));
+        if !skip_dependencies {
+            let _ = self.internal_events.send(PublishedEvent::ordinary(event));
+        }
 
         Ok(run)
     }

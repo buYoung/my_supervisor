@@ -2,6 +2,8 @@
 //! (`docs/ARCHITECTURE.md` §4.1.2); it embeds no core and forks no wire type.
 
 mod client;
+mod log_search;
+mod workspace_commands;
 
 use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
@@ -65,6 +67,22 @@ enum ConfigMode {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Read and update complete process definitions.
+    Process {
+        #[command(subcommand)]
+        sub: workspace_commands::ProcessCommand,
+    },
+    /// Discover, install and inspect executable runtimes.
+    #[command(disable_help_subcommand = true)]
+    Runtime {
+        #[command(subcommand)]
+        sub: workspace_commands::RuntimeCommand,
+    },
+    /// Search process or job logs, group repeats, or export raw JSONL.
+    Log {
+        #[command(flatten)]
+        query: Box<log_search::LogSearchArgs>,
+    },
     /// List managed processes.
     Ps,
     /// Show one managed process.
@@ -262,6 +280,19 @@ enum ConfigCmd {
 
 #[derive(Subcommand)]
 enum JobCmd {
+    /// Edit, compare, run and export task flows.
+    Workflow {
+        #[command(subcommand)]
+        sub: workspace_commands::WorkflowCommand,
+    },
+    /// Read the complete saved job configuration as JSON.
+    Config { name: String },
+    /// Apply a complete JSON job configuration (including its schedule_revision).
+    Update {
+        name: String,
+        #[arg(long)]
+        file: PathBuf,
+    },
     /// List jobs.
     Ls,
     /// Show one job.
@@ -534,6 +565,8 @@ fn format_memory(bytes: u64) -> String {
 async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
     let json = matches!(cli.output, OutputFormat::Json | OutputFormat::JsonV2);
     match &cli.command {
+        Command::Process { sub } => print_json(&workspace_commands::process(client, sub).await?)?,
+        Command::Runtime { sub } => print_json(&workspace_commands::runtime(client, sub).await?)?,
         Command::Ps => {
             let list = client.list_processes().await?;
             if json {
@@ -715,6 +748,7 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 }
             }
         }
+        Command::Log { query } => log_search::execute(client, query, json).await?,
         Command::Add { config } => {
             add_from_config(client, config, json).await?;
         }
@@ -851,6 +885,32 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     );
                     println!("upstream:   {}", job.dependencies.upstream.join(", "));
                     println!("downstream: {}", job.dependencies.downstream.join(", "));
+                }
+            }
+            JobCmd::Workflow { sub } => {
+                let result = workspace_commands::workflow(client, sub).await?;
+                if !json
+                    && matches!(
+                        sub,
+                        workspace_commands::WorkflowCommand::Export { file: None, .. }
+                    )
+                {
+                    print!("{}", result["script"].as_str().unwrap_or(""));
+                } else {
+                    print_json(&result)?;
+                }
+            }
+            JobCmd::Config { name } => print_json(&client.get_job_config(name).await?)?,
+            JobCmd::Update { name, file } => {
+                let contents =
+                    std::fs::read(file).map_err(|error| CliError::Failed(error.to_string()))?;
+                let config = serde_json::from_slice(&contents)
+                    .map_err(|error| CliError::Failed(error.to_string()))?;
+                let result = client.update_job(name, &config).await?;
+                if json {
+                    print_json(&result)?;
+                } else {
+                    println!("updated job {}", result.name);
                 }
             }
             JobCmd::Remove { name, force } => {

@@ -92,7 +92,12 @@ pub fn desired_running_target(previous: &ConfigSnapshot, target: &ConfigSnapshot
         .iter()
         .filter(|spec| {
             matches!(spec.management_mode, ManagementMode::Direct)
-                && (spec.autostart || previously_running.contains(&spec.name))
+                && (spec.autostart
+                    || previously_running.contains(&spec.name)
+                    || previous.processes.iter().any(|old| {
+                        old.definition_id == spec.definition_id
+                            && previously_running.contains(&old.name)
+                    }))
         })
         .map(|spec| spec.name.clone())
         .collect()

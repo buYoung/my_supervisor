@@ -559,6 +559,115 @@ pub struct OperationsFacade {
 }
 
 impl OperationsFacade {
+    pub async fn trigger_workflow(
+        &self,
+        name: &str,
+        definition: Option<serde_json::Value>,
+        only_node: Option<String>,
+        single_job: bool,
+    ) -> AppResult<JobRunId> {
+        let view = self.get_job(name).await?;
+        let saved = self.get_workflow(name, None).await?;
+        let definition = definition.unwrap_or_else(|| saved["definition"].clone());
+        let revision = if definition == saved["definition"] {
+            saved["revision"].as_u64().unwrap_or(0)
+        } else {
+            0
+        };
+        let flow: crate::workflow::Workflow = serde_json::from_value(definition.clone())
+            .map_err(|e| AppError::InvalidRequest(e.to_string()))?;
+        crate::workflow::validate(&flow)?;
+        if only_node
+            .as_ref()
+            .is_some_and(|id| !flow.nodes.iter().any(|n| &n.id == id))
+        {
+            return Err(AppError::InvalidRequest("step not found".into()));
+        }
+        let run_id = JobRunId::new();
+        self.deps.state_repo.save_workspace_state(&format!("workflow-override/{}",run_id.0),&serde_json::json!({"definition":definition,"revision":revision,"onlyNode":only_node,"singleJob":single_job}).to_string()).await?;
+        if matches!(
+            self.dispatch_run(view.job, TriggeredBy::Manual, run_id)
+                .await?,
+            RunDispatch::Skipped
+        ) {
+            self.record_skipped_run(name, TriggeredBy::Manual, run_id, "overlap_skip")
+                .await;
+        }
+        Ok(run_id)
+    }
+    pub(crate) fn workspace_deps(&self) -> &AppDeps {
+        &self.deps
+    }
+    pub(crate) fn workflow_lock(&self, key: &str) -> Arc<tokio::sync::Mutex<()>> {
+        self.job_lock(key)
+    }
+
+    pub async fn process_config(&self, name: &str) -> AppResult<ProcessSpec> {
+        self.require_spec(name).await
+    }
+
+    pub async fn update_process_config(
+        &self,
+        name: &str,
+        mut spec: ProcessSpec,
+        expected: Option<ProcessSpec>,
+    ) -> AppResult<ProcessStatus> {
+        if self.is_applying_config.swap(true, Ordering::SeqCst) {
+            return Err(AppError::conflict(ConflictReason::OperationBusy));
+        }
+        struct Reset<'a>(&'a AtomicBool);
+        impl Drop for Reset<'_> {
+            fn drop(&mut self) {
+                self.0.store(false, Ordering::SeqCst);
+            }
+        }
+        let _reset = Reset(&self.is_applying_config);
+        let current = self.config_snapshot().await?;
+        let original = current
+            .processes
+            .iter()
+            .find(|item| item.name == name)
+            .ok_or_else(|| AppError::not_found(ResourceKind::Process, name))?;
+        if let Some(mut expected) = expected {
+            expected.definition_id = original.definition_id;
+            if expected != *original {
+                return Err(AppError::conflict(ConflictReason::OperationBusy));
+            }
+        }
+        if spec.name != name && current.processes.iter().any(|item| item.name == spec.name) {
+            return Err(AppError::conflict(ConflictReason::NameConflict));
+        }
+        spec.definition_id = original.definition_id;
+        validate_process(&spec)?;
+        let new_name = spec.name.clone();
+        let processes = current
+            .processes
+            .iter()
+            .map(|item| {
+                if item.name == name {
+                    spec.clone()
+                } else {
+                    item.clone()
+                }
+            })
+            .collect();
+        self.apply_config_inner(
+            my_supervisor_core::domain::LoadedConfig {
+                processes,
+                jobs: current.jobs,
+            },
+            ApplyMode::Replace,
+            false,
+        )
+        .await?;
+        self.get_process(&new_name).await
+    }
+    pub async fn query_logs(
+        &self,
+        request: crate::log_explorer::LogQuery,
+    ) -> AppResult<crate::log_explorer::LogQueryResult> {
+        crate::log_explorer::query(&self.deps, request).await
+    }
     pub fn new(deps: AppDeps) -> Arc<Self> {
         let (events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let (internal_events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
@@ -572,7 +681,7 @@ impl OperationsFacade {
         ));
         let facade = Arc::new(OperationsFacade {
             deps,
-            runner,
+            runner: runner.clone(),
             runtime: Mutex::new(HashMap::new()),
             active_runs: Arc::new(ActiveRunRegistry::default()),
             restart_tokens: Mutex::new(HashMap::new()),
@@ -594,6 +703,7 @@ impl OperationsFacade {
         // Guard tasks keep only a weak reference. Shutdown cancels and joins
         // their explicit owner records instead of relying on an Arc cycle.
         let _ = facade.self_weak.set(Arc::downgrade(&facade));
+        runner.set_facade(Arc::downgrade(&facade));
         facade
     }
 
@@ -3014,6 +3124,21 @@ impl OperationsFacade {
             else {
                 return;
             };
+            // Advancing a generation resets the counter for manual starts.
+            // Automatic restarts must carry their budget into the new generation.
+            match facade
+                .deps
+                .state_repo
+                .set_process_instance_restart_count(&next_instance, next_restart_count)
+                .await
+            {
+                Ok(true) => {}
+                Ok(false) => return,
+                Err(error) => {
+                    tracing::warn!(process = %name, %error, "automatic restart could not preserve retry count");
+                    return;
+                }
+            }
             let spec = match facade.require_spec(&name).await {
                 Ok(spec) => spec,
                 Err(_) => return,
@@ -3172,6 +3297,8 @@ impl OperationsFacade {
     }
 
     pub async fn update_job(&self, name: &str, mut job: Job) -> AppResult<JobView> {
+        let lock = self.job_lock(name);
+        let _guard = lock.lock().await;
         let all = self.deps.job_repo.list_jobs().await?;
         let existing = all
             .iter()
@@ -3215,6 +3342,11 @@ impl OperationsFacade {
                 )));
             }
             return Err(e.into());
+        }
+        if let Err(error) = self.record_job_settings(existing, &job).await {
+            self.deps.job_repo.save_job(existing).await?;
+            self.deps.scheduler.register_job(existing).await?;
+            return Err(error);
         }
         let mut updated = others;
         updated.push(job.clone());
@@ -3497,7 +3629,7 @@ impl OperationsFacade {
 
     async fn build_job_view(&self, job: &Job, all: &[Job]) -> AppResult<JobView> {
         let now = self.deps.clock.now();
-        let next_run_at = self.deps.scheduler.next_run(&job.trigger, now);
+        let next_run_at = self.deps.scheduler.preview(job, now, 1)?.into_iter().next();
         let runs = self
             .deps
             .job_repo
@@ -4670,7 +4802,10 @@ impl OperationsFacade {
             .collect::<HashSet<_>>();
         self.reconcile_job_deletions().await;
         self.recover_incomplete_config_apply().await?;
-        self.reload().await?;
+        // Startup imports file definitions while preserving API/GUI registrations.
+        // An explicit reload remains the opt-in, authoritative replacement.
+        let loaded = self.deps.config.load().await?;
+        self.apply_config(loaded, ApplyMode::Merge, false).await?;
         // Resolve durable cleanup before blanket startup cancellation turns a
         // recoverable Running row into an event-less terminal state.
         self.reconcile_transient_cleanup().await;

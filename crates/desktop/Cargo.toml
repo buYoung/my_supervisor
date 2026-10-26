@@ -23,6 +23,7 @@ my-supervisor-shared = { workspace = true }
 my-supervisor-app-daemon = { workspace = true }
 my-supervisor-infra-http = { workspace = true }
 tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

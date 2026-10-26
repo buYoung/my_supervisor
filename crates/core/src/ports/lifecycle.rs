@@ -181,6 +181,9 @@ pub enum GuardError {
 /// `ProcessServiceRegistrar` instead.
 #[async_trait]
 pub trait LifecycleController: Send + Sync {
+    fn developer_tools(&self) -> Option<&dyn crate::ports::DeveloperTools> {
+        None
+    }
     /// Spawn a child tied to the daemon (dies when the daemon exits).
     async fn spawn_tied(&self, spec: &ProcessSpec) -> Result<ChildHandle, SpawnError>;
     /// Spawn a child that survives daemon exit.

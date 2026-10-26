@@ -28,6 +28,32 @@ pub struct LogTail {
 
 #[async_trait]
 pub trait LogSink: Send + Sync {
+    /// Ascending, bounded journal scan for historical search. Unlike tail,
+    /// `next_sequence` is the last returned sequence (an exclusive cursor).
+    /// Backends must apply the time range before the page limit.
+    async fn scan(
+        &self,
+        source: &str,
+        limit: usize,
+        since: Option<DateTime<Utc>>,
+        until: DateTime<Utc>,
+        after_sequence: u64,
+    ) -> Result<LogTail, LogError> {
+        let tail = self.tail(source, 0, since, Some(after_sequence)).await;
+        Ok(scan_page(tail, limit, until))
+    }
+
+    async fn scan_run(
+        &self,
+        run_id: JobRunId,
+        limit: usize,
+        since: Option<DateTime<Utc>>,
+        until: DateTime<Utc>,
+        after_sequence: u64,
+    ) -> Result<LogTail, LogError> {
+        let tail = self.tail_run(run_id, 0, since, Some(after_sequence)).await;
+        Ok(scan_page(tail, limit, until))
+    }
     /// Supplies the complete persisted process-name set before legacy-path
     /// lookup.  Implementations that do not persist process logs can ignore
     /// it; durable implementations use it to quarantine sanitized-name
@@ -84,4 +110,13 @@ pub trait LogSink: Send + Sync {
     ) -> (LogTail, broadcast::Receiver<LogLine>);
     /// Run journals discovered on disk, including journals left by a crash.
     async fn persisted_run_ids(&self) -> Result<Vec<JobRunId>, LogError>;
+}
+
+fn scan_page(mut tail: LogTail, limit: usize, until: DateTime<Utc>) -> LogTail {
+    tail.lines.retain(|line| line.timestamp <= until);
+    tail.lines.sort_by_key(|line| line.sequence);
+    tail.truncated = tail.lines.len() > limit;
+    tail.lines.truncate(limit);
+    tail.next_sequence = tail.lines.last().map_or(0, |line| line.sequence);
+    tail
 }

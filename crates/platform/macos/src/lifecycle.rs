@@ -624,6 +624,9 @@ impl MacLifecycle {
 
 #[async_trait]
 impl LifecycleController for MacLifecycle {
+    fn developer_tools(&self) -> Option<&dyn my_supervisor_core::ports::DeveloperTools> {
+        Some(self)
+    }
     async fn spawn_tied(&self, spec: &ProcessSpec) -> Result<ChildHandle, SpawnError> {
         self.spawn_common(spec)
     }

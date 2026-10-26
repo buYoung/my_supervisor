@@ -27,6 +27,7 @@ const FSYNC_EVERY_LINES: u64 = 64;
 pub struct JournalPolicy {
     pub max_segment_bytes: u64,
     pub max_segment_age: Duration,
+    pub retention_age: Duration,
     pub max_sealed_segments: usize,
     pub max_total_bytes: u64,
 }
@@ -36,8 +37,9 @@ impl Default for JournalPolicy {
         Self {
             max_segment_bytes: 1_048_576,
             max_segment_age: Duration::hours(24),
-            max_sealed_segments: 32,
-            max_total_bytes: 32 * 1_048_576,
+            retention_age: Duration::days(210),
+            max_sealed_segments: 512,
+            max_total_bytes: 512 * 1_048_576,
         }
     }
 }
@@ -363,6 +365,66 @@ impl InMemoryLogSink {
             ),
         };
         (page, receiver)
+    }
+
+    async fn scan_from(
+        &self,
+        journal: Arc<Journal>,
+        paths: Option<JournalPaths>,
+        limit: usize,
+        since: Option<DateTime<Utc>>,
+        until: DateTime<Utc>,
+        after_sequence: u64,
+    ) -> Result<LogTail, LogError> {
+        let mut state = journal.state.lock().await;
+        Self::initialize(&mut state, paths.as_ref(), &self.policy).await?;
+        let manifest = state.manifest.as_ref().expect("initialized manifest");
+        let mut page = LogTail {
+            high_watermark: manifest.high_watermark,
+            earliest_retained_sequence: manifest.earliest_retained_sequence(),
+            cursor_expired: manifest
+                .earliest_retained_sequence()
+                .is_some_and(|first| after_sequence.saturating_add(1) < first),
+            ..LogTail::default()
+        };
+        let mut accept = |line: &LogLine| {
+            if line.sequence > after_sequence
+                && since.is_none_or(|start| line.timestamp >= start)
+                && line.timestamp <= until
+            {
+                if page.lines.len() == limit {
+                    page.truncated = true;
+                    return false;
+                }
+                page.next_sequence = line.sequence;
+                page.lines.push(line.clone());
+            }
+            true
+        };
+        if let Some(paths) = paths {
+            let files = manifest
+                .sealed_segments
+                .iter()
+                .filter(|segment| segment.last_sequence > after_sequence)
+                .map(|segment| paths.active.with_file_name(&segment.filename))
+                .chain(std::iter::once(paths.active.clone()));
+            'files: for file in files {
+                if let Some(lines) = read_journal(&file).await? {
+                    for line in &lines {
+                        if !accept(line) {
+                            break 'files;
+                        }
+                    }
+                }
+            }
+        } else {
+            for line in &state.buffer {
+                if !accept(line) {
+                    break;
+                }
+            }
+        }
+        Ok(page)
     }
 
     async fn seal_run_to(
@@ -787,7 +849,7 @@ async fn enforce_retention(
             .sum::<u64>(),
     );
     while let Some(first) = manifest.sealed_segments.first() {
-        let too_old = now - first.sealed_at >= policy.max_segment_age;
+        let too_old = now - first.sealed_at >= policy.retention_age;
         let too_many = manifest.sealed_segments.len() > policy.max_sealed_segments;
         let too_large = total_bytes > policy.max_total_bytes;
         if !too_old && !too_many && !too_large {
@@ -884,6 +946,43 @@ fn snapshot(
 
 #[async_trait]
 impl LogSink for InMemoryLogSink {
+    async fn scan(
+        &self,
+        source: &str,
+        limit: usize,
+        since: Option<DateTime<Utc>>,
+        until: DateTime<Utc>,
+        after_sequence: u64,
+    ) -> Result<LogTail, LogError> {
+        self.scan_from(
+            self.process_state(source),
+            self.process_paths(source),
+            limit,
+            since,
+            until,
+            after_sequence,
+        )
+        .await
+    }
+
+    async fn scan_run(
+        &self,
+        run_id: JobRunId,
+        limit: usize,
+        since: Option<DateTime<Utc>>,
+        until: DateTime<Utc>,
+        after_sequence: u64,
+    ) -> Result<LogTail, LogError> {
+        self.scan_from(
+            self.run_state(run_id),
+            self.run_paths(run_id),
+            limit,
+            since,
+            until,
+            after_sequence,
+        )
+        .await
+    }
     fn register_process_names(&self, names: &[String]) {
         self.known_processes
             .lock()

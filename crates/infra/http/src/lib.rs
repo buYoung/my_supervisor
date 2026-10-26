@@ -50,6 +50,40 @@ pub fn assemble(deps: AppDeps, auth: AuthVerifier) -> Assembled {
 pub fn build_router(facade: Arc<OperationsFacade>, auth: AuthVerifier) -> Router {
     Router::new()
         .route("/api/v1/health", get(handlers::health))
+        .route("/api/v1/tools", post(handlers::developer_tool))
+        .route(
+            "/api/v1/processes/{name}/config",
+            get(handlers::get_process_config).patch(handlers::update_process_config),
+        )
+        .route(
+            "/api/v1/jobs/{name}/workflow",
+            get(handlers::get_workflow).put(handlers::save_workflow),
+        )
+        .route(
+            "/api/v1/jobs/{name}/workflow/versions",
+            get(handlers::workflow_versions),
+        )
+        .route(
+            "/api/v1/jobs/{name}/workflow/history",
+            get(handlers::workflow_history),
+        )
+        .route(
+            "/api/v1/jobs/{name}/workflow/run",
+            post(handlers::trigger_workflow),
+        )
+        .route(
+            "/api/v1/jobs/{name}/workflow/export",
+            post(handlers::export_workflow),
+        )
+        .route(
+            "/api/v1/jobs/{name}/workflow/runs/{id}",
+            get(handlers::workflow_run),
+        )
+        .route(
+            "/api/v1/jobs/{name}/workflow/circuits/{id}/reset",
+            post(handlers::reset_step_circuit),
+        )
+        .route("/api/v1/logs", get(handlers::query_logs))
         // Additive native-to-browser debug-session exchange. Both routes stay
         // behind the same auth middleware as the operations surface.
         .route(
@@ -104,6 +138,7 @@ pub fn build_router(facade: Arc<OperationsFacade>, auth: AuthVerifier) -> Router
         )
         .route("/api/v1/jobs/page", get(handlers::list_jobs_page))
         .route("/api/v1/jobs/preview", post(handlers::preview_job))
+        .route("/api/v1/jobs/{name}/config", get(handlers::get_job_config))
         .route(
             "/api/v1/jobs/{name}",
             get(handlers::get_job)

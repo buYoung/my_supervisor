@@ -1,6 +1,8 @@
 //! Port traits — the seams `application` depends on and adapters implement.
 
 pub mod clock;
+pub mod developer_tools;
+pub use developer_tools::{CommandHelp, DeveloperTools, ExecutableCandidate, RuntimeRelease};
 pub mod config_source;
 pub mod error;
 pub mod job_runner;

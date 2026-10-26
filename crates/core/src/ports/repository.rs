@@ -48,6 +48,37 @@ pub struct TransientTerminalEvent {
 /// list is remembered; live runtime status is held in memory by the supervisor.
 #[async_trait]
 pub trait StateRepository: Send + Sync {
+    async fn workspace_document(
+        &self,
+        _key: &str,
+        _revision: Option<u64>,
+    ) -> Result<Option<crate::domain::WorkspaceDocument>, RepoError> {
+        Ok(None)
+    }
+    async fn workspace_versions(
+        &self,
+        _key: &str,
+    ) -> Result<Vec<crate::domain::WorkspaceDocument>, RepoError> {
+        Ok(Vec::new())
+    }
+    async fn save_workspace_document(
+        &self,
+        _key: &str,
+        _value: &str,
+        _expected_revision: u64,
+    ) -> Result<crate::domain::WorkspaceDocument, RepoError> {
+        Err(RepoError::Backend(
+            "workspace persistence is unavailable".into(),
+        ))
+    }
+    async fn workspace_state(&self, _key: &str) -> Result<Option<String>, RepoError> {
+        Ok(None)
+    }
+    async fn save_workspace_state(&self, _key: &str, _value: &str) -> Result<(), RepoError> {
+        Err(RepoError::Backend(
+            "workspace persistence is unavailable".into(),
+        ))
+    }
     /// Additive observability capability. Existing state-only test adapters
     /// retain their behavior; production adapters override these methods.
     async fn observability_upsert_rule(

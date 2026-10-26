@@ -380,6 +380,50 @@ pub fn job_view_to_dto(view: JobView) -> JobStatusDto {
     }
 }
 
+pub fn job_config_to_dto(job: &Job) -> JobConfigDto {
+    JobConfigDto {
+        name: job.name.clone(),
+        command: job.command.clone(),
+        args: job.args.clone(),
+        cwd: job.cwd.as_ref().map(|path| path.display().to_string()),
+        env: job.env.clone(),
+        trigger: job_trigger_to_dto(&job.trigger),
+        on_overlap: Some(overlap_to_dto(job.on_overlap)),
+        on_dependency_failure: Some(match job.on_dependency_failure {
+            DependencyFailurePolicy::Skip => OnDependencyFailureDto::Skip,
+            DependencyFailurePolicy::RunAnyway => OnDependencyFailureDto::RunAnyway,
+        }),
+        timeout_sec: job.timeout.map(|timeout| timeout.as_secs()),
+        log_retention: Some(my_supervisor_shared::api::LogRetentionDto {
+            max_runs: job.log_retention.max_runs,
+            max_age_days: job.log_retention.max_age_days,
+        }),
+        timezone: Some(job.timezone.clone()),
+        schedule_revision: Some(job.schedule_revision),
+        trigger_id: Some(job.trigger_id.to_string()),
+        misfire_policy: Some(match job.misfire_policy {
+            MisfirePolicy::Skip => MisfirePolicyDto::Skip,
+            MisfirePolicy::RunOnce => MisfirePolicyDto::RunOnce,
+            MisfirePolicy::CatchUp { .. } => MisfirePolicyDto::CatchUp,
+        }),
+        retry_policy: Some(RetryPolicyDto {
+            max_attempts: job.retry_policy.max_attempts,
+            initial_backoff_sec: job.retry_policy.initial_backoff.as_secs(),
+            max_backoff_sec: job.retry_policy.max_backoff.as_secs(),
+            multiplier: job.retry_policy.multiplier,
+            jitter_percent: job.retry_policy.jitter_percent,
+        }),
+        admission: Some(AdmissionPolicyDto {
+            max_concurrency: job.admission.max_concurrency,
+            max_queue: job.admission.max_queue,
+            overflow: match job.admission.overflow {
+                QueueOverflowPolicy::RejectNew => QueueOverflowDto::RejectNew,
+                QueueOverflowPolicy::Skip => QueueOverflowDto::Skip,
+            },
+        }),
+    }
+}
+
 pub fn log_stream_to_dto(s: LogStream) -> LogStreamDto {
     match s {
         LogStream::Stdout => LogStreamDto::Stdout,
@@ -605,6 +649,95 @@ pub fn process_config_to_spec(dto: ProcessConfigDto) -> ProcessSpec {
     }
 }
 
+pub fn process_config_to_dto(spec: &ProcessSpec) -> ProcessConfigDto {
+    ProcessConfigDto {
+        definition_id: Some(spec.definition_id.0),
+        name: spec.name.clone(),
+        command: spec.command.clone(),
+        args: spec.args.clone(),
+        cwd: spec.cwd.as_ref().map(|p| p.display().to_string()),
+        env: spec.env.clone(),
+        management_mode: Some(match &spec.management_mode {
+            ManagementMode::Direct => ManagementModeDto::Direct,
+            ManagementMode::SystemRegistered { unit_name } => ManagementModeDto::SystemRegistered {
+                unit_name: unit_name.clone(),
+            },
+        }),
+        lifecycle: Some(match spec.lifecycle {
+            LifecycleMode::Tied => LifecycleModeDto::Tied,
+            LifecycleMode::Detached => LifecycleModeDto::Detached,
+        }),
+        autostart: Some(spec.autostart),
+        instances: Some(spec.instances),
+        restart: Some(RestartPolicyDto {
+            enabled: Some(spec.restart.enabled),
+            max_retries: spec.restart.max_retries,
+            backoff_initial_ms: Some(spec.restart.backoff_initial.as_millis() as u64),
+            backoff_max_ms: Some(spec.restart.backoff_max.as_millis() as u64),
+            backoff_multiplier: Some(spec.restart.backoff_multiplier),
+            jitter: Some(spec.restart.jitter),
+            reset_after_ms: Some(spec.restart.reset_after.as_millis() as u64),
+        }),
+        shutdown: Some(ShutdownPolicyDto {
+            signal: Some(match spec.shutdown.signal {
+                ShutdownSignal::Term => ShutdownSignalDto::Term,
+                ShutdownSignal::Int => ShutdownSignalDto::Int,
+                ShutdownSignal::Kill => ShutdownSignalDto::Kill,
+            }),
+            grace_period_ms: Some(spec.shutdown.grace_period.as_millis() as u64),
+        }),
+        watch: spec.watch.as_ref().map(|p| WatchPolicyDto {
+            roots: p.roots.iter().map(|p| p.display().to_string()).collect(),
+            recursive: Some(p.recursive),
+            exclusions: p
+                .exclusions
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect(),
+            follow_symlinks: Some(p.follow_symlinks),
+            debounce_ms: p.debounce.as_millis() as u64,
+        }),
+        memory: spec.memory.as_ref().map(|p| MemoryPolicyDto {
+            ceiling_bytes: p.ceiling_bytes,
+            sample_interval_ms: p.sample_interval.as_millis() as u64,
+            consecutive_breaches: p.consecutive_breaches,
+        }),
+        liveness: spec.liveness.as_ref().map(check_to_dto),
+        readiness: spec.readiness.as_ref().map(check_to_dto),
+        rolling: spec.rolling.as_ref().map(|p| RollingPolicyDto {
+            max_surge: p.max_surge,
+            max_unavailable: p.max_unavailable,
+            readiness_timeout_ms: p.readiness_timeout.as_millis() as u64,
+            routability: Some(p.routability),
+        }),
+    }
+}
+fn check_to_dto(p: &CheckPolicy) -> CheckPolicyDto {
+    CheckPolicyDto {
+        kind: match &p.kind {
+            CheckKind::Exec { command, args } => CheckKindDto::Exec {
+                command: command.clone(),
+                args: args.clone(),
+            },
+            CheckKind::Tcp { host, port } => CheckKindDto::Tcp {
+                host: host.clone(),
+                port: *port,
+            },
+            CheckKind::Http {
+                url,
+                expected_status,
+            } => CheckKindDto::Http {
+                url: url.clone(),
+                expected_status: *expected_status,
+            },
+        },
+        interval_ms: p.interval.as_millis() as u64,
+        timeout_ms: p.timeout.as_millis() as u64,
+        consecutive_successes: p.consecutive_successes,
+        consecutive_failures: p.consecutive_failures,
+    }
+}
+
 pub fn job_trigger_to_domain(dto: JobTriggerDto) -> JobTrigger {
     match dto {
         JobTriggerDto::Cron { expr } => JobTrigger::Cron(expr),
@@ -681,5 +814,68 @@ pub fn job_config_to_job(dto: JobConfigDto) -> Job {
                 },
             })
             .unwrap_or_else(|| AdmissionPolicy::legacy(overlap)),
+    }
+}
+pub fn log_query_to_domain(
+    request: my_supervisor_shared::logs::LogQueryDto,
+) -> my_supervisor_application::log_explorer::LogQuery {
+    my_supervisor_application::log_explorer::LogQuery {
+        kind: request.kind,
+        source: request.source,
+        run_id: request.run_id.map(my_supervisor_core::domain::JobRunId),
+        level: request.level,
+        stream: request.stream,
+        search: request.search,
+        message: request.message,
+        instance: request.instance,
+        step: request.step,
+        since: request.since,
+        until: request.until,
+        grouping: request.grouping,
+        ascending: request.ascending,
+        offset: request.offset,
+        limit: request.limit,
+    }
+}
+
+fn log_entry_to_dto(
+    entry: my_supervisor_application::log_explorer::LogEntry,
+) -> my_supervisor_shared::logs::LogEntryDto {
+    my_supervisor_shared::logs::LogEntryDto {
+        id: entry.id,
+        kind: entry.kind,
+        source: entry.source,
+        run_id: entry.run_id.map(|id| id.0),
+        instance: entry.instance,
+        step: entry.step,
+        level: entry.level,
+        message: entry.message,
+        raw: log_line_to_dto(&entry.raw),
+    }
+}
+
+pub fn log_query_result_to_dto(
+    result: my_supervisor_application::log_explorer::LogQueryResult,
+) -> my_supervisor_shared::logs::LogQueryResultDto {
+    my_supervisor_shared::logs::LogQueryResultDto {
+        records: result
+            .records
+            .into_iter()
+            .map(|group| my_supervisor_shared::logs::LogGroupDto {
+                entry: log_entry_to_dto(group.entry),
+                count: group.count,
+                first_seen: group.first_seen,
+                last_seen: group.last_seen,
+                preview: group.preview.into_iter().map(log_entry_to_dto).collect(),
+            })
+            .collect(),
+        total_lines: result.total_lines,
+        total_groups: result.total_groups,
+        scanned_lines: result.scanned_lines,
+        next_offset: result.next_offset,
+        snapshot_at: result.snapshot_at,
+        level_counts: result.level_counts,
+        daily_counts: result.daily_counts,
+        partial_sources: result.partial_sources,
     }
 }
