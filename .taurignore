@@ -1,0 +1,15 @@
+# Vite owns frontend source and output; these must not restart the Rust host.
+/crates/desktop/ui/
+/crates/desktop/gen/
+/crates/desktop/binaries/
+
+# Development tools, documents and build output are not Rust inputs.
+/.git/
+/.codemap/
+/.codex/
+/.agents/
+/node_modules/
+/target/
+/docs/
+/examples/
+**/*.log

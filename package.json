@@ -3,6 +3,9 @@
   "private": true,
   "packageManager": "pnpm@10.11.0",
   "scripts": {
+    "dev:desktop": "scripts/build-local.sh cli && cd crates/desktop && MSV_DESKTOP_EMBEDDED_DEV=1 cargo tauri dev",
+    "dev:ui": "pnpm --dir crates/desktop/ui dev",
+    "dev:cli": "scripts/build-local.sh cli && cargo run --locked -p my-supervisor-app-cli --bin msv --",
     "ci": "pnpm run ci:fmt && pnpm run ci:clippy",
     "ci:clippy": "cargo clippy --workspace --all-targets -- -D warnings",
     "ci:fmt": "cargo fmt --all -- --check",

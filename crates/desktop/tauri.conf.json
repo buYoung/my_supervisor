@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.my-supervisor.desktop",
   "build": {
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": { "script": "pnpm dev", "cwd": "ui" },
+    "beforeBuildCommand": { "script": "pnpm build", "cwd": "ui" },
     "frontendDist": "ui/dist",
-    "devUrl": "http://localhost:5173"
+    "devUrl": "http://127.0.0.1:1420"
   },
   "app": {
     "windows": [
