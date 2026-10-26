@@ -179,6 +179,24 @@ async fn cmd_query_logs(
     ))
 }
 
+#[tauri::command]
+async fn cmd_display_settings(
+    facade: Facade<'_>,
+) -> CmdResult<my_supervisor_shared::settings::DisplaySettingsDto> {
+    Ok(my_supervisor_infra_http::mapping::display_settings_to_dto(
+        facade.display_settings().await?,
+    ))
+}
+#[tauri::command]
+async fn cmd_update_display_settings(
+    facade: Facade<'_>,
+    request: my_supervisor_shared::settings::DisplaySettingsDto,
+) -> CmdResult<my_supervisor_shared::settings::DisplaySettingsDto> {
+    Ok(my_supervisor_infra_http::mapping::display_settings_to_dto(
+        facade.set_display_time_zone(&request.time_zone).await?,
+    ))
+}
+
 // --- invoke handlers (production UI transport) ------------------------------
 // Each is a thin adapter over the shared facade + the infra/http mapping — the
 // SAME facade the devBridge routes call. No domain logic here (parity).
@@ -655,6 +673,8 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            cmd_display_settings,
+            cmd_update_display_settings,
             cmd_developer_tool,
             cmd_get_process_config,
             cmd_update_process_config,

@@ -45,7 +45,7 @@ globalThis.window = {
 try {
   const { createHttpClient } = await vite.ssrLoadModule("/src/services/http-client.ts");
   const { createInvokeClient } = await vite.ssrLoadModule("/src/services/invoke-client.ts");
-  const { ProcessLifecycleActions, restartProcess } = await vite.ssrLoadModule("/src/features/processes/ProcessesView.tsx");
+  const { ProcessLifecycleActions, restartProcess, getProcessRemovalAction } = await vite.ssrLoadModule("/src/features/processes/ProcessesView.tsx");
   const http = createHttpClient();
   const invoke = createInvokeClient();
 
@@ -93,76 +93,47 @@ try {
   assert.equal(httpCalls.at(-1).body, JSON.stringify(config), "GUI leaves Job defaults omitted");
 
   const restartCalls = [];
-  const rollingRestartCalls = [];
+  const stopCalls = [];
+  const startCalls = [];
   const removeCalls = [];
   const processActionsClient = {
+    startProcess: async (name) => { startCalls.push(name); },
+    stopProcess: async (name) => { stopCalls.push(name); },
     restartProcess: async (name) => { restartCalls.push(name); },
-    rollingRestartProcess: async (name) => { rollingRestartCalls.push(name); },
     removeProcess: async (name, force) => { removeCalls.push([name, force]); },
   };
-  const actionMarkup = renderToStaticMarkup(createElement(ProcessLifecycleActions, {
-    client: processActionsClient,
-    process: {
-      name: "direct",
-      state: "running",
-      managementMode: { type: "direct" },
-      pid: 1000,
-      restartCount: 0,
-      startedAt: null,
-      cpuPercent: 0,
-      memoryBytes: 0,
-      uptime: "-",
-    },
-    pending: false,
-    runAction: () => {},
-  }));
-  assert.match(actionMarkup, /aria-label="재시작"/, "ProcessesView renders the normal restart control");
-  assert.match(actionMarkup, /aria-label="삭제"/, "ProcessesView renders the protected default delete control");
-  assert.match(actionMarkup, /aria-label="강제 삭제"/, "ProcessesView renders a separate explicit force-delete control");
-  assert.doesNotMatch(actionMarkup, /롤링 재시작/, "ProcessesView hides rolling restart until policy support is available to the UI");
-  await restartProcess(processActionsClient, "direct");
-  await restartProcess(processActionsClient, "system-registered");
-  assert.deepEqual(restartCalls, ["direct", "system-registered"], "ProcessesView uses normal restart for Direct and SystemRegistered processes");
-  assert.deepEqual(rollingRestartCalls, [], "ProcessesView does not silently issue a rolling restart");
-
+  const process = {
+    name: "direct", state: "running", managementMode: {type: "direct"},
+    pid: 1000, restartCount: 0, startedAt: null, cpuPercent: 0, memoryBytes: 0, uptime: "-",
+  };
   let lastAction = null;
-  const lifecycleActions = ProcessLifecycleActions({
-    client: processActionsClient,
-    process: {
-      name: "direct",
-      state: "running",
-      managementMode: { type: "direct" },
-      pid: 1000,
-      restartCount: 0,
-      startedAt: null,
-      cpuPercent: 0,
-      memoryBytes: 0,
-      uptime: "-",
-    },
-    pending: false,
-    runAction: (name, action) => { lastAction = { name, action }; },
-  });
-  const actionButtons = lifecycleActions.props.children;
-  const defaultDelete = actionButtons.find((button) => button.props.label === "삭제");
-  const forceDelete = actionButtons.find((button) => button.props.label === "강제 삭제");
-  const clickEvent = { stopPropagation() {} };
+  const props = {client: processActionsClient, process, isBusy: false, onAction: action => {lastAction = action;}};
+  const markup = renderToStaticMarkup(createElement(ProcessLifecycleActions, props));
+  assert.match(markup, /aria-label="direct 중지"/, "stop is a visible primary control");
+  assert.match(markup, /aria-label="direct 재시작"/, "normal restart is a visible primary control");
+  assert.doesNotMatch(markup, /삭제|관리 방식/, "destructive and management actions are separate from runtime controls");
+  const buttons = ProcessLifecycleActions(props).props.children;
+  buttons[0].props.onClick(); await lastAction();
+  buttons[1].props.onClick(); await lastAction();
+  assert.deepEqual(stopCalls, ["direct"]);
+  assert.deepEqual(restartCalls, ["direct"]);
+  const stopped = {...process, state: "stopped"};
+  const startMarkup = renderToStaticMarkup(createElement(ProcessLifecycleActions, {...props, process: stopped}));
+  assert.match(startMarkup, /aria-label="direct 시작"/);
+  assert.doesNotMatch(startMarkup, /aria-label="direct 재시작"/);
+  ProcessLifecycleActions({...props, process: stopped}).props.children[0].props.onClick(); await lastAction();
+  assert.deepEqual(startCalls, ["direct"]);
+  await restartProcess(processActionsClient, "system-registered");
+  assert.deepEqual(restartCalls, ["direct", "system-registered"], "restart uses the documented client operation");
 
-  defaultDelete.props.onClick(clickEvent);
-  assert.equal(lastAction.name, "direct", "default delete routes through ProcessLifecycleActions");
-  await lastAction.action();
-  assert.deepEqual(removeCalls, [["direct", false]], "default delete preserves the running-process non-force conflict protection");
-
-  window.confirm = () => true;
-  forceDelete.props.onClick(clickEvent);
-  assert.equal(lastAction.name, "direct", "confirmed force delete routes through ProcessLifecycleActions");
-  await lastAction.action();
-  assert.deepEqual(removeCalls, [["direct", false], ["direct", true]], "confirmed force delete preserves force=true");
-
-  lastAction = null;
+  await getProcessRemovalAction(processActionsClient, stopped)();
+  assert.deepEqual(removeCalls, [["direct", false]], "stopped process removal is not forced");
   window.confirm = () => false;
-  forceDelete.props.onClick(clickEvent);
-  assert.equal(lastAction, null, "cancelled force delete does not dispatch an action");
-  assert.deepEqual(removeCalls, [["direct", false], ["direct", true]], "cancelled force delete does not call the client");
+  assert.equal(getProcessRemovalAction(processActionsClient, process), null, "cancelled confirmation cannot dispatch removal");
+  assert.deepEqual(removeCalls, [["direct", false]]);
+  window.confirm = () => true;
+  await getProcessRemovalAction(processActionsClient, process)();
+  assert.deepEqual(removeCalls, [["direct", false], ["direct", true]], "active removal requires explicit confirmation and force");
   console.log("desktop process/job HTTP-Tauri parity passed");
 } finally {
   await vite.close();

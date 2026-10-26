@@ -1,3 +1,5 @@
+import {mapDisplaySettings} from "./wire-mapping";
+import type {DisplaySettingsDto} from "./wire-types";
 /**
  * Tauri `invoke` adapter for the OperationsClient interface (production path inside Tauri).
  * Calls the exact command names the Tauri host exposes (briefs ...-03-tauri-bridge.md); each
@@ -118,6 +120,8 @@ export function createInvokeClient(
 ): OperationsClient {
   return {
     transport: "invoke",
+    async getDisplaySettings() { return mapDisplaySettings(await invokeCommand<DisplaySettingsDto>("cmd_display_settings")); },
+    async setDisplayTimeZone(timeZone) { return mapDisplaySettings(await invokeCommand<DisplaySettingsDto>("cmd_update_display_settings", {request: {time_zone: timeZone}})); },
     getProcessConfig(name) {return invokeCommand("cmd_get_process_config",{name});},
     async updateProcessConfig(name,config,expected) {return mapProcessStatus(await invokeCommand("cmd_update_process_config",{name,request:{config,expected}}));},
     developerTool<T>(request:Record<string,unknown>) {return invokeCommand<T>("cmd_developer_tool",{request});},

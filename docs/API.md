@@ -373,6 +373,7 @@ CLI에서 `msv job config <name>`으로 JSON 설정을 읽고, `msv job update <
 | `message`, `instance` | 없음 | 반복 묶음의 정확한 메시지 또는 인스턴스 조회 |
 | `step` | 전체 단계 | 작업 흐름의 정확한 단계 ID로 필터링 |
 | `since`, `until` | 보관된 전체 / 조회 시각 | RFC3339, 양쪽 경계 포함 |
+| `time_zone` | `UTC` | `daily_counts` 일자 집계의 IANA 시간대. 원본 시각과 실행에는 영향 없음 |
 | `grouping` | `repeat` | `repeat` 또는 `none` |
 | `ascending` | `false` | 최초 발생 오름차순, 기본은 최근 발생 내림차순 |
 | `offset`, `limit` | `0`, `50` | 결과 항목 페이지. `limit` 최대 5000 |
@@ -466,6 +467,19 @@ msv runtime help node --arg dist/server.js --cwd /absolute/project
 msv runtime versions go
 msv runtime install node --version <available-version> --directory /absolute/empty/path
 ```
+
+### 2.3.5 표시 시간대
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/api/v1/settings/display` | 저장된 표시 설정 조회 |
+| `PUT` | `/api/v1/settings/display` | `{ "time_zone": "Asia/Seoul" }` 저장 |
+
+요청과 응답은 `DisplaySettingsDto`이며 `time_zone`은 IANA 시간대 문자열이다. 최초 기본값은 `UTC`이고 데몬 저장소에 보존된다. 잘못된 시간대는 `400 invalid_request`로 거부하며 이전 설정은 유지한다. 기존 API와 같은 인증을 사용한다.
+
+프로세스·작업·흐름·로그의 원본 시각과 실행 시점은 UTC로 유지한다. 표시 시간대 변경은 작업 정의, Cron 해석 기준, 실행 시각을 수정하지 않는다. 기존 Cron의 `timezone`은 반복 일정을 해석하는 별도 메타데이터다. UI는 모든 시각을 표시 설정으로 변환하고, 한 번 실행 시각과 날짜 필터는 선택한 시간대로 입력받아 UTC로 전송한다. 서머타임으로 존재하지 않는 입력 시각은 거부하고, 두 번 존재하는 시각은 이른 UTC 시점을 선택한다. 로그의 원문과 JSON 내보내기는 변경하지 않는다.
+
+CLI도 같은 설정을 사용한다. `msv settings show`로 조회하고 `msv settings timezone Asia/Seoul`로 변경한다. `msv --timezone UTC job ls`처럼 한 명령의 표시만 덮어쓸 수 있다. 사람이 읽는 출력은 선택한 UTC 오프셋을 표시하고, `-o json`과 `-o json-v2`의 타임스탬프는 기존 UTC 계약을 유지한다.
 
 ### 2.4 Rules 리소스 (자동화)
 

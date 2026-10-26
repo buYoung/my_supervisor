@@ -5,6 +5,7 @@
 pub mod config_apply;
 pub mod deps;
 mod developer_tools;
+pub mod display_settings;
 pub mod error;
 pub mod events;
 pub mod facade;

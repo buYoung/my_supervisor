@@ -1,5 +1,6 @@
 import {
   Activity,
+  Clock3,
   BriefcaseBusiness,
   CheckCircle2,
   CircleDot,
@@ -21,6 +22,8 @@ import { ProcessesView } from "./features/processes/ProcessesView";
 import { SettingsView } from "./features/settings/SettingsView";
 import { useOperationsClient, usePolledResource } from "./services/use-operations";
 import type { NavigationKey, ThemePreference } from "./shared/types";
+
+import {useDisplayTime} from "./shared/display-time";
 
 const DAEMON_STATUS_POLL_INTERVAL_MS = 2000;
 
@@ -48,6 +51,7 @@ function resolveSystemTheme() {
 
 function App() {
   const client = useOperationsClient();
+  const {timeZone,isLoading:isTimeZoneLoading} = useDisplayTime();
   const [activeNavigationKey, setActiveNavigationKey] = useState<NavigationKey>(() => {
     const page = new URLSearchParams(window.location.search).get("page");
     return navigationItems.some(item => item.key === page) ? page as NavigationKey : "processes";
@@ -205,6 +209,7 @@ function App() {
                 <p className="mt-1 truncate text-sm font-semibold text-foreground">{navigationItems.find(item => item.key === activeNavigationKey)?.label}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-panel px-3 text-xs text-muted" onClick={() => navigate("settings")} title="표시 시간대 설정 · 실행과 저장은 UTC"><Clock3 size={14}/>{isTimeZoneLoading?"시간대…":timeZone}</button>
                 <div className="hidden items-center gap-2 rounded-md border border-border bg-panel px-3 py-2 text-xs text-muted sm:flex">
                   <ListTree aria-hidden="true" size={15} />
                   {runningProcessCount}/{processList.length} 실행 중

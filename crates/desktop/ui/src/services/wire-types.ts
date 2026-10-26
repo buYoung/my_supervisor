@@ -206,3 +206,5 @@ export interface JobConfigDto {
   timeout_sec?: number;
   [key: string]: unknown;
 }
+
+export interface DisplaySettingsDto { time_zone: string; }

@@ -1,22 +1,22 @@
+import {useDisplayTime} from "../../shared/display-time";
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Button } from "../../components/ui/primitives";
 import { useOperationsClient, toErrorMessage } from "../../services/use-operations";
 import type { LogEntry, LogGroup, LogQuery } from "../../services/log-mapping";
 
-export const dateTime = (value: string) => new Date(value).toLocaleString("sv-SE", {
-  year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
-  second: "2-digit", hour12: false, fractionalSecondDigits: 3,
-}).replace(",", ".");
-const timeOnly = (value: string) => new Date(value).toLocaleTimeString("en-GB", { hour12: false });
 export function Level({ value }: { value: string }) { return <span className={`log-level log-level-${value}`}>{value === "unknown" ? "미분류" : value.toUpperCase()}</span>; }
 
 export function LogRow({ entry, onInspect }: { entry: LogEntry; onInspect: (entry: LogEntry) => void }) {
+  const {dateTime: formatDateTime, time: timeOnly} = useDisplayTime();
+  const dateTime = (value: string) => formatDateTime(value, true);
   return <button className="log-single" onClick={() => onInspect(entry)}><span /><time title={dateTime(entry.raw.timestamp)}>{timeOnly(entry.raw.timestamp)}</time><Level value={entry.level} /><span className="log-source">{entry.source}{entry.runId && <small>실행 {entry.runId.slice(0, 8)}{entry.step?` · ${entry.step}`:""}</small>}</span><code className="log-message">{entry.message}</code><ChevronRight size={14} /></button>;
 }
 
 export function RepeatGroup({ group, query, onInspect }: { group: LogGroup; query: LogQuery; onInspect: (entry: LogEntry) => void }) {
   const client = useOperationsClient();
+  const {dateTime: formatDateTime, time: timeOnly} = useDisplayTime();
+  const dateTime = (value: string) => formatDateTime(value, true);
   const [isOpen, setIsOpen] = useState(false);
   const [members, setMembers] = useState<LogEntry[]>([]);
   const [nextOffset, setNextOffset] = useState<number>();

@@ -132,3 +132,5 @@ export interface DaemonStatus {
   configPath: string;
   logDir: string;
 }
+
+export interface DisplaySettings { timeZone: string; }

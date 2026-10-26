@@ -822,3 +822,20 @@ pub fn parse_run_id(raw: &str) -> Result<JobRunId, HttpError> {
         ))
     })
 }
+
+pub async fn display_settings(
+    State(facade): State<Facade>,
+) -> Result<Json<my_supervisor_shared::settings::DisplaySettingsDto>, HttpError> {
+    Ok(Json(crate::mapping::display_settings_to_dto(
+        facade.display_settings().await?,
+    )))
+}
+
+pub async fn update_display_settings(
+    State(facade): State<Facade>,
+    Json(request): Json<my_supervisor_shared::settings::DisplaySettingsDto>,
+) -> Result<Json<my_supervisor_shared::settings::DisplaySettingsDto>, HttpError> {
+    Ok(Json(crate::mapping::display_settings_to_dto(
+        facade.set_display_time_zone(&request.time_zone).await?,
+    )))
+}

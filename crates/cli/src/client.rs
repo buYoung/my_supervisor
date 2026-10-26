@@ -89,6 +89,25 @@ pub struct Client {
 }
 
 impl Client {
+    pub async fn display_settings(
+        &self,
+    ) -> Result<my_supervisor_shared::settings::DisplaySettingsDto, CliError> {
+        self.get_json("/api/v1/settings/display").await
+    }
+    pub async fn set_display_time_zone(
+        &self,
+        time_zone: &str,
+    ) -> Result<my_supervisor_shared::settings::DisplaySettingsDto, CliError> {
+        let value = self
+            .workspace_request(
+                Method::PUT,
+                "/api/v1/settings/display",
+                Some(serde_json::json!({"time_zone":time_zone})),
+            )
+            .await?;
+        serde_json::from_value(value).map_err(|error| CliError::Failed(error.to_string()))
+    }
+
     pub async fn workspace_request(
         &self,
         method: Method,

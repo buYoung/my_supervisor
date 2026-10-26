@@ -1,3 +1,4 @@
+import {useDisplayTime} from "../../shared/display-time";
 import {MoreHorizontal, Play, Plus, RotateCcw, Square, Settings2, FileText, Search, X, Trash2} from "lucide-react";
 import {useCallback, useEffect, useRef, useState} from "react";
 import {Badge, Button, EmptyState, IconButton} from "../../components/ui/primitives";
@@ -19,8 +20,7 @@ const guardStates: Record<string, string> = {healthy: "정상", unhealthy: "실�
 const restartCauses: Record<string, string> = {watch_changed: "파일 변경", memory_ceiling: "메모리 상한 초과", liveness_failure: "응답 확인 실패"};
 type RunAction = (action: () => Promise<unknown>, notice: string) => void;
 
-function LifecycleActions({process, isBusy, onAction}: {process: ProcessStatus; isBusy: boolean; onAction: RunAction}) {
-  const client = useOperationsClient();
+export function ProcessLifecycleActions({client, process, isBusy, onAction}: {client: Pick<OperationsClient, "startProcess" | "stopProcess" | "restartProcess">; process: ProcessStatus; isBusy: boolean; onAction: RunAction}) {
   const canStop = process.state === "running" || process.state === "starting";
   const isTransitioning = process.state === "starting" || process.state === "stopping";
   const isSystemManaged = process.managementMode.type === "system_registered";
@@ -30,6 +30,12 @@ function LifecycleActions({process, isBusy, onAction}: {process: ProcessStatus; 
       <Button disabled={isBusy} aria-label={process.name + " 시작"} onClick={() => onAction(() => client.startProcess(process.name), process.name + " 시작 요청을 반영했습니다.")}><Play size={14}/>시작</Button>}
     {canStop && <Button disabled={isBusy || isTransitioning || isSystemManaged} title={isSystemManaged ? "시스템 서비스의 재시작은 macOS가 관리합니다." : "프로세스를 중지한 뒤 다시 시작합니다."} aria-label={process.name + " 재시작"} onClick={() => onAction(() => client.restartProcess(process.name), process.name + " 재시작 요청을 반영했습니다.")}><RotateCcw size={14}/>재시작</Button>}
   </>;
+}
+
+export function getProcessRemovalAction(client: Pick<OperationsClient, "removeProcess">, process: Pick<ProcessStatus, "name" | "state">) {
+  const hasActiveProcess = process.state === "running" || process.state === "starting" || process.state === "stopping";
+  if (hasActiveProcess && !confirmForceProcessRemoval(process.name)) return null;
+  return () => client.removeProcess(process.name, hasActiveProcess);
 }
 
 function Actions({process, isBusy, onAction, onEdit}: {process: ProcessStatus; isBusy: boolean; onAction: RunAction; onEdit: () => void}) {
@@ -43,14 +49,14 @@ function Actions({process, isBusy, onAction, onEdit}: {process: ProcessStatus; i
     return () => {document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape);};
   }, [isOpen]);
   return <div className="process-actions" onClick={event => event.stopPropagation()} onKeyDown={event => {if (event.key === "Enter" || event.key === " ") event.stopPropagation();}}>
-    <LifecycleActions process={process} isBusy={isBusy} onAction={onAction}/>
+    <ProcessLifecycleActions client={client} process={process} isBusy={isBusy} onAction={onAction}/>
     <div ref={ref} className="overflow-anchor">
       <IconButton label={process.name + " 더 보기"} disabled={isBusy} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}><MoreHorizontal size={16}/></IconButton>
       {isOpen && <div className="overflow-menu">
         <button type="button" onClick={() => {setIsOpen(false); onEdit();}}><Settings2 size={14}/>설정 편집</button>
         <button type="button" className="text-danger" onClick={() => {
-          const hasActiveProcess = process.state === "running" || process.state === "starting" || process.state === "stopping";
-          if (!hasActiveProcess || confirmForceProcessRemoval(process.name)) {onAction(() => client.removeProcess(process.name, hasActiveProcess), process.name + " 등록을 삭제했습니다."); setIsOpen(false);}
+          const action = getProcessRemovalAction(client, process);
+          if (action) {onAction(action, process.name + " 등록을 삭제했습니다."); setIsOpen(false);}
         }}><Trash2 size={14}/>등록 삭제</button>
       </div>}
     </div>
@@ -97,6 +103,7 @@ function PolicySummary({process, config, onEdit}: {process: ProcessStatus; confi
 }
 
 export function ProcessesView() {
+  const {dateTime} = useDisplayTime();
   const client = useOperationsClient();
   const list = usePolledResource(useCallback(() => client.listProcesses(), [client]), 2000);
   const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(location.search).get("selected"));
@@ -164,12 +171,12 @@ export function ProcessesView() {
       </section>
       {process && <aside className="workspace-panel process-detail">
         <header><div><h2>{process.name}</h2><small>{states[process.state]} · PID {process.pid ?? "—"}</small></div><IconButton label="상세 닫기" onClick={() => setSelected(null)}><X size={16}/></IconButton></header>
-        <div className="process-detail-actions"><div><LifecycleActions process={process} isBusy={isBusy} onAction={runAction}/></div><Button className="process-settings-button" disabled={isBusy || !config} onClick={() => void openEditor(process.name)}><Settings2 size={14}/>설정 편집</Button></div>
+        <div className="process-detail-actions"><div><ProcessLifecycleActions client={client} process={process} isBusy={isBusy} onAction={runAction}/></div><Button className="process-settings-button" disabled={isBusy || !config} onClick={() => void openEditor(process.name)}><Settings2 size={14}/>설정 편집</Button></div>
         <div className="editor-tabs" aria-label="프로세스 상세 보기"><button type="button" aria-pressed={tab === "overview"} onClick={() => setTab("overview")}>개요</button><button type="button" aria-pressed={tab === "logs"} onClick={() => setTab("logs")}>로그</button></div>
         {tab === "overview" ? <div className="process-detail-body">
           <div className="metric-grid"><div><span>CPU</span><strong>{process.cpuPercent.toFixed(1)}%</strong></div><div><span>메모리</span><strong>{(process.memoryBytes / 1048576).toFixed(1)} MiB</strong></div><div><span>가동 시간</span><strong>{process.uptime}</strong></div><div><span>재시작</span><strong>{process.restartCount}회</strong></div></div>
           {config ? <>
-            <dl className="detail-values"><dt>실행 명령</dt><dd><code>{config.command} {config.args?.join(" ")}</code></dd><dt>시작 시간</dt><dd>{process.startedAt ? new Date(process.startedAt).toLocaleString("ko-KR") : "—"}</dd><dt>인스턴스</dt><dd>{config.instances ?? 1}개</dd></dl>
+            <dl className="detail-values"><dt>실행 명령</dt><dd><code>{config.command} {config.args?.join(" ")}</code></dd><dt>시작 시간</dt><dd>{process.startedAt ? dateTime(process.startedAt) : "—"}</dd><dt>인스턴스</dt><dd>{config.instances ?? 1}개</dd></dl>
             <PathField label="작업 디렉터리" value={config.cwd ?? ""} readOnly/>
             <div className="argument-heading"><strong>환경변수 {Object.keys(config.env ?? {}).length}개</strong><button type="button" onClick={() => void openEditor(process.name, "environment")}>환경변수 편집</button></div>
             <div className="process-environment-keys">{Object.keys(config.env ?? {}).map(key => <code key={key}>{key} <span className="text-muted">••••</span></code>)}</div>

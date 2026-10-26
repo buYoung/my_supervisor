@@ -50,6 +50,10 @@ pub fn assemble(deps: AppDeps, auth: AuthVerifier) -> Assembled {
 pub fn build_router(facade: Arc<OperationsFacade>, auth: AuthVerifier) -> Router {
     Router::new()
         .route("/api/v1/health", get(handlers::health))
+        .route(
+            "/api/v1/settings/display",
+            get(handlers::display_settings).put(handlers::update_display_settings),
+        )
         .route("/api/v1/tools", post(handlers::developer_tool))
         .route(
             "/api/v1/processes/{name}/config",

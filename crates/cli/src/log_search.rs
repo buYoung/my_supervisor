@@ -52,6 +52,7 @@ pub struct LogSearchArgs {
 
 pub async fn execute(client: &Client, args: &LogSearchArgs, json: bool) -> Result<(), CliError> {
     let mut query = LogQueryDto {
+        time_zone: Some(crate::display_time::time_zone().to_string()),
         kind: args.kind.clone(),
         source: args.source.clone(),
         run_id: args.run_id,
@@ -133,7 +134,10 @@ pub async fn execute(client: &Client, args: &LogSearchArgs, json: bool) -> Resul
                             .map_err(|error| CliError::Failed(error.to_string()))?
                     );
                 } else {
-                    println!("\nSnapshot: {}", result.snapshot_at.to_rfc3339());
+                    println!(
+                        "\nSnapshot: {}",
+                        crate::display_time::format(&result.snapshot_at)
+                    );
                     print_result(&result, false)?;
                 }
                 previous = signature;
@@ -169,8 +173,8 @@ fn print_result(result: &LogQueryResultDto, json: bool) -> Result<(), CliError> 
             group.entry.level.to_uppercase(),
             source,
             group.count.to_string(),
-            group.first_seen.to_rfc3339(),
-            group.last_seen.to_rfc3339(),
+            crate::display_time::format(&group.first_seen),
+            crate::display_time::format(&group.last_seen),
             group.entry.message.clone(),
         ]);
     }

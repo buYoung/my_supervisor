@@ -2,6 +2,7 @@
 //! (`docs/ARCHITECTURE.md` §4.1.2); it embeds no core and forks no wire type.
 
 mod client;
+mod display_time;
 mod log_search;
 mod workspace_commands;
 
@@ -21,8 +22,8 @@ use client::{CliError, Client};
 use my_supervisor_app_daemon::{debug_or_canonical_root, DEFAULT_BASE_URL};
 use my_supervisor_platform_macos::{SupervisorLaunchAgent, SupervisorServiceStatus};
 use my_supervisor_shared::api::{
-    ConfigApplyModeDto, ConvertRequestDto, ConvertTargetDto, JobRunStateDto, LogLineDto,
-    LogStreamDto, LogsResponseDto, ProcessStateDto,
+    ConfigApplyModeDto, ConvertRequestDto, ConvertTargetDto, JobRunStateDto, JobTriggerDto,
+    LogLineDto, LogStreamDto, LogsResponseDto, ProcessStateDto,
 };
 use my_supervisor_shared::config::{ConfigApplyRequestDto, FileConfig};
 use my_supervisor_shared::events::EventEnvelope;
@@ -39,11 +40,20 @@ struct Cli {
     /// Operations host base URL (defaults to the local daemon).
     #[arg(long, global = true)]
     url: Option<String>,
+    /// Override the display time zone for this command. JSON timestamps stay UTC.
+    #[arg(long = "timezone", global = true)]
+    display_timezone: Option<String>,
     /// Output format.
     #[arg(short = 'o', long, global = true, default_value = "table")]
     output: OutputFormat,
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Subcommand)]
+enum SettingsCommand {
+    Show,
+    Timezone { zone: String },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -67,6 +77,11 @@ enum ConfigMode {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Read or change shared display settings. Scheduling remains unchanged.
+    Settings {
+        #[command(subcommand)]
+        sub: SettingsCommand,
+    },
     /// Read and update complete process definitions.
     Process {
         #[command(subcommand)]
@@ -372,6 +387,13 @@ async fn main() -> ExitCode {
             return ExitCode::from(exit_code(&error, json_v2) as u8);
         }
     };
+    if !matches!(cli.output, OutputFormat::Json | OutputFormat::JsonV2) {
+        if let Err(error) = display_time::configure(&client, cli.display_timezone.as_deref()).await
+        {
+            print_error(&error, json_v2);
+            return ExitCode::from(exit_code(&error, json_v2) as u8);
+        }
+    }
     match dispatch(&cli, &client).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
@@ -502,7 +524,7 @@ fn print_log_line(line: &LogLineDto, json: bool) -> Result<(), CliError> {
     } else {
         println!(
             "{} [{:?}] {}",
-            line.timestamp.to_rfc3339(),
+            display_time::format(&line.timestamp),
             line.stream,
             line.line
         );
@@ -520,7 +542,7 @@ fn print_event(event: &EventEnvelope, json: bool) -> Result<(), CliError> {
     } else {
         println!(
             "{} {} {}",
-            event.timestamp.to_rfc3339(),
+            display_time::format(&event.timestamp),
             event.event_type,
             event.payload
         );
@@ -550,6 +572,15 @@ fn run_state_label(state: JobRunStateDto) -> &'static str {
     }
 }
 
+fn format_job_trigger(trigger: &JobTriggerDto) -> String {
+    match trigger {
+        JobTriggerDto::OneShot { at } => {
+            format!("OneShot {{ at: {} }}", display_time::format(at))
+        }
+        _ => format!("{trigger:?}"),
+    }
+}
+
 fn format_memory(bytes: u64) -> String {
     const KIB: u64 = 1024;
     const MIB: u64 = KIB * 1024;
@@ -565,6 +596,20 @@ fn format_memory(bytes: u64) -> String {
 async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
     let json = matches!(cli.output, OutputFormat::Json | OutputFormat::JsonV2);
     match &cli.command {
+        Command::Settings { sub } => {
+            let settings = match sub {
+                SettingsCommand::Show => client.display_settings().await?,
+                SettingsCommand::Timezone { zone } => client.set_display_time_zone(zone).await?,
+            };
+            if json {
+                print_json(&settings)?;
+            } else {
+                println!(
+                    "display timezone: {} (stored timestamps: UTC)",
+                    settings.time_zone
+                );
+            }
+        }
         Command::Process { sub } => print_json(&workspace_commands::process(client, sub).await?)?,
         Command::Runtime { sub } => print_json(&workspace_commands::runtime(client, sub).await?)?,
         Command::Ps => {
@@ -585,7 +630,7 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                         format_memory(p.memory_bytes),
                         p.restart_count.to_string(),
                         p.started_at
-                            .map(|t| t.to_rfc3339())
+                            .map(|t| display_time::format(&t))
                             .unwrap_or_else(|| "-".into()),
                     ]);
                 }
@@ -611,7 +656,7 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     "started:   {}",
                     process
                         .started_at
-                        .map_or_else(|| "-".into(), |time| time.to_rfc3339())
+                        .map_or_else(|| "-".into(), |time| display_time::format(&time))
                 );
                 println!("cpu:       {:.1}%", process.cpu_percent);
                 println!("memory:    {}", format_memory(process.memory_bytes));
@@ -821,7 +866,7 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     println!("version:    {}", status.version);
                     println!("pid:        {}", status.pid);
                     println!("processes:  {}", status.process_count);
-                    println!("started_at: {}", status.started_at.to_rfc3339());
+                    println!("started_at: {}", display_time::format(&status.started_at));
                     println!("config:     {}", status.config_path);
                     println!("log_dir:    {}", status.log_dir);
                 }
@@ -860,10 +905,10 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     for j in &list.jobs {
                         table.add_row(vec![
                             j.name.clone(),
-                            format!("{:?}", j.trigger),
+                            format_job_trigger(&j.trigger),
                             format!("{:?}", j.on_overlap),
                             j.next_run_at
-                                .map(|t| t.to_rfc3339())
+                                .map(|t| display_time::format(&t))
                                 .unwrap_or_else(|| "-".into()),
                         ]);
                     }
@@ -876,12 +921,12 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                     print_json(&job)?;
                 } else {
                     println!("name:       {}", job.name);
-                    println!("trigger:    {:?}", job.trigger);
+                    println!("trigger:    {}", format_job_trigger(&job.trigger));
                     println!("overlap:    {:?}", job.on_overlap);
                     println!(
                         "next_run:   {}",
                         job.next_run_at
-                            .map_or_else(|| "-".into(), |time| time.to_rfc3339())
+                            .map_or_else(|| "-".into(), |time| display_time::format(&time))
                     );
                     println!("upstream:   {}", job.dependencies.upstream.join(", "));
                     println!("downstream: {}", job.dependencies.downstream.join(", "));
@@ -946,9 +991,9 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                 } else {
                     for occurrence in preview.occurrences {
                         println!(
-                            "{} {}",
-                            occurrence.scheduled_at.to_rfc3339(),
-                            occurrence.local_time
+                            "{} ({})",
+                            display_time::format(&occurrence.scheduled_at),
+                            display_time::time_zone()
                         );
                     }
                 }
@@ -977,9 +1022,9 @@ async fn dispatch(cli: &Cli, client: &Client) -> Result<(), CliError> {
                             r.exit_code
                                 .map(|c| c.to_string())
                                 .unwrap_or_else(|| "-".into()),
-                            r.scheduled_at.to_rfc3339(),
+                            display_time::format(&r.scheduled_at),
                             r.ended_at
-                                .map(|t| t.to_rfc3339())
+                                .map(|t| display_time::format(&t))
                                 .unwrap_or_else(|| "-".into()),
                         ]);
                     }

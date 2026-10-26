@@ -820,6 +820,7 @@ pub fn log_query_to_domain(
     request: my_supervisor_shared::logs::LogQueryDto,
 ) -> my_supervisor_application::log_explorer::LogQuery {
     my_supervisor_application::log_explorer::LogQuery {
+        time_zone: request.time_zone,
         kind: request.kind,
         source: request.source,
         run_id: request.run_id.map(my_supervisor_core::domain::JobRunId),
@@ -877,5 +878,13 @@ pub fn log_query_result_to_dto(
         level_counts: result.level_counts,
         daily_counts: result.daily_counts,
         partial_sources: result.partial_sources,
+    }
+}
+
+pub fn display_settings_to_dto(
+    settings: my_supervisor_application::display_settings::DisplaySettings,
+) -> my_supervisor_shared::settings::DisplaySettingsDto {
+    my_supervisor_shared::settings::DisplaySettingsDto {
+        time_zone: settings.time_zone,
     }
 }

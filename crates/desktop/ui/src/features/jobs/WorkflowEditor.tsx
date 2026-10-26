@@ -1,3 +1,4 @@
+import {useDisplayTime} from "../../shared/display-time";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {ReactFlow,ReactFlowProvider,Background,Controls,MiniMap,Handle,Position,applyNodeChanges,useReactFlow,type Connection,type NodeProps,type Node as CanvasNode} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -20,11 +21,11 @@ function StepNode({data,selected}:NodeProps<CanvasNode<StepData>>){
   </div>;
 }
 const nodeTypes={step:StepNode};
-const when=(value?:string)=>value?new Date(value).toLocaleString():"—";
 function stableJson(value:unknown):string{return JSON.stringify(value,(_,entry)=>entry&&typeof entry==="object"&&!Array.isArray(entry)?Object.fromEntries(Object.entries(entry).sort(([a],[b])=>a.localeCompare(b))):entry);}
 export function WorkflowEditor(props:{job:JobStatus;jobs:JobStatus[];onBack:()=>void;onSettings:()=>void;initialRunId?:string}){return <ReactFlowProvider><WorkflowWorkspace {...props}/></ReactFlowProvider>;}
 
 function WorkflowWorkspace({job,jobs,onBack,onSettings,initialRunId}:{job:JobStatus;jobs:JobStatus[];onBack:()=>void;onSettings:()=>void;initialRunId?:string}){
+  const {dateTime:when}=useDisplayTime();
   const client=useOperationsClient();const {screenToFlowPosition,fitView}=useReactFlow();
   const [document,setDocument]=useState<WorkflowDocument>();const [flow,setFlow]=useState<Workflow>();const [mode,setMode]=useState<"edit"|"runs"|"versions">(initialRunId?"runs":"edit");
   const [dimensions,setDimensions]=useState<Record<string,{width:number;height:number}>>({});
@@ -76,4 +77,4 @@ function WorkflowWorkspace({job,jobs,onBack,onSettings,initialRunId}:{job:JobSta
 }
 
 function SettingsDiff({before,after}:{before?:Record<string,unknown>;after?:Record<string,unknown>}){const keys=[...new Set([...Object.keys(before||{}),...Object.keys(after||{})])];return <div className="settings-diff">{keys.filter(key=>JSON.stringify(before?.[key])!==JSON.stringify(after?.[key])).map(key=><div key={key}><strong>{key}</strong><pre className="diff-removed">− {JSON.stringify(before?.[key],null,2)??"없음"}</pre><pre className="diff-added">+ {JSON.stringify(after?.[key],null,2)??"없음"}</pre></div>)}{JSON.stringify(before)===JSON.stringify(after)&&<p>이 단계의 설정 변경이 없습니다.</p>}</div>;}
-function StepExecution({run,nodeId,jobName}:{run?:WorkflowRun;nodeId:string;jobName:string}){const result=run?.steps[nodeId];return <div className="step-execution">{result?<><span className={`run-badge state-${result.state}`}>{stateLabels[result.state]||result.state}</span><dl><dt>시작</dt><dd>{when(result.startedAt)}</dd><dt>종료</dt><dd>{when(result.finishedAt)}</dd><dt>종료 코드</dt><dd>{result.exitCode??"—"}</dd><dt>시도 횟수</dt><dd>{result.attempt??"—"}</dd><dt>선택한 경로</dt><dd>{result.selectedPort||"—"}</dd></dl><h4>실행 결과</h4><pre>{result.summary||result.stdout||result.stderr||"결과 없음"}</pre><h4>단계 로그 <small>최근 200줄</small></h4><div className="step-logs">{result.logs?.length?result.logs.map((line,index)=><div key={index}><time>{new Date(line.time).toLocaleTimeString()}</time><code className={line.stream==="stderr"?"text-danger":""}>{line.message}</code></div>):<p>기록된 로그가 없습니다.</p>}</div>{run&&<a href={`?page=logs&kind=job&source=${encodeURIComponent(jobName)}&run=${run.id}&step=${encodeURIComponent(nodeId)}`}>이 실행의 상세 로그</a>}</>:<p>이 단계는 실행되지 않았습니다.</p>}</div>;}
+function StepExecution({run,nodeId,jobName}:{run?:WorkflowRun;nodeId:string;jobName:string}){const {dateTime:when,time}=useDisplayTime();const result=run?.steps[nodeId];return <div className="step-execution">{result?<><span className={`run-badge state-${result.state}`}>{stateLabels[result.state]||result.state}</span><dl><dt>시작</dt><dd>{when(result.startedAt)}</dd><dt>종료</dt><dd>{when(result.finishedAt)}</dd><dt>종료 코드</dt><dd>{result.exitCode??"—"}</dd><dt>시도 횟수</dt><dd>{result.attempt??"—"}</dd><dt>선택한 경로</dt><dd>{result.selectedPort||"—"}</dd></dl><h4>실행 결과</h4><pre>{result.summary||result.stdout||result.stderr||"결과 없음"}</pre><h4>단계 로그 <small>최근 200줄</small></h4><div className="step-logs">{result.logs?.length?result.logs.map((line,index)=><div key={index}><time>{time(line.time)}</time><code className={line.stream==="stderr"?"text-danger":""}>{line.message}</code></div>):<p>기록된 로그가 없습니다.</p>}</div>{run&&<a href={`?page=logs&kind=job&source=${encodeURIComponent(jobName)}&run=${run.id}&step=${encodeURIComponent(nodeId)}`}>이 실행의 상세 로그</a>}</>:<p>이 단계는 실행되지 않았습니다.</p>}</div>;}

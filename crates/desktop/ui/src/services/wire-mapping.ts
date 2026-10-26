@@ -207,3 +207,5 @@ export function mapLogLine(dto: LogLineDto, source: string, index: number): LogL
     line: dto.line,
   };
 }
+
+export function mapDisplaySettings(value: import("./wire-types").DisplaySettingsDto): import("../shared/types").DisplaySettings { return {timeZone: value.time_zone}; }

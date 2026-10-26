@@ -13,6 +13,7 @@ const MAX_RUNS_PER_JOB: usize = 2_000;
 
 #[derive(Debug, Clone)]
 pub struct LogQuery {
+    pub time_zone: Option<String>,
     pub kind: String,
     pub source: Option<String>,
     pub run_id: Option<JobRunId>,
@@ -74,6 +75,12 @@ struct Source {
 
 pub async fn query(deps: &AppDeps, request: LogQuery) -> AppResult<LogQueryResult> {
     validate(&request)?;
+    let time_zone = request
+        .time_zone
+        .as_deref()
+        .unwrap_or("UTC")
+        .parse::<chrono_tz::Tz>()
+        .map_err(|_| AppError::InvalidRequest("invalid time_zone".into()))?;
     let snapshot_at = request.until.unwrap_or_else(|| deps.clock.now());
     let mut result = LogQueryResult {
         records: Vec::new(),
@@ -159,7 +166,14 @@ pub async fn query(deps: &AppDeps, request: LogQuery) -> AppResult<LogQueryResul
                 *result.level_counts.entry(entry.level.clone()).or_default() += 1;
                 *result
                     .daily_counts
-                    .entry(entry.raw.timestamp.format("%Y-%m-%d").to_string())
+                    .entry(
+                        entry
+                            .raw
+                            .timestamp
+                            .with_timezone(&time_zone)
+                            .format("%Y-%m-%d")
+                            .to_string(),
+                    )
                     .or_default() += 1;
                 if !matches_level(&request.level, &entry.level) {
                     continue;

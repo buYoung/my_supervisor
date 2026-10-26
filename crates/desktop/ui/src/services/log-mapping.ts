@@ -1,6 +1,7 @@
 import type { LogLineDto } from "./wire-types";
 
 export interface LogQuery {
+  timeZone?: string;
   kind: "process" | "job";
   source?: string;
   runId?: string;
@@ -62,8 +63,8 @@ export interface LogQueryResultDto {
 }
 
 export function logQueryToWire(query: LogQuery) {
-  const { runId, ...rest } = query;
-  return { ...rest, run_id: runId };
+  const { runId, timeZone, ...rest } = query;
+  return { ...rest, run_id: runId, time_zone: timeZone };
 }
 export function logEntryToWire({ runId, ...entry }: LogEntry) {
   return { ...entry, run_id: runId ?? null };

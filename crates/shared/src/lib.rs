@@ -7,4 +7,5 @@ pub mod config;
 pub mod error;
 pub mod events;
 pub mod logs;
+pub mod settings;
 pub mod workspace;

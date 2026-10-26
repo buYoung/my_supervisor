@@ -123,6 +123,8 @@ export function createEventDeduper(capacity = EVENT_DEDUP_CACHE_CAPACITY): (even
 export interface OperationsClient {
   /** Identifies which transport is active (for diagnostics / handoff visibility). */
   readonly transport: "invoke" | "http";
+  getDisplaySettings(): Promise<import("../shared/types").DisplaySettings>;
+  setDisplayTimeZone(timeZone: string): Promise<import("../shared/types").DisplaySettings>;
   getProcessConfig(name:string):Promise<ProcessConfigDto>;
   updateProcessConfig(name:string,config:ProcessConfigDto,expected?:ProcessConfigDto):Promise<ProcessStatus>;
   developerTool<T=unknown>(request:Record<string,unknown>):Promise<T>;

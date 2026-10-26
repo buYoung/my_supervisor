@@ -1,3 +1,5 @@
+import {mapDisplaySettings} from "./wire-mapping";
+import type {DisplaySettingsDto} from "./wire-types";
 /**
  * HTTP fetch + WebSocket adapter for the OperationsClient interface (standalone path).
  * Talks to the daemon at VITE_API_BASE_URL (default http://127.0.0.1:9876). Loopback,
@@ -137,6 +139,8 @@ export function createHttpClient(): OperationsClient {
 
   return {
     transport: "http",
+    async getDisplaySettings() { return mapDisplaySettings(await requestJson<DisplaySettingsDto>("/api/v1/settings/display")); },
+    async setDisplayTimeZone(timeZone) { return mapDisplaySettings(await requestJson<DisplaySettingsDto>("/api/v1/settings/display", {method: "PUT", body: JSON.stringify({time_zone: timeZone})})); },
     getProcessConfig(name) {return requestJson(`/api/v1/processes/${encode(name)}/config`);},
     async updateProcessConfig(name,config,expected) {return mapProcessStatus(await requestJson(`/api/v1/processes/${encode(name)}/config`,{method:"PATCH",body:JSON.stringify({config,expected})}));},
     developerTool<T>(request:Record<string,unknown>) {return requestJson<T>("/api/v1/tools",{method:"POST",body:JSON.stringify(request)});},

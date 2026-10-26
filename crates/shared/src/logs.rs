@@ -21,6 +21,8 @@ fn page_limit() -> usize {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogQueryDto {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_zone: Option<String>,
     #[serde(default = "process_kind")]
     pub kind: String,
     pub source: Option<String>,
@@ -47,6 +49,7 @@ pub struct LogQueryDto {
 impl Default for LogQueryDto {
     fn default() -> Self {
         Self {
+            time_zone: None,
             kind: process_kind(),
             source: None,
             run_id: None,
