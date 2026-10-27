@@ -1,0 +1,97 @@
+[
+  {
+    "id": "STATE-01",
+    "realDatabaseFailureRecovered": true
+  },
+  {
+    "id": "STATE-02",
+    "newMutationRetained": true
+  },
+  {
+    "id": "STATE-04",
+    "result": {
+      "batch": 1,
+      "compensation": "old healthy instance retained after readiness failure",
+      "completed": true,
+      "deadline": "2026-10-27T02:19:16.308152Z",
+      "kind": "rolling_restart",
+      "name": "state-rolling",
+      "operationId": "f8e7e95e-5109-49af-a86f-e6c235f68d77",
+      "outcomes": [
+        {
+          "failedStage": "readiness_timeout",
+          "instanceId": "685aacbe-1a05-4529-b905-98a98d04e3c2",
+          "ordinal": 2,
+          "retryable": true,
+          "state": "failed"
+        }
+      ],
+      "phase": "failed_closed",
+      "targetInstances": 2
+    },
+    "before": {
+      "desiredInstances": 2,
+      "instances": [
+        {
+          "cpuPercent": 0.6,
+          "generation": 1,
+          "instanceId": "06b93e28-097d-45f6-97ba-61c5efa780b7",
+          "memoryBytes": 1081344,
+          "ordinal": 0,
+          "pid": 82234,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T02:19:12.515705Z",
+          "state": "running"
+        },
+        {
+          "cpuPercent": 0.6,
+          "generation": 1,
+          "instanceId": "e10b87e6-766f-459d-b0b9-b570c787e453",
+          "memoryBytes": 1048576,
+          "ordinal": 1,
+          "pid": 82236,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T02:19:12.519132Z",
+          "state": "running"
+        }
+      ],
+      "name": "state-rolling"
+    },
+    "after": {
+      "desiredInstances": 2,
+      "instances": [
+        {
+          "cpuPercent": 0,
+          "generation": 1,
+          "instanceId": "06b93e28-097d-45f6-97ba-61c5efa780b7",
+          "memoryBytes": 491520,
+          "ordinal": 0,
+          "pid": 82234,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T02:19:12.515705Z",
+          "state": "running"
+        },
+        {
+          "cpuPercent": 0,
+          "generation": 1,
+          "instanceId": "e10b87e6-766f-459d-b0b9-b570c787e453",
+          "memoryBytes": 458752,
+          "ordinal": 1,
+          "pid": 82236,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T02:19:12.519132Z",
+          "state": "running"
+        }
+      ],
+      "name": "state-rolling"
+    }
+  },
+  {
+    "id": "STATE-08",
+    "jobs": 250,
+    "instances": 50,
+    "pages": 3,
+    "registerMs": 894,
+    "totalMs": 12877
+  }
+]

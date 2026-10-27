@@ -1,0 +1,5 @@
+{
+  "probe": "startup",
+  "code": 1,
+  "expectedFailure": true
+}

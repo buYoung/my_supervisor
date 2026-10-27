@@ -1,0 +1,57 @@
+[
+  {
+    "expected": [
+      "run",
+      "start",
+      "--",
+      "--port",
+      "4000"
+    ],
+    "actual": {
+      "args": [
+        "run",
+        "start",
+        "--",
+        "--port",
+        "4000"
+      ],
+      "env": "한글, value"
+    }
+  },
+  {
+    "expected": [
+      "",
+      "값,alpha",
+      "a b",
+      "한글"
+    ],
+    "actual": {
+      "args": [
+        "",
+        "값,alpha",
+        "a b",
+        "한글"
+      ],
+      "env": "한글, value"
+    }
+  },
+  {
+    "expected": [
+      "native-recorder",
+      "--tag=a",
+      "--tag=b",
+      "--empty=",
+      "quote'value"
+    ],
+    "actual": {
+      "args": [
+        "native-recorder",
+        "--tag=a",
+        "--tag=b",
+        "--empty=",
+        "quote'value"
+      ],
+      "env": "한글, value"
+    }
+  }
+]

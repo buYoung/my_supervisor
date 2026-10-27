@@ -50,3 +50,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid rgb(var(--color
     animation-iteration-count: 1 !important;
   }
 }
+
+input::placeholder,textarea::placeholder{color:rgb(var(--color-muted));opacity:1}
+:is(button,summary,input,textarea,select,a,[tabindex]):focus-visible{outline:2px solid rgb(var(--color-primary));outline-offset:3px}
+.react-flow__attribution{background:rgb(var(--color-panel));color:rgb(var(--color-muted))}.react-flow__attribution a{color:inherit}.react-flow__controls-button{background:rgb(var(--color-panel));color:rgb(var(--color-foreground));border-color:rgb(var(--color-border))}.react-flow__controls-button svg{fill:currentColor}

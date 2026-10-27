@@ -1,0 +1,12 @@
+[
+  {
+    "phase": "file-picker-cancel",
+    "action": "Guest native Escape",
+    "observed": "Original /bin/sleep retained before re-opening"
+  },
+  {
+    "phase": "file-picker-select",
+    "action": "Guest native slash path navigation and Return confirmation",
+    "observed": "/usr/bin/printf selected with argv 600 retained"
+  }
+]

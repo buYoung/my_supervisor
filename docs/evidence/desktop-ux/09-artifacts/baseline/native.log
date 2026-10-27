@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T02:44:35.063Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/visual-baseline.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/visual-baseline.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 44615f0c-9c8d-49ba-83cf-3144dbd92cc7
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/visual-baseline.spec.mjs
+[webkit 605.1.15 macos #0-0] Native presentation baseline
+[webkit 605.1.15 macos #0-0]    ✓ records 1100px control bounds and dark text contrast
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (693ms)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:01  
+

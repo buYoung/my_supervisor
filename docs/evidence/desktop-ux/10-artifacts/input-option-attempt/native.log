@@ -1,0 +1,83 @@
+
+Execution of 1 workers started at 2026-10-27T04:15:37.874Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/input.spec.mjs
+[0-0] Error in "Predictable repeated and draft input.INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent"
+Error: Can't call elementClick on element with selector "button[role='option']=이름,쉼표" because element wasn't found
+[0-0] Error in "Predictable repeated and draft input.INPUT-03 [N-R] comma-bearing absolute paths stay literal and invalid exclusions block save"
+Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+    at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:62:5)
+[0-0] Error in "Predictable repeated and draft input.INPUT-04 [N-R] blank numeric drafts remain blank and 5000/3000ms reaches HTTP checks"
+Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+    at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:79:7)
+[0-0] Error in "Predictable repeated and draft input.INPUT-05 [N-R] inactive HTTP, TCP and interval drafts restore without serialization"
+Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+    at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:100:5)
+[0-0] Error in "Predictable repeated and draft input.INPUT-06 [N-R] environment rows stay visible, validate, undo and import multiline values"
+Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+    at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:112:5)
+[0-0] Error in "Predictable repeated and draft input.INPUT-08 [N-R] unsupported symlinks and rolling prerequisites are explicit"
+Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+    at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:128:5)
+[0-0] FAILED in undefined - file:///tests/e2e/input.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 66f66370-3e5b-483a-a39b-710a3e773bfc
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/input.spec.mjs
+[webkit 605.1.15 macos #0-0] Predictable repeated and draft input
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-03 [N-R] comma-bearing absolute paths stay literal and invalid exclusions block save
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-04 [N-R] blank numeric drafts remain blank and 5000/3000ms reaches HTTP checks
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-05 [N-R] inactive HTTP, TCP and interval drafts restore without serialization
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-06 [N-R] environment rows stay visible, validate, undo and import multiline values
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-08 [N-R] unsupported symlinks and rolling prerequisites are explicit
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (1m 3.7s)
+[webkit 605.1.15 macos #0-0] 6 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Predictable repeated and draft input INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent
+[webkit 605.1.15 macos #0-0] Can't call elementClick on element with selector "button[role='option']=이름,쉼표" because element wasn't found
+[webkit 605.1.15 macos #0-0] Error: Can't call elementClick on element with selector "button[role='option']=이름,쉼표" because element wasn't found
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2) Predictable repeated and draft input INPUT-03 [N-R] comma-bearing absolute paths stay literal and invalid exclusions block save
+[webkit 605.1.15 macos #0-0] element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0] Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0]     at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:62:5)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 3) Predictable repeated and draft input INPUT-04 [N-R] blank numeric drafts remain blank and 5000/3000ms reaches HTTP checks
+[webkit 605.1.15 macos #0-0] element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0] Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0]     at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:79:7)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 4) Predictable repeated and draft input INPUT-05 [N-R] inactive HTTP, TCP and interval drafts restore without serialization
+[webkit 605.1.15 macos #0-0] element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0] Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0]     at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:100:5)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 5) Predictable repeated and draft input INPUT-06 [N-R] environment rows stay visible, validate, undo and import multiline values
+[webkit 605.1.15 macos #0-0] element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0] Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0]     at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:112:5)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 6) Predictable repeated and draft input INPUT-08 [N-R] unsupported symlinks and rolling prerequisites are explicit
+[webkit 605.1.15 macos #0-0] element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0] Error: element ("button[aria-label='native-input 더 보기']") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0]     at async openProcess (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:9:61)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:128:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:01:10  
+

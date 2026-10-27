@@ -1,0 +1,34 @@
+[
+  {
+    "command": "pnpm --dir crates/desktop/ui typecheck",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "log": "typecheck.log"
+  },
+  {
+    "command": "pnpm --dir crates/desktop/ui build",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "log": "build.log"
+  },
+  {
+    "command": "node crates/desktop/ui/tests/reconcile-draft.test.mjs",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "mode": "R"
+  },
+  {
+    "command": "node tests/operations-parity.test.mjs",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "exitCode": 0,
+    "mode": "R",
+    "log": "parity.log"
+  },
+  {
+    "command": "pnpm test:follow-events",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "exitCode": 0,
+    "mode": "R",
+    "log": "follow-events.log"
+  }
+]

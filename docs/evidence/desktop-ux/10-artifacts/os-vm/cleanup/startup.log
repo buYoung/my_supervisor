@@ -1,0 +1,24 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:native /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/e2e/run-native.mjs --no-build --probe\=startup
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-MF6A7E/output
+HookError [SevereServiceError]: 
+A service failed in the 'onPrepare' hook
+SevereServiceError: Failed to start embedded WebDriver for instance 0: Tauri app exited before the embedded WebDriver server became ready (code=101, signal=null). The app likely crashed during startup. Set captureBackendLogs: true in wdio:tauriServiceOptions to see the app's stderr.
+    at severeServiceError (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+tauri-service@1.5.1_expect-webdriverio@6.1.0_tsx@4.23.15_webdriverio@9.31.9/node_modules/@wdio/tauri-service/dist/esm/index.js:1079:19)
+    at TauriLaunchService.onPrepare (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+tauri-service@1.5.1_expect-webdriverio@6.1.0_tsx@4.23.15_webdriverio@9.31.9/node_modules/@wdio/tauri-service/dist/esm/index.js:2340:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+cli@9.31.9_@types+node@22.20.5_expect-webdriverio@6.1.0/node_modules/@wdio/cli/build/index.js:330:9
+    at async Promise.all (index 0)
+    at async Launcher.run (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+cli@9.31.9_@types+node@22.20.5_expect-webdriverio@6.1.0/node_modules/@wdio/cli/build/index.js:873:7)
+
+
+
+Stopping runner...
+    at file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+cli@9.31.9_@types+node@22.20.5_expect-webdriverio@6.1.0/node_modules/@wdio/cli/build/index.js:348:29
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Launcher.run (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+cli@9.31.9_@types+node@22.20.5_expect-webdriverio@6.1.0/node_modules/@wdio/cli/build/index.js:873:7) {
+  origin: 'onPrepare'
+}
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-MF6A7E/output; cleanup: PASS

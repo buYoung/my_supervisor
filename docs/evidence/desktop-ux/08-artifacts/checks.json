@@ -1,0 +1,31 @@
+{
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+  "checks": [
+    {
+      "command": "node crates/desktop/ui/tests/log-navigation.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --dir crates/desktop/ui typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --dir crates/desktop/ui build",
+      "exitCode": 0
+    }
+  ],
+  "uiCwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+  "existingChecks": [
+    {
+      "command": "node tests/operations-parity.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm test:follow-events",
+      "exitCode": 0
+    }
+  ],
+  "warnings": [
+    "Existing Vite HMR EPERM on 0.0.0.0:24678; renderer assertions passed, not a network integration pass"
+  ]
+}

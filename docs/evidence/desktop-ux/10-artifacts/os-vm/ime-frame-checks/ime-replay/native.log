@@ -1,0 +1,28 @@
+
+Execution of 1 workers started at 2026-10-27T08:05:25.125Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/ime-replay.spec.mjs
+[0-0] AssertionError in "INPUT-07 [N-R] isolated replay of the recorded Korean composition preserves row boundaries"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    '한글',
+-   ''
+  ]
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/ime-replay.spec.mjs:32:10)
+[0-0] FAILED in undefined - file:///tests/e2e/ime-replay.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: db6eeb71-e075-488b-8625-c12885c01d13
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] 1 failing (1.8s)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:03  
+

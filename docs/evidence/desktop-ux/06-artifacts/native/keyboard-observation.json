@@ -1,0 +1,23 @@
+[
+  {
+    "code": 13,
+    "key": "Enter",
+    "target": "state-key-a 시작",
+    "trusted": true,
+    "type": "keydown"
+  },
+  {
+    "code": null,
+    "key": null,
+    "target": "state-key-a 시작",
+    "trusted": true,
+    "type": "click"
+  },
+  {
+    "code": 13,
+    "key": "Enter",
+    "target": null,
+    "trusted": true,
+    "type": "keyup"
+  }
+]

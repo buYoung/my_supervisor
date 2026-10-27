@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "mode": "O",
+  "nativeSignal": "native-229-replacement",
+  "method": "vm-hardware-keyboard",
+  "humanObservation": null,
+  "observation": "docs/evidence/desktop-ux/10-artifacts/os-vm/os-ime-frame/ime-checkpoint.json",
+  "command": "/Users/buyonglee/.nvm/versions/node/v24.14.0/bin/node /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/verify-native-ime.mjs docs/evidence/desktop-ux/10-artifacts/os-vm/os-ime-frame/ime-checkpoint.json docs/evidence/desktop-ux/10-artifacts/os-vm/os-ime-frame/ime-checkpoint-validation.json",
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor"
+}

@@ -1,0 +1,109 @@
+{
+  "active": null,
+  "events": [
+    {
+      "code": null,
+      "data": null,
+      "focused": "선행 작업 1",
+      "inputType": "deleteContentBackward",
+      "isComposing": false,
+      "isTrusted": false,
+      "key": null,
+      "keyCode": null,
+      "rowCount": 1,
+      "type": "input",
+      "value": ""
+    },
+    {
+      "code": null,
+      "data": "first",
+      "focused": "선행 작업 1",
+      "inputType": "insertText",
+      "isComposing": false,
+      "isTrusted": false,
+      "key": null,
+      "keyCode": null,
+      "rowCount": 1,
+      "type": "input",
+      "value": "first"
+    },
+    {
+      "code": ",",
+      "data": null,
+      "focused": "선행 작업 1",
+      "inputType": null,
+      "isComposing": false,
+      "isTrusted": false,
+      "key": ",",
+      "keyCode": 44,
+      "rowCount": 1,
+      "type": "keydown",
+      "value": "first"
+    },
+    {
+      "code": ",",
+      "data": null,
+      "focused": "선행 작업 2",
+      "inputType": null,
+      "isComposing": false,
+      "isTrusted": false,
+      "key": ",",
+      "keyCode": 44,
+      "rowCount": 2,
+      "type": "keyup",
+      "value": ""
+    },
+    {
+      "code": null,
+      "data": null,
+      "focused": "선행 작업 2",
+      "inputType": "deleteContentBackward",
+      "isComposing": false,
+      "isTrusted": false,
+      "key": null,
+      "keyCode": null,
+      "rowCount": 2,
+      "type": "input",
+      "value": ""
+    },
+    {
+      "code": null,
+      "data": "second",
+      "focused": "선행 작업 2",
+      "inputType": "insertText",
+      "isComposing": false,
+      "isTrusted": false,
+      "key": null,
+      "keyCode": null,
+      "rowCount": 2,
+      "type": "input",
+      "value": "second"
+    },
+    {
+      "code": "Enter",
+      "data": null,
+      "focused": "선행 작업 2",
+      "inputType": null,
+      "isComposing": false,
+      "isTrusted": false,
+      "key": "Enter",
+      "keyCode": 13,
+      "rowCount": 2,
+      "type": "keydown",
+      "value": "second"
+    },
+    {
+      "code": "Enter",
+      "data": null,
+      "focused": "선행 작업 2",
+      "inputType": null,
+      "isComposing": false,
+      "isTrusted": false,
+      "key": "Enter",
+      "keyCode": 13,
+      "rowCount": 3,
+      "type": "keyup",
+      "value": "second"
+    }
+  ]
+}

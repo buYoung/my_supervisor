@@ -1,0 +1,8 @@
+
+Execution of 1 workers started at 2026-10-27T04:09:20.144Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/native-gates.spec.mjs
+
+
+Ending WebDriver sessions gracefully ...
+(press ctrl+c again to hard kill the runner)

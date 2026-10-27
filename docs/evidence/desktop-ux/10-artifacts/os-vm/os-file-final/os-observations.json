@@ -1,0 +1,7 @@
+[
+  {
+    "phase": "file-picker-cancel",
+    "action": "VM native Cancel button",
+    "observed": "Original executable /bin/sleep retained; no changes saved"
+  }
+]

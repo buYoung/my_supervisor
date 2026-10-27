@@ -1,0 +1,74 @@
+
+Execution of 1 workers started at 2026-10-27T02:46:12.752Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/visual.spec.mjs
+[0-0] AssertionError in "Native layout and accessibility.VISUAL-02 [N-R] selecting the last detail reveals it and returns focus on close"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ null
+- 'visual-19-long-process-name 상세 보기'
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/visual.spec.mjs:18:524)
+[0-0] AssertionError in "Native layout and accessibility.VISUAL-03 [N-R] focus is visible and an inner lifecycle action keeps the selected target"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+'none' !== 'solid'
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/visual.spec.mjs:21:388)
+[0-0] FAILED in undefined - file:///tests/e2e/visual.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 0b4734eb-48b0-45b7-a5ed-cf668835181a
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/visual.spec.mjs
+[webkit 605.1.15 macos #0-0] Native layout and accessibility
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-01 [N-M] lifecycle layouts do not overlap for long and transitional rows
+[webkit 605.1.15 macos #0-0]    ✖ VISUAL-02 [N-R] selecting the last detail reveals it and returns focus on close
+[webkit 605.1.15 macos #0-0]    ✖ VISUAL-03 [N-R] focus is visible and an inner lifecycle action keeps the selected target
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-04 [N-R] settled enabled text has minimum contrast in both themes
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-05 [N-M] error announcements preserve focus and dialogs focus their content
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-06 [N-R] theme shortcuts agree with settings and technical details remain available
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 4 passing (4.6s)
+[webkit 605.1.15 macos #0-0] 2 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Native layout and accessibility VISUAL-02 [N-R] selecting the last detail reveals it and returns focus on close
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
++ actual - expected
+
++ null
+- 'visual-19-long-process-name 상세 보기'
+      
+      actual expected
+      
+      null'visual-19-long-process-name 상세 보기'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + null
+[webkit 605.1.15 macos #0-0] - 'visual-19-long-process-name 상세 보기'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/visual.spec.mjs:18:524)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2) Native layout and accessibility VISUAL-03 [N-R] focus is visible and an inner lifecycle action keeps the selected target
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
+
+'none' !== 'solid'
+      
+      actual expected
+      
+      'nonesolid'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 'none' !== 'solid'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/visual.spec.mjs:21:388)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:05  
+

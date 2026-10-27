@@ -1,6 +1,6 @@
 import {Monitor, Moon, Sun, ArrowUpRight, Clock3} from "lucide-react";
 import {useCallback, useEffect, useMemo, useState} from "react";
-import {useOperationsClient, usePolledResource, toErrorMessage} from "../../services/use-operations";
+import {useOperationsClient, useDaemonResource, toErrorMessage} from "../../services/use-operations";
 import type {ThemePreference} from "../../shared/types";
 import {useDisplayTime} from "../../shared/display-time";
 import {formatDateTime, supportedTimeZones} from "../../shared/time";
@@ -34,7 +34,7 @@ function TimeZoneSettings() {
 
 export function SettingsView({themePreference, onThemePreferenceChange}: {themePreference: ThemePreference; onThemePreferenceChange: (value: ThemePreference) => void}) {
   const client = useOperationsClient();
-  const status = usePolledResource(useCallback(() => client.daemonStatus(), [client]), 10000);
+  const status = useDaemonResource();
   return <div className="settings-workspace"><header className="workspace-heading"><div><h1>설정</h1><p>표시 방식과 데스크톱 실행 정보를 설정합니다.</p></div></header><div className="workspace-panel settings-list">
     <section><header><h2>날짜와 시간</h2><p>표시에 사용할 시간대</p></header><TimeZoneSettings/></section>
     <section><header><h2>화면 모양</h2><p>변경하면 바로 적용됩니다.</p></header><div className="theme-choices">{([{value: "light", label: "라이트", Icon: Sun}, {value: "dark", label: "다크", Icon: Moon}, {value: "auto", label: "시스템", Icon: Monitor}] as const).map(({value, label, Icon}) => <button className={themePreference === value ? "selected" : ""} key={value} aria-pressed={themePreference === value} onClick={() => onThemePreferenceChange(value)}><div className={"theme-preview theme-" + value}><span/><span/><span/></div><span><Icon size={14}/>{label}</span></button>)}<p className="editor-note">시스템을 선택하면 운영체제의 화면 모양을 따릅니다.</p></div></section>

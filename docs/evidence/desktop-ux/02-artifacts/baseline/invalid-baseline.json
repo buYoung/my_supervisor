@@ -1,0 +1,9 @@
+{
+  "invalidApplyEnabled": true,
+  "submittedArgs": [
+    "original"
+  ],
+  "mocks": [
+    "cmd_update_process_config"
+  ]
+}

@@ -1,0 +1,18 @@
+
+> my-supervisor-desktop-ui@0.1.0 build /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1783 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                      0.51 kB │ gzip:   0.32 kB
+dist/assets/JobsView-BnuhLJ6X.css   15.87 kB │ gzip:   2.67 kB
+dist/assets/index-4U6Jfr4A.css      55.14 kB │ gzip:  11.01 kB
+dist/assets/index-y69PjG8t.js        0.17 kB │ gzip:   0.17 kB
+dist/assets/event-D6xIiUZv.js        1.44 kB │ gzip:   0.69 kB
+dist/assets/core-BUhCcD2K.js         2.70 kB │ gzip:   1.11 kB
+dist/assets/JobsView-fnqVIg1Y.js   237.41 kB │ gzip:  77.52 kB
+dist/assets/index-BI1hNBkp.js      337.43 kB │ gzip: 102.31 kB
+✓ built in 2.96s

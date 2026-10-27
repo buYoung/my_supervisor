@@ -1,0 +1,294 @@
+{
+  "automaticScenarios": 57,
+  "noFocusedWindow": true,
+  "nativeKeyEvents": 0,
+  "binarySha256": "312d0978c209280a27c189aa4793316bf2bd239f41d9fb78bf1748200c064d0a",
+  "checks": [
+    {
+      "id": "HARNESS-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "HARNESS-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "HARNESS-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "CMD-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "CMD-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "CMD-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "CMD-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "CMD-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "CMD-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-08",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "INPUT-07",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SAVE-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SAVE-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SAVE-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SAVE-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SAVE-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SAVE-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SCHEDULE-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SCHEDULE-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SCHEDULE-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SCHEDULE-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SCHEDULE-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "SCHEDULE-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-07",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "STATE-08",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "FLOW-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "FLOW-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "FLOW-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "FLOW-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "FLOW-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "FLOW-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "FLOW-07",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "LOG-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "LOG-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "LOG-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "LOG-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "LOG-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "LOG-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "LOG-07",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "VISUAL-01",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "VISUAL-02",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "VISUAL-03",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "VISUAL-04",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "VISUAL-05",
+      "focused": false,
+      "nativeKeyEvents": 0
+    },
+    {
+      "id": "VISUAL-06",
+      "focused": false,
+      "nativeKeyEvents": 0
+    }
+  ],
+  "redactedAutomaticTraceFiles": 10
+}

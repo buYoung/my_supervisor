@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T02:50:57.566Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/visual.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/visual.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 6562c423-f878-4b3a-a863-be686baaa487
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/visual.spec.mjs
+[webkit 605.1.15 macos #0-0] Native layout and accessibility
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-04 [N-R] settled enabled text has minimum contrast in both themes
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (2.1s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:03  
+

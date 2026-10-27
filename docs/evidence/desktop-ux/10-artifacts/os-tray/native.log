@@ -1,0 +1,61 @@
+
+Execution of 1 workers started at 2026-10-27T04:07:41.483Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/native-gates.spec.mjs
+[0-0] AssertionError in "Integrated native OS gates.GATE-03 [O] native folder cancellation and selection preserve exact paths"
+AssertionError [ERR_ASSERTION]: Unexpected native path: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wNPSEl
++ actual - expected
+
++ 310112268
+- 310112376
+        ^
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:59:12)
+[0-0] javascript error in "Integrated native OS gates.GATE-03 [O] raw clipboard copy is pasted by the native keyboard unchanged"
+javascript error: WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.process-log-preview .log-single*=native 한글, clipboard' is not a valid selector. @ 2:48 when running "element" with method "POST"
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:72:5)
+[0-0] FAILED in undefined - file:///tests/e2e/native-gates.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 33c97ca2-e0d4-4646-a9f2-d4d198e9d92d
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/native-gates.spec.mjs
+[webkit 605.1.15 macos #0-0] Integrated native OS gates
+[webkit 605.1.15 macos #0-0]    ✖ GATE-03 [O] native folder cancellation and selection preserve exact paths
+[webkit 605.1.15 macos #0-0]    ✖ GATE-03 [O] raw clipboard copy is pasted by the native keyboard unchanged
+[webkit 605.1.15 macos #0-0]    ✓ GATE-03 [O] close to tray keeps owned work alive and Show Window restores state
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (1m 25.2s)
+[webkit 605.1.15 macos #0-0] 2 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Integrated native OS gates GATE-03 [O] native folder cancellation and selection preserve exact paths
+[webkit 605.1.15 macos #0-0] Unexpected native path: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wNPSEl
++ actual - expected
+
++ 310112268
+- 310112376
+        ^
+      
+      actual expected
+      
+      310112268310112376
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Unexpected native path: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wNPSEl
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + 310112268
+[webkit 605.1.15 macos #0-0] - 310112376
+[webkit 605.1.15 macos #0-0]         ^
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:59:12)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2) Integrated native OS gates GATE-03 [O] raw clipboard copy is pasted by the native keyboard unchanged
+[webkit 605.1.15 macos #0-0] WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.process-log-preview .log-single*=native 한글, clipboard' is not a valid selector. @ 2:48 when running "element" with method "POST"
+[webkit 605.1.15 macos #0-0] javascript error: WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.process-log-preview .log-single*=native 한글, clipboard' is not a valid selector. @ 2:48 when running "element" with method "POST"
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:72:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:01:27  
+

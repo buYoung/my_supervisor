@@ -86,6 +86,10 @@ function toOperationsError(cause: unknown): OperationsError {
   if (cause instanceof OperationsError) {
     return cause;
   }
+  if(cause&&typeof cause==="object"&&"code" in cause&&"message" in cause){
+    const error=cause as {code:unknown;message:unknown;details?:unknown};
+    if(typeof error.code==="string"&&typeof error.message==="string")return new OperationsError(error.code,error.message,error.details);
+  }
   if (cause && typeof cause === "object" && "error" in cause) {
     const envelope = (cause as { error?: { code?: string; message?: string; details?: unknown } })
       .error;

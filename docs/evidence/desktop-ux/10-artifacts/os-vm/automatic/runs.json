@@ -1,0 +1,1764 @@
+[
+  {
+    "spec": "isolation",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--spec=isolation.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 49.25434064865112,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-ApVmKv/output",
+    "cases": [
+      {
+        "id": "ISOLATION-01",
+        "title": "ISOLATION-01 [N-R] invisible automation stays non-key and keeps rendering without desktop input",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-ApVmKv/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-ApVmKv/logs",
+            "pid": 84228,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:07.768756Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-ApVmKv",
+        "screenshot": "ISOLATION-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --spec=isolation.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "harness",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=harness.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 13.48058009147644,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/output",
+    "cases": [
+      {
+        "id": "HARNESS-01",
+        "title": "HARNESS-01 [N-R] real main window and invoke persistence",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/logs",
+            "pid": 84465,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:13.971641Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6",
+        "screenshot": "HARNESS-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=harness.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "HARNESS-02",
+        "title": "HARNESS-02 [N-M] module invoke rejection and complete restoration",
+        "mode": "N-M",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/logs",
+            "pid": 84465,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:13.971641Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6",
+        "screenshot": "HARNESS-02.png",
+        "mocks": [
+          "cmd_list_processes_page"
+        ],
+        "command": "pnpm test:native --no-build --spec=harness.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "HARNESS-04",
+        "title": "HARNESS-04 [N-R] records integrated native layout and input capabilities",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/logs",
+            "pid": 84465,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:13.971641Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6",
+        "screenshot": "HARNESS-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=harness.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "command",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=command.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 22.238392114639282,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/output",
+    "cases": [
+      {
+        "id": "CMD-01",
+        "title": "CMD-01 [N-R] ordered port edit reaches the real child argv and environment",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/logs",
+            "pid": 84926,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:27.261350Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX",
+        "screenshot": "CMD-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=command.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "CMD-02",
+        "title": "CMD-02 [N-R] empty, literal, repeated and executable-name arguments round trip",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/logs",
+            "pid": 84926,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:27.261350Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX",
+        "screenshot": "CMD-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=command.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "CMD-03",
+        "title": "CMD-03 [N-M] invalid drafts never submit and survive editor tabs",
+        "mode": "N-M",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/logs",
+            "pid": 84926,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:27.261350Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX",
+        "screenshot": "CMD-03.png",
+        "mocks": [
+          "cmd_update_process_config"
+        ],
+        "command": "pnpm test:native --no-build --spec=command.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "CMD-04",
+        "title": "CMD-04 [N-R] editing is inert and help is an explicit execution",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/logs",
+            "pid": 84926,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:27.261350Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX",
+        "screenshot": "CMD-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=command.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "CMD-05",
+        "title": "CMD-05 [N-R] cancelled slow help is bounded and does not replace newer input",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/logs",
+            "pid": 84926,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:27.261350Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX",
+        "screenshot": "CMD-05.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=command.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "CMD-06",
+        "title": "CMD-06 [N-R] job, workflow and exec health consumers reject invalid drafts",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/logs",
+            "pid": 84926,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:27.261350Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX",
+        "screenshot": "CMD-06.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=command.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "input",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=input.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 21.216840028762817,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/output",
+    "cases": [
+      {
+        "id": "INPUT-01",
+        "title": "INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/logs",
+            "pid": 85360,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:49.663375Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN",
+        "screenshot": "INPUT-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=input.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "INPUT-02",
+        "title": "INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/logs",
+            "pid": 85360,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:49.663375Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN",
+        "screenshot": "INPUT-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=input.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "INPUT-03",
+        "title": "INPUT-03 [N-R] comma-bearing absolute paths stay literal and invalid exclusions block save",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/logs",
+            "pid": 85360,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:49.663375Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN",
+        "screenshot": "INPUT-03.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=input.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "INPUT-04",
+        "title": "INPUT-04 [N-R] blank numeric drafts remain blank and 5000/3000ms reaches HTTP checks",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/logs",
+            "pid": 85360,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:49.663375Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN",
+        "screenshot": "INPUT-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=input.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "INPUT-05",
+        "title": "INPUT-05 [N-R] inactive HTTP, TCP and interval drafts restore without serialization",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/logs",
+            "pid": 85360,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:49.663375Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN",
+        "screenshot": "INPUT-05.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=input.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "INPUT-06",
+        "title": "INPUT-06 [N-R] environment rows stay visible, validate, undo and import multiline values",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/logs",
+            "pid": 85360,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:49.663375Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN",
+        "screenshot": "INPUT-06.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=input.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "INPUT-08",
+        "title": "INPUT-08 [N-R] unsupported symlinks and rolling prerequisites are explicit",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN/logs",
+            "pid": 85360,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:23:49.663375Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UZO2SN",
+        "screenshot": "INPUT-08.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=input.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "ime-replay",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=ime-replay.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 7.518351078033447,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F1tuTs/output",
+    "cases": [
+      {
+        "id": "INPUT-07",
+        "title": "INPUT-07 [N-R] isolated replay of the recorded Korean composition preserves row boundaries",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F1tuTs/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F1tuTs/logs",
+            "pid": 85960,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:11.077254Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F1tuTs",
+        "screenshot": "INPUT-07.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=ime-replay.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "save",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=save.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 17.9803729057312,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/output",
+    "cases": [
+      {
+        "id": "SAVE-01",
+        "title": "SAVE-01 [N-R] close, backdrop, cancel, sidebar, Back and links retain drafts until discard",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/logs",
+            "pid": 86255,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:18.917513Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX",
+        "screenshot": "SAVE-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=save.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SAVE-02",
+        "title": "SAVE-02 [N-R] invalid command, numeric and dependency drafts cannot save old values",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/logs",
+            "pid": 86255,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:18.917513Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX",
+        "screenshot": "SAVE-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=save.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SAVE-03",
+        "title": "SAVE-03 [N-R] settings revisions reconcile and external conflicts require explicit choices",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/logs",
+            "pid": 86255,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:18.917513Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX",
+        "screenshot": "SAVE-03.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=save.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SAVE-04",
+        "title": "SAVE-04 [N-R] delayed success and failure lock edits and preserve the submitted draft",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/logs",
+            "pid": 86255,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:18.917513Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX",
+        "screenshot": "SAVE-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=save.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SAVE-05",
+        "title": "SAVE-05 [N-R] double submission and cancelled navigation produce one real process restart",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/logs",
+            "pid": 86255,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:18.917513Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX",
+        "screenshot": "SAVE-05.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=save.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SAVE-06",
+        "title": "SAVE-06 [N-R] environment import stays a draft and live application names its effect",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX/logs",
+            "pid": 86255,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:18.917513Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wk90HX",
+        "screenshot": "SAVE-06.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=save.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "schedule",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=schedule.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 18.544400215148926,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/output",
+    "cases": [
+      {
+        "id": "SCHEDULE-01",
+        "title": "SCHEDULE-01 [N-R] GUI, authenticated HTTP and invoke agree on omitted and explicit timezones",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/logs",
+            "pid": 86656,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:36.849549Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI",
+        "screenshot": "SCHEDULE-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=schedule.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SCHEDULE-02",
+        "title": "SCHEDULE-02 [N-R] unset timeout remains unset and an explicit second reaches the real runner",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/logs",
+            "pid": 86656,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:36.849549Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI",
+        "screenshot": "SCHEDULE-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=schedule.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SCHEDULE-03",
+        "title": "SCHEDULE-03 [N-R] stale preview replies cannot replace newer schedule results",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/logs",
+            "pid": 86656,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:36.849549Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI",
+        "screenshot": "SCHEDULE-03.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=schedule.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SCHEDULE-04",
+        "title": "SCHEDULE-04 [N-R] display zones preserve the instant and nonexistent DST input remains visible",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/logs",
+            "pid": 86656,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:36.849549Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI",
+        "screenshot": "SCHEDULE-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=schedule.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SCHEDULE-05",
+        "title": "SCHEDULE-05 [N-R] presets are reversible and saved cron agrees with preview",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/logs",
+            "pid": 86656,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:36.849549Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI",
+        "screenshot": "SCHEDULE-05.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=schedule.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "SCHEDULE-06",
+        "title": "SCHEDULE-06 [N-R] timezone, misfire, trigger ID and wire casing survive editing",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI/logs",
+            "pid": 86656,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:36.849549Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-wy1GQI",
+        "screenshot": "SCHEDULE-06.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=schedule.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "state",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=state.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 42.95480513572693,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/output",
+    "cases": [
+      {
+        "id": "STATE-01",
+        "title": "STATE-01 [N-R] loading, empty, search-empty, real storage failure and partial results differ",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "STATE-02",
+        "title": "STATE-02 [N-R] header refresh and a newer mutation supersede a delayed old page",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "STATE-03",
+        "title": "STATE-03 [N-R] switching targets clears old logs, runs and instances even if the new read fails",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-03.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "STATE-04",
+        "title": "STATE-04 [N-R] real rolling readiness failure reports failed and unattempted capacity",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "STATE-05",
+        "title": "STATE-05 [N-R] actual start, crash and stop events use payload transitions",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-05.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "STATE-06",
+        "title": "STATE-06 [N-R] DOM-focused lifecycle activation operates once without selecting another row",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-06.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "STATE-07",
+        "title": "STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-07.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "STATE-08",
+        "title": "STATE-08 [N-R] 250 jobs and 50 real instances remain bounded and inspectable",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D/logs",
+            "pid": 86915,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:24:55.577714Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kb7s1D",
+        "screenshot": "STATE-08.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=state.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "flow",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=flow.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 11.319175004959106,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/output",
+    "cases": [
+      {
+        "id": "FLOW-01",
+        "title": "FLOW-01 [N-R] add, delete, settings and reconnect undo/redo preserve graph identities",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/logs",
+            "pid": 9268,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:38.075357Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU",
+        "screenshot": "FLOW-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=flow.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "FLOW-02",
+        "title": "FLOW-02 [N-R] reordered matching routes drive the actual first-match result",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/logs",
+            "pid": 9268,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:38.075357Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU",
+        "screenshot": "FLOW-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=flow.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "FLOW-03",
+        "title": "FLOW-03 [N-R] palette and inspection retain pan/zoom while explicit fit works",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/logs",
+            "pid": 9268,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:38.075357Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU",
+        "screenshot": "FLOW-03.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=flow.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "FLOW-04",
+        "title": "FLOW-04 [N-R] copied nodes stay independent and a job reference reads the saved source",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/logs",
+            "pid": 9268,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:38.075357Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU",
+        "screenshot": "FLOW-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=flow.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "FLOW-05",
+        "title": "FLOW-05 [N-R] an unsaved command executes only its declared snapshot and step scope",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/logs",
+            "pid": 9268,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:38.075357Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU",
+        "screenshot": "FLOW-05.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=flow.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "FLOW-06",
+        "title": "FLOW-06 [N-R] run and version styles never leak into edit edges",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/logs",
+            "pid": 9268,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:38.075357Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU",
+        "screenshot": "FLOW-06.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=flow.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "FLOW-07",
+        "title": "FLOW-07 [N-R] isolated DOM keyboard reorders routes and local undo restores them",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU/logs",
+            "pid": 9268,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:38.075357Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-xJ11gU",
+        "screenshot": "FLOW-07.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=flow.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "log",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=log.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 27.250993967056274,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/output",
+    "cases": [
+      {
+        "id": "LOG-01",
+        "title": "LOG-01 [N-R] process, job and step links show the declared all-level scope",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/logs",
+            "pid": 9450,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:48.705249Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur",
+        "screenshot": "LOG-01.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=log.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "LOG-02",
+        "title": "LOG-02 [N-R] multi-day records show dates in the display timezone",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/logs",
+            "pid": 9450,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:48.705249Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur",
+        "screenshot": "LOG-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=log.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "LOG-03",
+        "title": "LOG-03 [N-R] expanded groups and older pages stay still as new records arrive",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/logs",
+            "pid": 9450,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:48.705249Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur",
+        "screenshot": "LOG-03.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=log.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "LOG-04",
+        "title": "LOG-04 [N-R] inspector, context and browser Back restore the query and position",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/logs",
+            "pid": 9450,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:48.705249Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur",
+        "screenshot": "LOG-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=log.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "LOG-05",
+        "title": "LOG-05 [N-R] custom-range and snapshot exports keep exact boundaries and report partial sources",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/logs",
+            "pid": 9450,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:48.705249Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur",
+        "screenshot": "LOG-05.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=log.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "LOG-06",
+        "title": "LOG-06 [N-R] shared raw inspection and the 10000-entry fixture remain bounded",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/logs",
+            "pid": 9450,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:48.705249Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur",
+        "screenshot": "LOG-06.png",
+        "mocks": [
+          "isolated in-memory clipboard; no system clipboard access"
+        ],
+        "command": "pnpm test:native --no-build --spec=log.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "LOG-07",
+        "title": "LOG-07 [N-R] a real failed query keeps its source and offers retry",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur/logs",
+            "pid": 9450,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:25:48.705249Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-1zAbur",
+        "screenshot": "LOG-07.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=log.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  },
+  {
+    "spec": "visual",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=visual.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "elapsedSeconds": 11.609550714492798,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/output",
+    "cases": [
+      {
+        "id": "VISUAL-01",
+        "title": "VISUAL-01 [N-M] lifecycle layouts do not overlap for long and transitional rows",
+        "mode": "N-M",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/logs",
+            "pid": 9677,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:26:16.291283Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7",
+        "screenshot": "VISUAL-01.png",
+        "mocks": [
+          "listProcessesPage presentation/failure fixture"
+        ],
+        "command": "pnpm test:native --no-build --spec=visual.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "VISUAL-02",
+        "title": "VISUAL-02 [N-R] selecting the last detail reveals it and returns focus on close",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/logs",
+            "pid": 9677,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:26:16.291283Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7",
+        "screenshot": "VISUAL-02.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=visual.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "VISUAL-03",
+        "title": "VISUAL-03 [N-R] DOM focus stays isolated and an inner lifecycle action keeps the selected target",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/logs",
+            "pid": 9677,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:26:16.291283Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7",
+        "screenshot": "VISUAL-03.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=visual.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "VISUAL-04",
+        "title": "VISUAL-04 [N-R] settled enabled text has minimum contrast in both themes",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/logs",
+            "pid": 9677,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:26:16.291283Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7",
+        "screenshot": "VISUAL-04.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=visual.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "VISUAL-05",
+        "title": "VISUAL-05 [N-M] error announcements preserve focus and dialogs focus their content",
+        "mode": "N-M",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/logs",
+            "pid": 9677,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:26:16.291283Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7",
+        "screenshot": "VISUAL-05.png",
+        "mocks": [
+          "listProcessesPage presentation/failure fixture"
+        ],
+        "command": "pnpm test:native --no-build --spec=visual.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      },
+      {
+        "id": "VISUAL-06",
+        "title": "VISUAL-06 [N-R] theme shortcuts agree with settings and technical details remain available",
+        "mode": "N-R",
+        "passed": true,
+        "identity": {
+          "daemon": {
+            "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/config/config.toml",
+            "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7/logs",
+            "pid": 9677,
+            "processCount": 0,
+            "startedAt": "2026-10-27T06:26:16.291283Z",
+            "version": "0.1.0"
+          },
+          "platform": "MacIntel",
+          "revision": "748537710413f224be9f25a65d114426b33c0770",
+          "sourceSha256": "12d258160906d68e3b1b88c569bc3058848b3e43c1344af1d002b4402d81bd60",
+          "transport": "invoke",
+          "url": "tauri://localhost",
+          "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+        },
+        "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-F81CW7",
+        "screenshot": "VISUAL-06.png",
+        "mocks": [],
+        "command": "pnpm test:native --no-build --spec=visual.spec.mjs",
+        "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+      }
+    ]
+  }
+]

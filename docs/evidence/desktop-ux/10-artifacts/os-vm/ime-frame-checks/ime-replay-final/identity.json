@@ -1,0 +1,16 @@
+{
+  "daemon": {
+    "configPath": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-BNEqQ2/config/config.toml",
+    "logDir": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-BNEqQ2/logs",
+    "pid": 60585,
+    "processCount": 0,
+    "startedAt": "2026-10-27T08:19:44.084148Z",
+    "version": "0.1.0"
+  },
+  "platform": "MacIntel",
+  "revision": "748537710413f224be9f25a65d114426b33c0770",
+  "sourceSha256": "7e4c0cd3b043f0714dc44729ca950ebfe386151982b1ccd8edbb82a7e88f5679",
+  "transport": "invoke",
+  "url": "tauri://localhost",
+  "webview": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+}

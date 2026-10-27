@@ -1,0 +1,87 @@
+{
+  "HARNESS-03": {
+    "passed": true,
+    "mode": "N-R",
+    "actual": "정상·시작 실패·검사 실패·중단 모두 앱/포트/소유 프로세스 정리 통과",
+    "evidence": [
+      "10-artifacts/cleanup-runs.json",
+      "10-artifacts/cleanup-summary.json"
+    ]
+  },
+  "HARNESS-05": {
+    "passed": true,
+    "mode": "R",
+    "actual": "일반 산출물에 테스트 훅·WDIO 미포함, 기존 CSP/권한 유지",
+    "evidence": [
+      "10-artifacts/checks/normal-build-audit.json"
+    ]
+  },
+  "ISOLATION-01": {
+    "passed": true,
+    "mode": "N-R",
+    "actual": "앱 비활성·창 포커스 없음·투명도 0·마우스 통과·애니메이션 프레임 동작, 실제 키 유입 0",
+    "evidence": [
+      "10-artifacts/isolation/isolation-proof.json",
+      "10-artifacts/input-isolation-summary.json"
+    ]
+  },
+  "GATE-01": {
+    "passed": false,
+    "mode": "N-R",
+    "actual": "자동 57개와 격리 검사 통과; 최종 빌드의 새 OS 관찰은 완료하지 않음",
+    "evidence": [
+      "10-artifacts/autonomous-suite-runs.json",
+      "10-artifacts/input-isolation-summary.json"
+    ]
+  },
+  "GATE-02": {
+    "passed": true,
+    "mode": "N-R",
+    "actual": "실제 invoke 최종값, 모킹 복원 및 입력 격리 통과",
+    "evidence": [
+      "10-artifacts/harness/results.jsonl",
+      "10-artifacts/command/command-final-consumer.json"
+    ]
+  },
+  "GATE-03": {
+    "passed": false,
+    "mode": "O",
+    "actual": "기존 실제 IME·폴더 선택·클립보드·트레이 관찰을 보존. 새 OS 파일 선택과 최종 빌드의 실제 OS 재관찰은 자동 경로에서 수행하지 않음",
+    "evidence": [
+      "10-artifacts/native-ime/native-ime.json",
+      "10-artifacts/os-picker/os-observations.json",
+      "10-artifacts/os-clipboard/os-observations.json",
+      "10-artifacts/os-tray/os-observations.json",
+      "10-artifacts/ime-replay/ime-replay.json"
+    ],
+    "historicalOnly": true
+  },
+  "GATE-04": {
+    "passed": true,
+    "mode": "R",
+    "actual": "최종 typecheck/build/unit/parity/event/cargo check 통과; 기존 환경 경고 기록",
+    "evidence": [
+      "10-artifacts/checks/results.json",
+      "10-artifacts/checks/scheduler-preview.json"
+    ]
+  },
+  "GATE-05": {
+    "passed": true,
+    "mode": "N-R",
+    "actual": "입력 격리와 정상·실패·중단 정리 및 일반 산출물 검사 통과",
+    "evidence": [
+      "10-artifacts/cleanup-summary.json",
+      "10-artifacts/checks/normal-build-audit.json",
+      "10-artifacts/input-isolation-summary.json"
+    ]
+  },
+  "GATE-06": {
+    "passed": true,
+    "mode": "R",
+    "actual": "debug 테스트 호스트와 설치·서명된 릴리스 검증을 구분",
+    "evidence": [
+      "10-artifacts/build-identity.json",
+      "10-native-gates.md"
+    ]
+  }
+}

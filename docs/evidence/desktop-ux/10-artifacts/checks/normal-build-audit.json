@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cargo",
+    "tree",
+    "-p",
+    "my-supervisor-app-desktop",
+    "-e",
+    "normal"
+  ],
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+  "exitCode": 0,
+  "ordinaryRustIncludesWdio": false,
+  "ordinaryFrontendTestHooks": {
+    "__MSV_E2E__": false,
+    "wdioTauri": false,
+    "__wdio_mocks__": false,
+    "native-harness": false
+  },
+  "productionConfigsUnchanged": {
+    "crates/desktop/tauri.conf.json": true,
+    "crates/desktop/capabilities/main.json": true
+  },
+  "releaseE2EGuardPresent": true
+}

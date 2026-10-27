@@ -1,0 +1,28 @@
+
+Execution of 1 workers started at 2026-10-27T04:16:59.836Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/input.spec.mjs
+[0-0] Error in "Predictable repeated and draft input.INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent"
+Error: Can't call elementClick on element with selector "//button[@role='option' and text()='이름,쉼표']" because element wasn't found
+[0-0] FAILED in undefined - file:///tests/e2e/input.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: b164caf7-2a17-4b8b-b967-123ec98787f9
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/input.spec.mjs
+[webkit 605.1.15 macos #0-0] Predictable repeated and draft input
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (11.9s)
+[webkit 605.1.15 macos #0-0] 1 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Predictable repeated and draft input INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent
+[webkit 605.1.15 macos #0-0] Can't call elementClick on element with selector "//button[@role='option' and text()='이름,쉼표']" because element wasn't found
+[webkit 605.1.15 macos #0-0] Error: Can't call elementClick on element with selector "//button[@role='option' and text()='이름,쉼표']" because element wasn't found
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:14  
+

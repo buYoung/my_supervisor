@@ -1,0 +1,73 @@
+
+Execution of 1 workers started at 2026-10-27T07:15:20.546Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/ime-observe.spec.mjs
+[0-0] AssertionError in "Native Korean input observation.INPUT-07 [O] native composition confirms text without adding a row or saving"
+AssertionError [ERR_ASSERTION]: First OS Return must only commit Korean composition
++ actual - expected
+
+  {
++   active: '선행 작업 2',
++   rowCount: 2,
+-   active: '선행 작업 1',
+-   rowCount: 1,
+    values: [
+      '한글',
++     ''
+    ]
+  }
+
+    at verifyNativeIme (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/verify-native-ime.mjs:17:12)
+    at Context.<anonymous> (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/ime-observe.spec.mjs:36:5)
+[0-0] FAILED in undefined - file:///tests/e2e/ime-observe.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: fc82a0a9-38e6-4ff7-8b1f-5ce24b7202bb
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/ime-observe.spec.mjs
+[webkit 605.1.15 macos #0-0] Native Korean input observation
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-07 [O] native composition confirms text without adding a row or saving
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 failing (2m 57.2s)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Native Korean input observation INPUT-07 [O] native composition confirms text without adding a row or saving
+[webkit 605.1.15 macos #0-0] First OS Return must only commit Korean composition
++ actual - expected
+
+  {
++   active: '선행 작업 2',
++   rowCount: 2,
+-   active: '선행 작업 1',
+-   rowCount: 1,
+    values: [
+      '한글',
++     ''
+    ]
+  }
+      
+      actual expected
+      
+      { active: '선행 작업 2', rowCount: 21, values: [ '한글' ], active: ''선행 ]작업 1' }
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: First OS Return must only commit Korean composition
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]   {
+[webkit 605.1.15 macos #0-0] +   active: '선행 작업 2',
+[webkit 605.1.15 macos #0-0] +   rowCount: 2,
+[webkit 605.1.15 macos #0-0] -   active: '선행 작업 1',
+[webkit 605.1.15 macos #0-0] -   rowCount: 1,
+[webkit 605.1.15 macos #0-0]     values: [
+[webkit 605.1.15 macos #0-0]       '한글',
+[webkit 605.1.15 macos #0-0] +     ''
+[webkit 605.1.15 macos #0-0]     ]
+[webkit 605.1.15 macos #0-0]   }
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at verifyNativeIme (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/verify-native-ime.mjs:17:12)
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/ime-observe.spec.mjs:36:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:02:58  
+

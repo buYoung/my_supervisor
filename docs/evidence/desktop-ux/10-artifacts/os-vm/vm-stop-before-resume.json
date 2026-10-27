@@ -1,0 +1,11 @@
+{
+  "pid": 17527,
+  "stopped": true,
+  "command": [
+    "tart",
+    "stop",
+    "desktop-ux-os"
+  ],
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+  "reason": "User restricted verification and stopped further environment setup"
+}

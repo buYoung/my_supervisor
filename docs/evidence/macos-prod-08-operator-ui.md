@@ -66,3 +66,13 @@ U22 source 및 static-build 기준선은 위 revision과 명령 결과로 고정
 - omitted Job response의 실제 timezone과 `run_once`가 wire DTO → 공통 mapping → GUI model/view까지 전달됨을 관찰했다. form은 server authority를 유지하며 생략값을 발명하지 않는다.
 - `pnpm --dir crates/desktop/ui typecheck`, `build`, `test:follow-events`도 exit `0`이었다.
 - 따라서 최초 출시의 대표 CLI/GUI 동등 관리 gate는 `pass`다. 250 jobs/50 instances/10,000 entries, 장애 partition, expired cursor, keyboard-only 전체 matrix는 계속 `partial`이다.
+
+## 2026-10-27 desktop UX 후속 검증
+
+앞선 U20/U22/U23 결과는 각 당시 소스와 범위의 기록으로 유지한다. 현재 미커밋 UX 변경과 최신 네이티브 증거는 [desktop UX 결과 행렬](desktop-ux/native-matrix.md)과 [최종 검증 및 OS 관찰](desktop-ux/10-native-gates.md)에서 추적한다.
+
+- 공통 resource query가 중복 조회와 오래된 응답을 제어하고, 부분 실패와 마지막 정상 데이터를 구분한다. 예전의 첫 50개 조회 설명을 현재 구현 전체의 설명으로 사용하지 않는다.
+- 실제 invoke/backend로 250개 작업을 3페이지에서 조회·검색하고 50개 실행 인스턴스를 검사했다. 10,000개 로그는 50개 표시 경계, 다일 날짜, 과거 페이지·컨텍스트 복귀와 범위 내보내기를 확인했다. 처리 시간은 증거에만 기록하며 임의의 성능 합격 기준으로 해석하지 않는다.
+- 자동 네이티브 회귀 57개와 입력 격리 검사가 통과했다. 테스트 호스트는 사용자 창을 활성화하지 않고 실제 키보드·마우스·클립보드를 사용하지 않는다. 모든 자동 사례에서 포커스 없음과 실제 키 입력 유입 0을 기록했다.
+- 실제 OS 한글·폴더·클립보드·트레이 관찰은 이전 빌드 식별과 함께 별도 보존한다. 새 실제 OS 파일 선택과 최신 빌드의 OS 재관찰은 완료되지 않아 해당 최종 게이트는 여전히 남아 있다.
+- 이 결과는 debug/embedded 테스트 호스트의 UX 검증이다. installed-owner, 서명된 릴리스, 로그인·재부팅 또는 전체 플랫폼 인증으로 확대하지 않는다.

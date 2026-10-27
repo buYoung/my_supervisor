@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T04:15:13.872Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/input.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/input.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: e6dc57c3-2880-432f-8e7d-20367056fb8e
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/input.spec.mjs
+[webkit 605.1.15 macos #0-0] Predictable repeated and draft input
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (1.2s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:08  
+

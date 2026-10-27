@@ -1,0 +1,162 @@
+[
+  {
+    "spec": "harness",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=harness.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 13.59,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-K18x3u/output",
+    "evidence": "harness"
+  },
+  {
+    "spec": "command",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=command.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 23.87,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Kzxpz8/output",
+    "evidence": "command"
+  },
+  {
+    "spec": "input",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=input.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 24.13,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-FKPgvu/output",
+    "evidence": "input"
+  },
+  {
+    "spec": "ime-replay",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=ime-replay.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 8.42,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-i01Bs9/output",
+    "evidence": "ime-replay"
+  },
+  {
+    "spec": "save",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=save.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 16.82,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-MF74Ie/output",
+    "evidence": "save"
+  },
+  {
+    "spec": "schedule",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=schedule.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 17.51,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-FNZKLF/output",
+    "evidence": "schedule"
+  },
+  {
+    "spec": "state",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=state.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 41.27,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UztCFS/output",
+    "evidence": "state"
+  },
+  {
+    "spec": "flow",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=flow.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 11.95,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-ENV2go/output",
+    "evidence": "flow"
+  },
+  {
+    "spec": "log",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=log.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 30.51,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-flSeUC/output",
+    "evidence": "log"
+  },
+  {
+    "spec": "visual",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=visual.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 11.67,
+    "originalOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-jlNqeL/output",
+    "evidence": "visual"
+  }
+]

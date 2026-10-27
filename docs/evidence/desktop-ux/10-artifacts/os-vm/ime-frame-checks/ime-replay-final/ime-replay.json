@@ -1,0 +1,206 @@
+{
+  "source": "/Users/buyonglee/Documents/work/private/my_supervisor/docs/evidence/desktop-ux/10-artifacts/os-vm/os-ime-frame/ime-checkpoint.json",
+  "mode": "recorded event replay, not a new OS observation",
+  "result": {
+    "active": "선행 작업 2",
+    "nativeKeys": 0,
+    "snapshots": [
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 71,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅏ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅏ",
+        "keyCode": 75,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 83,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄱ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄱ",
+        "keyCode": 82,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅡ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅡ",
+        "keyCode": 77,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄹ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄹ",
+        "keyCode": 70,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 2,
+        "type": "keydown"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 2,
+        "type": "keyup"
+      }
+    ],
+    "values": [
+      "한글",
+      ""
+    ]
+  }
+}

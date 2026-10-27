@@ -1,0 +1,1 @@
+{"method": "vm-hardware-keyboard", "vmModel": "VirtualMac2,1", "observation": "First Return used a second VNC connection; full event capture retained for transport diagnosis; not a pass", "focusProbe": "Native pointer moved from first row to second; waited 350ms; candidate remained visible"}

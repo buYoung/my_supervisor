@@ -1,0 +1,28 @@
+
+Execution of 1 workers started at 2026-10-27T06:26:49.672Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/harness.spec.mjs
+[0-0] AssertionError in "Isolated native host.HARNESS-01 [N-R] real main window and invoke persistence"
+AssertionError [ERR_ASSERTION]: deliberate cleanup probe
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/harness.spec.mjs:32:57)
+[0-0] FAILED in undefined - file:///tests/e2e/harness.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: f74a0607-c3aa-4c90-ab9e-e3e416fe0b9c
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/harness.spec.mjs
+[webkit 605.1.15 macos #0-0] Isolated native host
+[webkit 605.1.15 macos #0-0]    ✖ HARNESS-01 [N-R] real main window and invoke persistence
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 failing (513ms)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Isolated native host HARNESS-01 [N-R] real main window and invoke persistence
+[webkit 605.1.15 macos #0-0] deliberate cleanup probe
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: deliberate cleanup probe
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/harness.spec.mjs:32:57)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:01  
+

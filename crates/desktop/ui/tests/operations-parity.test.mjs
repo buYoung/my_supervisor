@@ -126,6 +126,9 @@ try {
   await restartProcess(processActionsClient, "system-registered");
   assert.deepEqual(restartCalls, ["direct", "system-registered"], "restart uses the documented client operation");
 
+  window.confirm = () => false;
+  assert.equal(getProcessRemovalAction(processActionsClient, stopped), null, "stopped persisted removal can be cancelled");
+  window.confirm = () => true;
   await getProcessRemovalAction(processActionsClient, stopped)();
   assert.deepEqual(removeCalls, [["direct", false]], "stopped process removal is not forced");
   window.confirm = () => false;

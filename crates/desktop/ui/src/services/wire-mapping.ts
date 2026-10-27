@@ -127,7 +127,7 @@ export function mapProcessInstanceStatus(dto: ProcessInstanceStatusDto): Process
 }
 
 export function mapProcessOperation(dto: ProcessOperationDto): ProcessOperation {
-  return { operationId: dto.operation_id, name: dto.name, kind: dto.kind, targetInstances: dto.target_instances, phase: dto.phase, batch: dto.batch, completed: dto.completed, outcomes: dto.outcomes.map((outcome) => ({ instanceId: outcome.instance_id, ordinal: outcome.ordinal, state: outcome.state, failedStage: outcome.failed_stage, retryable: outcome.retryable })) };
+  return { operationId: dto.operation_id, name: dto.name, kind: dto.kind, targetInstances: dto.target_instances, phase: dto.phase, batch: dto.batch, completed: dto.completed, ...(dto.deadline?{deadline:dto.deadline}:{}), ...(dto.compensation?{compensation:dto.compensation}:{}), outcomes: dto.outcomes.map((outcome) => ({ instanceId: outcome.instance_id, ordinal: outcome.ordinal, state: outcome.state, failedStage: outcome.failed_stage, retryable: outcome.retryable })) };
 }
 
 export function mapJobStatus(dto: JobStatusDto): JobStatus {

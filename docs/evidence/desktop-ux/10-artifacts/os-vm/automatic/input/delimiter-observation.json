@@ -1,0 +1,69 @@
+{
+  "active": "선행 작업 2",
+  "events": [
+    {
+      "code": null,
+      "data": null,
+      "focused": "선행 작업 1",
+      "inputType": "deleteContentBackward",
+      "isComposing": false,
+      "isTrusted": false,
+      "key": null,
+      "keyCode": null,
+      "rowCount": 1,
+      "type": "input",
+      "value": ""
+    },
+    {
+      "code": null,
+      "data": "first",
+      "focused": "선행 작업 1",
+      "inputType": "insertText",
+      "isComposing": false,
+      "isTrusted": false,
+      "key": null,
+      "keyCode": null,
+      "rowCount": 1,
+      "type": "input",
+      "value": "first"
+    },
+    {
+      "code": ",",
+      "data": null,
+      "focused": "선행 작업 1",
+      "inputType": null,
+      "isComposing": false,
+      "isTrusted": false,
+      "key": ",",
+      "keyCode": 44,
+      "rowCount": 1,
+      "type": "keydown",
+      "value": "first"
+    },
+    {
+      "code": ",",
+      "data": null,
+      "focused": "선행 작업 2",
+      "inputType": null,
+      "isComposing": false,
+      "isTrusted": false,
+      "key": ",",
+      "keyCode": 44,
+      "rowCount": 2,
+      "type": "keyup",
+      "value": ""
+    }
+  ],
+  "hasFocus": false,
+  "suggestions": [
+    "native-bulk",
+    "native-dependencies",
+    "native-interval",
+    "second",
+    "이름,쉼표"
+  ],
+  "values": [
+    "first",
+    ""
+  ]
+}

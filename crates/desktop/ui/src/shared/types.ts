@@ -66,6 +66,8 @@ export interface ProcessOperation {
   batch: number;
   completed: boolean;
   outcomes: ProcessOperationOutcome[];
+  deadline?:string;
+  compensation?:string;
 }
 
 export type JobRunState =

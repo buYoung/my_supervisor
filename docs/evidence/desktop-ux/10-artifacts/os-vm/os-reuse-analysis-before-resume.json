@@ -1,0 +1,130 @@
+{
+  "automaticCases": 58,
+  "automaticStatus": "passed-do-not-repeat-unless-related-code-changes",
+  "cleanupRuns": 14,
+  "cleanupStatus": "passed-do-not-repeat-unless-related-code-changes",
+  "comparisonScope": "Current files versus the previously completed final automatic source fingerprint; older OS build reuse is impact analysis, not a claim of byte-identical sources or current-build rerun",
+  "files": [
+    {
+      "path": "crates/desktop/ui/src/components/ui/PathField.tsx",
+      "currentSha256": "8772a1522da97f774a36db89037c71b303824daff87a2ffb46db5dd05c179731",
+      "previousFinalSha256": "8772a1522da97f774a36db89037c71b303824daff87a2ffb46db5dd05c179731",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/features/processes/ProcessEditor.tsx",
+      "currentSha256": "0896964ba8dc1e88bb78a67faaf2c2062de0d8fb41440f3b3d2282dca2ca9050",
+      "previousFinalSha256": "0896964ba8dc1e88bb78a67faaf2c2062de0d8fb41440f3b3d2282dca2ca9050",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/features/logs/RawLogInspector.tsx",
+      "currentSha256": "121bf5d63ea4b5dcb47a807fe79f6d4c16127078219341f088a305e430dc2bee",
+      "previousFinalSha256": "121bf5d63ea4b5dcb47a807fe79f6d4c16127078219341f088a305e430dc2bee",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/features/logs/LogsView.tsx",
+      "currentSha256": "2aa7cc69a756578d774e031f805398ce94e7f3a564f7404282dda45cc247b115",
+      "previousFinalSha256": "2aa7cc69a756578d774e031f805398ce94e7f3a564f7404282dda45cc247b115",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/components/ui/Modal.tsx",
+      "currentSha256": "09daaabaf692525a2b79446d66a459c7b6294d46240057d610c6a19a8733f9b2",
+      "previousFinalSha256": "09daaabaf692525a2b79446d66a459c7b6294d46240057d610c6a19a8733f9b2",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/components/ui/RepeatedField.tsx",
+      "currentSha256": "146644c7ff517e00ff04749feec559e10c1cf6c5e259136c74355b9d27751fb5",
+      "previousFinalSha256": "146644c7ff517e00ff04749feec559e10c1cf6c5e259136c74355b9d27751fb5",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/features/processes/CommandEditor.tsx",
+      "currentSha256": "3c26a1110a6ab4a88a3fddef20ef31ad1077d76f427436cd040e9aa608e5a107",
+      "previousFinalSha256": "3c26a1110a6ab4a88a3fddef20ef31ad1077d76f427436cd040e9aa608e5a107",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/index.css",
+      "currentSha256": "79bf078215c9486a8bf3b65b2531d1b5288b05572ac24ca7136a05b72647bf49",
+      "previousFinalSha256": "79bf078215c9486a8bf3b65b2531d1b5288b05572ac24ca7136a05b72647bf49",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/shared/theme.css",
+      "currentSha256": "f5cea8d42899d19a11c10221c024a961512ebf85cc535171b061182d2e833662",
+      "previousFinalSha256": "f5cea8d42899d19a11c10221c024a961512ebf85cc535171b061182d2e833662",
+      "sameAsPreviousFinal": true
+    },
+    {
+      "path": "crates/desktop/ui/src/features/processes/process-controls.css",
+      "currentSha256": "eb24f39ac1e21e45dae6bc57a02e8ee1ac98a42637f0456c250a44152972c970",
+      "previousFinalSha256": "eb24f39ac1e21e45dae6bc57a02e8ee1ac98a42637f0456c250a44152972c970",
+      "sameAsPreviousFinal": true
+    }
+  ],
+  "observations": [
+    {
+      "kind": "folder",
+      "decision": "reused",
+      "reason": "PathField -> choosePath(directory=true) -> ProcessEditor cwd -> apply path is outside the changed blur handlers",
+      "manifest": "10-artifacts/os-picker/manifest.json",
+      "record": "10-artifacts/os-picker/os-observations.json",
+      "binarySha256": "bae500bfaa42ca675cb904f46b3a646a5c75c77baf7bfde4887f27d7dd9d0893",
+      "revision": "748537710413f224be9f25a65d114426b33c0770",
+      "runSourceSha256": "0b3f218471d90eca136b1007150ba44b48b256ad24113872826408f126cc1fb6",
+      "embeddedSourceSha256": "d94f0f597299fe52babeb339559d571b10058f4e933d1086b0a561b352ccf2ae",
+      "command": "pnpm test:native --no-build --spec=native-gates.spec.mjs --case=GATE-07 --observe",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+    },
+    {
+      "kind": "clipboard",
+      "decision": "reused",
+      "reason": "RawLogInspector writes entry.raw.line to navigator.clipboard; product path unchanged, in-memory substitute is test-only",
+      "manifest": "10-artifacts/os-clipboard/manifest.json",
+      "record": "10-artifacts/os-clipboard/os-observations.json",
+      "binarySha256": "bae500bfaa42ca675cb904f46b3a646a5c75c77baf7bfde4887f27d7dd9d0893",
+      "revision": "748537710413f224be9f25a65d114426b33c0770",
+      "runSourceSha256": "0b3f218471d90eca136b1007150ba44b48b256ad24113872826408f126cc1fb6",
+      "embeddedSourceSha256": "d94f0f597299fe52babeb339559d571b10058f4e933d1086b0a561b352ccf2ae",
+      "command": "pnpm test:native --no-build --spec=native-gates.spec.mjs --case=GATE-08 --observe",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+    },
+    {
+      "kind": "tray",
+      "decision": "reused",
+      "reason": "Ordinary CloseRequested hide and build_tray show/focus callbacks retain behavior; new cfg branches only select test hosts",
+      "manifest": "10-artifacts/os-tray/manifest.json",
+      "record": "10-artifacts/os-tray/os-observations.json",
+      "binarySha256": "bae500bfaa42ca675cb904f46b3a646a5c75c77baf7bfde4887f27d7dd9d0893",
+      "revision": "748537710413f224be9f25a65d114426b33c0770",
+      "runSourceSha256": "febacc1df7c1c2ab418743d1f3b0cd2a169948d97e274831359dcd29700e45f8",
+      "embeddedSourceSha256": "d94f0f597299fe52babeb339559d571b10058f4e933d1086b0a561b352ccf2ae",
+      "command": "pnpm test:native --no-build --spec=native-gates.spec.mjs --observe",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+    },
+    {
+      "kind": "ime",
+      "decision": "unverified-current-blur",
+      "reason": "Old physical IME evidence remains valid for its build; late RepeatedField/CommandEditor blur handling needs current OS observation",
+      "manifest": "10-artifacts/native-ime/manifest.json",
+      "record": "10-artifacts/native-ime/native-ime.json",
+      "binarySha256": "bae500bfaa42ca675cb904f46b3a646a5c75c77baf7bfde4887f27d7dd9d0893",
+      "revision": "748537710413f224be9f25a65d114426b33c0770",
+      "runSourceSha256": "0b3f218471d90eca136b1007150ba44b48b256ad24113872826408f126cc1fb6",
+      "embeddedSourceSha256": "d94f0f597299fe52babeb339559d571b10058f4e933d1086b0a561b352ccf2ae",
+      "command": "pnpm test:native --no-build --spec=ime-observe.spec.mjs --observe",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui"
+    }
+  ],
+  "unverified": [
+    "Native executable file selection and cancellation",
+    "Korean IME interaction with the changed delayed blur/focus handling",
+    "Real OS focus/suggestion behavior after the changed delayed blur callbacks"
+  ],
+  "newOsProductScenariosExecuted": 0,
+  "environmentWork": "stopped at user request; VM booted but app/observation transport not ready"
+}

@@ -1,0 +1,78 @@
+[
+  {
+    "name": "typecheck",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "typecheck"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 0.41,
+    "log": "typecheck.log"
+  },
+  {
+    "name": "build",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "build"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 5.08,
+    "log": "build.log"
+  },
+  {
+    "name": "cargo-check",
+    "command": [
+      "cargo",
+      "check",
+      "--workspace"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0,
+    "seconds": 5.6,
+    "log": "cargo-check.log"
+  },
+  {
+    "name": "unit",
+    "command": [
+      "node",
+      "--test",
+      "tests/command-model.test.mjs",
+      "tests/reconcile-draft.test.mjs",
+      "tests/resource-store.test.mjs",
+      "tests/draft-history.test.mjs",
+      "tests/log-navigation.test.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "exitCode": 0,
+    "seconds": 0.58,
+    "log": "unit.log"
+  },
+  {
+    "name": "parity",
+    "command": [
+      "node",
+      "tests/operations-parity.test.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "exitCode": 0,
+    "seconds": 1.26,
+    "log": "parity.log"
+  },
+  {
+    "name": "events",
+    "command": [
+      "pnpm",
+      "test:follow-events"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "exitCode": 0,
+    "seconds": 2.76,
+    "log": "events.log"
+  }
+]

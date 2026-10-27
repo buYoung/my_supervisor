@@ -1,0 +1,4 @@
+.button-primary{border-color:rgb(var(--color-action));background:rgb(var(--color-action));color:rgb(var(--color-on-action))}
+.button-primary:hover{background:rgb(var(--color-action)/.9)}
+:is(.workspace-error,.workspace-alert,.log-alert){padding:12px 14px;margin-bottom:12px;border:1px solid rgb(var(--color-danger)/.28);border-radius:6px;color:rgb(var(--color-danger));background:rgb(var(--color-danger)/.06);font-size:12px;line-height:1.7}
+:is(.workspace-notice,.log-notice){padding:12px 14px;margin-bottom:12px;border:1px solid rgb(var(--color-primary)/.24);border-radius:6px;color:rgb(var(--color-primary));background:rgb(var(--color-primary)/.06);font-size:12px;line-height:1.7}

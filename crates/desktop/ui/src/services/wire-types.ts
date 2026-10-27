@@ -70,7 +70,7 @@ export interface ProcessInstanceStatusDto {
 
 export interface ProcessInstancesDto { name: string; desired_instances: number; instances: ProcessInstanceStatusDto[]; }
 export interface ProcessOperationDto {
-  operation_id: string; name: string; kind: string; target_instances?: number; phase: string; batch: number; completed: boolean;
+  operation_id: string; name: string; kind: string; target_instances?: number; phase: string; batch: number; completed: boolean; deadline?:string; compensation?:string;
   outcomes: Array<{ instance_id: string; ordinal: number; state: "completed" | "failed" | "not_attempted" | "superseded"; failed_stage?: string; retryable: boolean }>;
 }
 

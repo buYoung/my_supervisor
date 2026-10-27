@@ -1,0 +1,100 @@
+
+Execution of 1 workers started at 2026-10-27T02:04:12.998Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/schedule.spec.mjs
+[0-0] Error in "Schedule editing follows server semantics.SCHEDULE-03 [N-R] stale preview replies cannot replace newer schedule results"
+Error: waitUntil condition timed out after 10000ms
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:41:102)
+[0-0] Error in "Schedule editing follows server semantics.SCHEDULE-04 [N-R] display zones preserve the instant and nonexistent DST input remains visible"
+Error: waitUntil condition failed with the following reason: WebDriverError: null is not an object (evaluating 'document.querySelector('input[type="datetime-local"]').parentElement') when running "execute/sync" with method "POST"
+    ---
+    at async zone (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:13:168)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:44:41)
+[0-0] AssertionError in "Schedule editing follows server semantics.SCHEDULE-05 [N-R] presets are reversible and saved cron agrees with preview"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'not cron'
+- '17 6 * * *'
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:47:231)
+[0-0] AssertionError in "Schedule editing follows server semantics.SCHEDULE-06 [N-R] timezone, misfire, trigger ID and wire casing survive editing"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ '16352203-d7ec-4567-902e-c87351b5a611'
+- '8e4e1626-9595-4e64-bb88-7df6d9bd9e38'
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:50:574)
+[0-0] FAILED in undefined - file:///tests/e2e/schedule.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 78800d51-4cd5-48bf-b54d-76f0b7e958ef
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/schedule.spec.mjs
+[webkit 605.1.15 macos #0-0] Schedule editing follows server semantics
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-01 [N-R] GUI, authenticated HTTP and invoke agree on omitted and explicit timezones
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-02 [N-R] unset timeout remains unset and an explicit second reaches the real runner
+[webkit 605.1.15 macos #0-0]    ✖ SCHEDULE-03 [N-R] stale preview replies cannot replace newer schedule results
+[webkit 605.1.15 macos #0-0]    ✖ SCHEDULE-04 [N-R] display zones preserve the instant and nonexistent DST input remains visible
+[webkit 605.1.15 macos #0-0]    ✖ SCHEDULE-05 [N-R] presets are reversible and saved cron agrees with preview
+[webkit 605.1.15 macos #0-0]    ✖ SCHEDULE-06 [N-R] timezone, misfire, trigger ID and wire casing survive editing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2 passing (31s)
+[webkit 605.1.15 macos #0-0] 4 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Schedule editing follows server semantics SCHEDULE-03 [N-R] stale preview replies cannot replace newer schedule results
+[webkit 605.1.15 macos #0-0] waitUntil condition timed out after 10000ms
+[webkit 605.1.15 macos #0-0] Error: waitUntil condition timed out after 10000ms
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:41:102)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2) Schedule editing follows server semantics SCHEDULE-04 [N-R] display zones preserve the instant and nonexistent DST input remains visible
+[webkit 605.1.15 macos #0-0] waitUntil condition failed with the following reason: WebDriverError: null is not an object (evaluating 'document.querySelector('input[type="datetime-local"]').parentElement') when running "execute/sync" with method "POST"
+[webkit 605.1.15 macos #0-0] Error: waitUntil condition failed with the following reason: WebDriverError: null is not an object (evaluating 'document.querySelector('input[type="datetime-local"]').parentElement') when running "execute/sync" with method "POST"
+[webkit 605.1.15 macos #0-0]     ---
+[webkit 605.1.15 macos #0-0]     at async zone (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:13:168)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:44:41)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 3) Schedule editing follows server semantics SCHEDULE-05 [N-R] presets are reversible and saved cron agrees with preview
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
++ actual - expected
+
++ 'not cron'
+- '17 6 * * *'
+      
+      actual expected
+      
+      'not17 cron6 * * *'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + 'not cron'
+[webkit 605.1.15 macos #0-0] - '17 6 * * *'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:47:231)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 4) Schedule editing follows server semantics SCHEDULE-06 [N-R] timezone, misfire, trigger ID and wire casing survive editing
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
++ actual - expected
+
++ '16352203-d7ec-4567-902e-c87351b5a611'
+- '8e4e1626-9595-4e64-bb88-7df6d9bd9e38'
+      
+      actual expected
+      
+      '163522038e4e1626-d7ec9595-45674e64-902ebb88-c87351b5a6117df6d9bd9e38'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + '16352203-d7ec-4567-902e-c87351b5a611'
+[webkit 605.1.15 macos #0-0] - '8e4e1626-9595-4e64-bb88-7df6d9bd9e38'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/schedule.spec.mjs:50:574)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:32  
+

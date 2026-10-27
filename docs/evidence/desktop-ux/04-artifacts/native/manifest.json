@@ -1,0 +1,10 @@
+{
+  "revision": "748537710413f224be9f25a65d114426b33c0770",
+  "sourceSha256": "0cb2bb33b1bcfbc149cd115c9a28d579d618ef2534809e6eaf721c0b6d34777a",
+  "root": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-r2QVe0",
+  "port": 53711,
+  "probe": "normal",
+  "binary": "/Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/bundle/macos/my-supervisor.app/Contents/MacOS/my-supervisor",
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+  "command": "pnpm test:native --spec=save.spec.mjs"
+}

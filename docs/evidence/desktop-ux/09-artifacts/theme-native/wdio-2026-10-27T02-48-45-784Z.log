@@ -1,0 +1,29 @@
+2026-10-27T02:48:45.867Z INFO tauri-service:service: [Tauri:Backend:0] Failed to set global logger (may be already set by another plugin): attempted to set a logger after the logging system was already initialized
+2026-10-27T02:48:46.147Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [frontend] [WDIO-FRONTEND][INFO] [WDIO][Frontend] Installing backend-log listener
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [frontend] [WDIO-FRONTEND][INFO] [WDIO][Frontend] Waiting for Tauri (attempt 1/100)
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [frontend] [WDIO-FRONTEND][INFO] [WDIO][Frontend] Tauri ready - setting up backend-log listener
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [frontend] [WDIO-FRONTEND][INFO] [WDIO][Frontend] Importing @tauri-apps/api/event
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.148Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] [WDIO Tauri Plugin] ⚠️ Invoke interception via defineProperty failed; mock routing via window.__wdio_mocks__ remains active
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] [WDIO Tauri Plugin] TEST: This is a test INFO log after setupConsoleForwarding()
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [Tauri:Frontend:0] [WDIO Tauri Plugin] TEST: This is a test WARN log after setupConsoleForwarding()
+2026-10-27T02:48:46.149Z INFO tauri-service:service: [frontend] [WDIO-FRONTEND][INFO] [WDIO][Frontend] Event module imported successfully
+2026-10-27T02:48:46.154Z INFO tauri-service:service: [frontend] [WDIO-FRONTEND][INFO] [WDIO][Frontend] Backend log listener registered successfully
+2026-10-27T02:48:46.154Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}
+2026-10-27T02:48:46.154Z INFO tauri-service:service: [Tauri:Frontend:0] IPC custom protocol failed, Tauri will now use the postMessage interface instead {}

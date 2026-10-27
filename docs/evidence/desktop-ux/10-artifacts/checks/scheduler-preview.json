@@ -1,0 +1,12 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "my-supervisor-infra-scheduler",
+    "--test",
+    "preview"
+  ],
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+  "exitCode": 0
+}

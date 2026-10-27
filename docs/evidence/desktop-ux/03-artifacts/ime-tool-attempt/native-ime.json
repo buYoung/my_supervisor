@@ -1,0 +1,25 @@
+{
+  "actions": {
+    "method": "CUA native key events",
+    "keys": [
+      "g",
+      "k",
+      "s",
+      "r",
+      "m",
+      "f",
+      "Return"
+    ],
+    "observed": "Korean 한글 composed; first Return unexpectedly added a second row",
+    "appPid": 70281
+  },
+  "events": [],
+  "result": {
+    "active": "선행 작업 2",
+    "rowCount": 2,
+    "values": [
+      "한글",
+      ""
+    ]
+  }
+}

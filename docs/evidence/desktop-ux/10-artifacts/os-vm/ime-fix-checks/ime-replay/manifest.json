@@ -1,0 +1,13 @@
+{
+  "revision": "748537710413f224be9f25a65d114426b33c0770",
+  "sourceSha256": "07ad6956892b3cd742574a7991224b607055e311ece6c119486df1d9318378fe",
+  "root": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-VUHxsS",
+  "port": 60512,
+  "probe": "normal",
+  "isOsObservation": false,
+  "binary": "/Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/bundle/macos/my-supervisor.app/Contents/MacOS/my-supervisor",
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+  "command": "pnpm test:native --no-build --spec=ime-replay.spec.mjs",
+  "binarySha256": "2757c8b48b7b57183180e123f014be0a1573bdf33a6040d07e6c96428875b363",
+  "sourceHashScope": "Git tracked and untracked crates, Cargo files and build-local.sh, excluding derived desktop/gen/schemas"
+}

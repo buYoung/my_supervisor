@@ -1,0 +1,54 @@
+
+Execution of 1 workers started at 2026-10-27T02:26:11.679Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/flow.spec.mjs
+[0-0] AssertionError in "Reversible workflow drafts.FLOW-03 [N-R] palette and inspection retain pan/zoom while explicit fit works"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'transform: translate(41px, 147.213014px) scale(0.453425);'
+- 'transform: translate(84.486111px, 65.694444px) scale(0.694444);'
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:25:268)
+[0-0] FAILED in undefined - file:///tests/e2e/flow.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 75c5fc1d-8586-4b0b-a828-eb45981641c5
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/flow.spec.mjs
+[webkit 605.1.15 macos #0-0] Reversible workflow drafts
+[webkit 605.1.15 macos #0-0]    ✓ FLOW-01 [N-R] add, delete, settings and reconnect undo/redo preserve graph identities
+[webkit 605.1.15 macos #0-0]    ✓ FLOW-02 [N-R] reordered matching routes drive the actual first-match result
+[webkit 605.1.15 macos #0-0]    ✖ FLOW-03 [N-R] palette and inspection retain pan/zoom while explicit fit works
+[webkit 605.1.15 macos #0-0]    ✓ FLOW-04 [N-R] copied nodes stay independent and a job reference reads the saved source
+[webkit 605.1.15 macos #0-0]    ✓ FLOW-05 [N-R] an unsaved command executes only its declared snapshot and step scope
+[webkit 605.1.15 macos #0-0]    ✓ FLOW-06 [N-R] run and version styles never leak into edit edges
+[webkit 605.1.15 macos #0-0]    ✓ FLOW-07 [O] native keyboard reorders routes and local undo restores them
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 6 passing (27s)
+[webkit 605.1.15 macos #0-0] 1 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Reversible workflow drafts FLOW-03 [N-R] palette and inspection retain pan/zoom while explicit fit works
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
++ actual - expected
+
++ 'transform: translate(41px, 147.213014px) scale(0.453425);'
+- 'transform: translate(84.486111px, 65.694444px) scale(0.694444);'
+      
+      actual expected
+      
+      'transform: translate(41px84.486111px, 14765.213014px694444px) scale(0.453425694444);'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + 'transform: translate(41px, 147.213014px) scale(0.453425);'
+[webkit 605.1.15 macos #0-0] - 'transform: translate(84.486111px, 65.694444px) scale(0.694444);'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:25:268)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:30  
+

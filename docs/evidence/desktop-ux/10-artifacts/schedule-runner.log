@@ -1,0 +1,31 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:native /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/e2e/run-native.mjs --no-build --spec\=schedule.spec.mjs
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-FNZKLF/output
+
+Execution of 1 workers started at 2026-10-27T04:51:14.651Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/schedule.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/schedule.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: b0c9f4d5-6d19-49bb-bfce-63b47faba1ec
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/schedule.spec.mjs
+[webkit 605.1.15 macos #0-0] Schedule editing follows server semantics
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-01 [N-R] GUI, authenticated HTTP and invoke agree on omitted and explicit timezones
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-02 [N-R] unset timeout remains unset and an explicit second reaches the real runner
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-03 [N-R] stale preview replies cannot replace newer schedule results
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-04 [N-R] display zones preserve the instant and nonexistent DST input remains visible
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-05 [N-R] presets are reversible and saved cron agrees with preview
+[webkit 605.1.15 macos #0-0]    ✓ SCHEDULE-06 [N-R] timezone, misfire, trigger ID and wire casing survive editing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 6 passing (11.2s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:12  
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-FNZKLF/output; cleanup: PASS

@@ -1,0 +1,40 @@
+
+Execution of 1 workers started at 2026-10-27T02:19:07.195Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/state.spec.mjs
+[0-0] Error in "Truthful operator state.STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances"
+Error: waitUntil condition failed with the following reason: Can't call getText on element with selector ".operation-result" because element wasn't found
+    at async Browser.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:55:685)
+    ---
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:55:651)
+[0-0] FAILED in undefined - file:///tests/e2e/state.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: c8c5ff92-2704-48e4-aa85-08ff25b5ff2c
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/state.spec.mjs
+[webkit 605.1.15 macos #0-0] Truthful operator state
+[webkit 605.1.15 macos #0-0]    ✓ STATE-01 [N-R] loading, empty, search-empty, real storage failure and partial results differ
+[webkit 605.1.15 macos #0-0]    ✓ STATE-02 [N-R] header refresh and a newer mutation supersede a delayed old page
+[webkit 605.1.15 macos #0-0]    ✓ STATE-03 [N-R] switching targets clears old logs, runs and instances even if the new read fails
+[webkit 605.1.15 macos #0-0]    ✓ STATE-04 [N-R] real rolling readiness failure reports failed and unattempted capacity
+[webkit 605.1.15 macos #0-0]    ✓ STATE-05 [N-R] actual start, crash and stop events use payload transitions
+[webkit 605.1.15 macos #0-0]    ✓ STATE-06 [O] keyboard lifecycle controls operate once without selecting another row
+[webkit 605.1.15 macos #0-0]    ✖ STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances
+[webkit 605.1.15 macos #0-0]    ✓ STATE-08 [N-R] 250 jobs and 50 real instances remain bounded and inspectable
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 7 passing (47.2s)
+[webkit 605.1.15 macos #0-0] 1 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Truthful operator state STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances
+[webkit 605.1.15 macos #0-0] waitUntil condition failed with the following reason: Can't call getText on element with selector ".operation-result" because element wasn't found
+[webkit 605.1.15 macos #0-0] Error: waitUntil condition failed with the following reason: Can't call getText on element with selector ".operation-result" because element wasn't found
+[webkit 605.1.15 macos #0-0]     at async Browser.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:55:685)
+[webkit 605.1.15 macos #0-0]     ---
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:55:651)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:48  
+

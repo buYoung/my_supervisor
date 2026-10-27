@@ -1,0 +1,30 @@
+
+Execution of 1 workers started at 2026-10-27T04:14:28.240Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/input.spec.mjs
+[0-0] Error in "Predictable repeated and draft input.INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows"
+Error: element (".job-table-row*=native-dependencies") still not existing after 10000ms
+    at async openJob (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:10:131)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:29:5)
+[0-0] FAILED in undefined - file:///tests/e2e/input.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 9ca2c91c-1101-45d6-9225-d38b2804a745
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/input.spec.mjs
+[webkit 605.1.15 macos #0-0] Predictable repeated and draft input
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 failing (10.4s)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Predictable repeated and draft input INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows
+[webkit 605.1.15 macos #0-0] element (".job-table-row*=native-dependencies") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0] Error: element (".job-table-row*=native-dependencies") still not existing after 10000ms
+[webkit 605.1.15 macos #0-0]     at async openJob (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:10:131)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/input.spec.mjs:29:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:11  
+

@@ -1,0 +1,42 @@
+[
+  {
+    "spec": "input",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--spec=input.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0
+  },
+  {
+    "spec": "ime-replay",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=ime-replay.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 1
+  },
+  {
+    "spec": "ime-replay",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--spec=ime-replay.spec.mjs"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0,
+    "evidence": "ime-replay-final",
+    "supersedes": "Previous replay failed because it compressed an older physical trace without separately captured Enter boundaries. Current VM trace preserves the two release boundaries and keeps both row assertions."
+  }
+]

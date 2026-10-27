@@ -1,0 +1,16 @@
+{
+  "portClosed": true,
+  "httpPortClosed": true,
+  "appStopped": true,
+  "ownedProcesses": [
+    {
+      "name": "timeout child",
+      "pid": 8635,
+      "requiredCleanup": false,
+      "stopped": true
+    }
+  ],
+  "interrupted": false,
+  "probe": "normal",
+  "retainedFixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-I6abPX"
+}

@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/services/resource-store.ts',import.meta.url),'utf8');
+const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {ResourceQuery,pagedQuery}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const pending=[];let calls=0;
+const query=new ResourceQuery(()=>{calls++;return new Promise((resolve,reject)=>pending.push({resolve,reject}));});
+const old=query.refresh();assert.equal(query.refresh(),old);assert.equal(calls,1);
+const fresh=query.refresh(true);assert.equal(calls,2);pending[1].resolve('fresh');assert.equal(await fresh,'success');pending[0].resolve('old');assert.equal(await old,'superseded');assert.equal(query.getSnapshot().data,'fresh');
+const failing=query.refresh();pending[2].reject(new Error('offline'));assert.equal(await failing,'error');assert.equal(query.getSnapshot().data,'fresh');assert.equal(query.getSnapshot().isLoading,false);assert.equal(query.getSnapshot().error.message,'offline');
+const requests=[];const client={};const pages=pagedQuery(client,'test-page',async(cursor,watermark,limit)=>{requests.push({cursor,watermark,limit});return cursor?{records:[{id:'b'}],nextCursor:undefined,highWatermark:'opaque,water mark',partial:true,failedPartitions:['unavailable']}:{records:[{id:'a'}],nextCursor:'opaque/next?value',highWatermark:'opaque,water mark',partial:false,failedPartitions:[]};},row=>row.id);
+await pages.query.refresh();assert.equal(pages.query.getSnapshot().data.hasMore,true);await pages.loadMore();assert.deepEqual(pages.query.getSnapshot().data.items,[{id:'a'},{id:'b'}]);assert.deepEqual(requests.at(-1),{cursor:'opaque/next?value',watermark:'opaque,water mark',limit:100});assert.equal(pages.query.getSnapshot().data.partial,true);assert.deepEqual(pages.query.getSnapshot().data.failedPartitions,['unavailable']);
+console.log('resource store: single-flight, latest response, stale data and opaque page boundaries passed');
+
+const eventSource=readFileSync(new URL('../src/shared/event-presentation.ts',import.meta.url),'utf8');
+const eventOutput=ts.transpileModule(eventSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {describeOperatorEvent}=await import('data:text/javascript;base64,'+Buffer.from(eventOutput).toString('base64'));
+assert.match(describeOperatorEvent({eventType:'process.state_changed',payload:{name:'opaque/name',from:'running',to:'future_state'}}).message,/알 수 없는 상태 \(future_state\)/);
+assert.equal(describeOperatorEvent({eventType:'process.guard_changed',payload:{name:'p',guard:{readiness:'unsupported'}}}).tone,'warning');
+assert.equal(describeOperatorEvent({eventType:'process.state_changed',payload:{name:'p',from:'running',to:'crashed'}}).tone,'danger');
+console.log('event payload: crash severity and explicit unknown/unsupported states passed');

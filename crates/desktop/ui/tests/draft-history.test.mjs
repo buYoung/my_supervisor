@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/features/jobs/draft-history.ts',import.meta.url),'utf8');
+const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {DraftHistory}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const history=new DraftHistory();const first={nodes:[{id:'a'}],edges:[{id:'edge',sourceHandle:'route-id'}],raw:{value:''}};
+history.record(first);first.nodes[0].id='mutated';const restored=history.undo({nodes:[],edges:[]});assert.equal(restored.nodes[0].id,'a');assert.equal(restored.edges[0].sourceHandle,'route-id');assert.equal(restored.raw.value,'');assert.deepEqual(history.redo(restored),{nodes:[],edges:[]});history.record(restored);assert.equal(history.canRedo,false);history.clear();assert.equal(history.canUndo,false);
+for(let index=0;index<120;index++)history.record(index);let count=0;while(history.undo(null)!==undefined)count++;assert.equal(count,100);
+console.log('draft history: immutable IDs/raw drafts, redo branch and 100-frame bound passed');

@@ -1,0 +1,20 @@
+[
+  {
+    "phase": "picker-cancel",
+    "action": "CUA clicked native NSOpenPanel Cancel",
+    "observed": "Editor retained original working directory and no change",
+    "at": "2026-10-27T03:56:01.339631+00:00"
+  },
+  {
+    "phase": "picker-select",
+    "action": "CUA native Go to Folder, set PathTextField, Return, Open",
+    "observed": "Editor shows exact native, 경로 folder path",
+    "at": "2026-10-27T03:56:35.691941+00:00"
+  },
+  {
+    "phase": "tray-close",
+    "action": "CUA clicked native close button",
+    "observed": "Window capture timed out after close; visibility to be asserted through real Tauri window",
+    "at": "2026-10-27T03:57:08.146509+00:00"
+  }
+]

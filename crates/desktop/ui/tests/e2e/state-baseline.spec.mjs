@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+describe('Operator state baseline',()=>{
+ it('records refresh scope, shared busy state, stale logs and flat invoke error',async()=>{
+  const error=await browser.execute(async()=>{const h=window.__MSV_E2E__;await h.client.addProcess(h.processFixture('native-state-a','/usr/bin/printf',['A unique line\n']));await h.client.addProcess(h.processFixture('native-state-b','/bin/sleep',['60']));await h.client.addJob(h.jobFixture('native-state-job'));await h.client.startProcess('native-state-a');try{await h.client.getProcess('missing-state-target');}catch(error){return {code:error.code,message:error.message,details:error.details};}});
+  await browser.execute(()=>{window.__originalInterval=window.setInterval;window.setInterval=()=>0;window.__originalList=window.__MSV_E2E__.client.listJobs;window.__jobsCalls=0;window.__MSV_E2E__.client.listJobs=(...args)=>{window.__jobsCalls++;return window.__originalList(...args);};});
+  await $('button=작업').click();await $('.job-table-row*=native-state-job').waitForExist();await browser.execute(()=>{window.__jobsCalls=0;});await $('button=새로고침').click();await browser.waitUntil(async()=>await $('button=새로고침').isEnabled());const jobsRefreshed=await browser.execute(()=>window.__jobsCalls);
+  await browser.execute(()=>{window.__MSV_E2E__.client.listJobs=window.__originalList;window.setInterval=window.__originalInterval;});
+  await $('button=프로세스').click();await $('.process-list-row*=native-state-a').waitForExist();await $('.process-list-row*=native-state-a').click();await $('.process-detail').$('button=로그').click();await browser.waitUntil(async()=>(await $('.process-log-preview').getText()).includes('A unique line'));
+  await browser.execute(()=>{const c=window.__MSV_E2E__.client;window.__originalQuery=c.queryLogs;c.queryLogs=async request=>{const result=await window.__originalQuery(request);if(request.source==='native-state-b')await new Promise(resolve=>window.__releaseLog=resolve);return result;};});
+  await $('.process-list-row*=native-state-b').click();await $('.process-detail').$('button=로그').click();await browser.waitUntil(()=>browser.execute(()=>Boolean(window.__releaseLog)));const staleLog=await $('.process-log-preview').getText();await browser.execute(()=>{window.__releaseLog?.();window.__MSV_E2E__.client.queryLogs=window.__originalQuery;});
+  await browser.execute(()=>{const c=window.__MSV_E2E__.client;window.__originalStart=c.startProcess;c.startProcess=async name=>{const result=await window.__originalStart(name);if(name==='native-state-a'){window.__startReady=true;await new Promise(resolve=>window.__releaseStart=resolve);}return result;};});
+  await $("button[aria-label='native-state-a 시작']").waitForExist();await $("button[aria-label='native-state-a 시작']").click();await browser.waitUntil(()=>browser.execute(()=>window.__startReady));const unrelatedDisabled=!(await $("button[aria-label='native-state-b 시작']").isEnabled());await browser.execute(()=>{window.__releaseStart();window.__MSV_E2E__.client.startProcess=window.__originalStart;});
+  writeFileSync(join(process.env.MSV_DESKTOP_E2E_ROOT,'output/state-baseline.json'),JSON.stringify({error,jobsRefreshed,staleLog,unrelatedDisabled},null,2));assert.equal(jobsRefreshed,0);assert.ok(staleLog.includes('A unique line'));assert.equal(unrelatedDisabled,true);
+ });
+});

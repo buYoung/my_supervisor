@@ -6,18 +6,29 @@
 //! `OperationsFacade` instance.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(all(feature = "desktop-e2e", not(debug_assertions)))]
+compile_error!("desktop-e2e is restricted to explicit debug test builds");
+
+#[cfg(feature = "desktop-e2e")]
+mod e2e;
+
+#[cfg(all(debug_assertions, not(feature = "desktop-e2e")))]
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde::Serialize;
+#[cfg(any(not(feature = "desktop-e2e"), feature = "desktop-e2e-os"))]
 use tauri::menu::{Menu, MenuItem};
+#[cfg(any(not(feature = "desktop-e2e"), feature = "desktop-e2e-os"))]
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+#[cfg(all(debug_assertions, not(feature = "desktop-e2e")))]
 use tokio::net::TcpListener;
 
 #[cfg(debug_assertions)]
 use my_supervisor_app_daemon::build_runtime;
-use my_supervisor_app_daemon::{data_dir, DEFAULT_BIND_PORT};
+#[cfg(all(debug_assertions, not(feature = "desktop-e2e")))]
+use my_supervisor_app_daemon::data_dir;
 use my_supervisor_application::{AppError, ConvertTarget, OperationsFacade, RestartOutcome};
 use my_supervisor_core::domain::JobRunId;
 use my_supervisor_infra_http::mapping::{
@@ -628,6 +639,9 @@ fn start_event_forwarder(app: AppHandle, facade: Arc<OperationsFacade>) {
 }
 
 fn main() {
+    #[cfg(feature = "desktop-e2e")]
+    e2e::prepare().expect("invalid isolated desktop-e2e configuration");
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -635,7 +649,7 @@ fn main() {
         )
         .init();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Build the wired core in-process, mount the test-only devBridge,
@@ -650,18 +664,31 @@ fn main() {
             tauri::async_runtime::block_on(async {
                 facade.bootstrap().await.ok();
             });
+            #[cfg(feature = "desktop-e2e")]
+            tauri::async_runtime::block_on(async { e2e::install_page_fixtures(facade.clone()); });
             tauri::async_runtime::spawn(facade.clone().run_scheduler_loop());
             tauri::async_runtime::spawn(facade.clone().run_process_supervisor_loop());
             start_event_forwarder(app.handle().clone(), facade.clone());
 
-            let data_dir = data_dir();
-            let port = std::env::var("MSV_DEVBRIDGE_PORT")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(DEFAULT_BIND_PORT);
-            tauri::async_runtime::spawn(run_devbridge(assembled.router, port, data_dir));
+            // Native HTTP parity uses the same isolated facade and writes only
+            // into the already-validated task-owned output directory.
+            #[cfg(feature = "desktop-e2e")]
+            tauri::async_runtime::block_on(e2e::start_http(assembled.router))?;
+
+            // Never write test discovery into the canonical desktop data directory.
+            #[cfg(all(debug_assertions, not(feature = "desktop-e2e")))]
+            if let Ok(port) = std::env::var("MSV_DEVBRIDGE_PORT") {
+                let port: u16 = port.parse()?;
+                if port == 0 {
+                    return Err(anyhow::anyhow!("MSV_DEVBRIDGE_PORT must be a nonzero loopback port").into());
+                }
+                tauri::async_runtime::spawn(run_devbridge(assembled.router, port, data_dir()));
+            }
 
             app.manage(facade);
+            #[cfg(all(feature = "desktop-e2e", not(feature = "desktop-e2e-os")))]
+            e2e::isolate_window(app)?;
+            #[cfg(any(not(feature = "desktop-e2e"), feature = "desktop-e2e-os"))]
             build_tray(app)?;
             Ok(())
         })
@@ -721,12 +748,42 @@ fn main() {
             cmd_upsert_alert_rule,
             cmd_acknowledge_alert_episode,
             cmd_follow_logs,
-        ])
-        .run(tauri::generate_context!())
+        ]);
+    #[cfg(feature = "desktop-e2e")]
+    let builder = builder
+        .plugin(tauri_plugin_wdio::init())
+        .plugin(tauri_plugin_wdio_webdriver::init());
+    #[cfg(all(feature = "desktop-e2e", not(feature = "desktop-e2e-os"), target_os = "macos"))]
+    let builder = builder.activate_ignoring_other_apps(false).enable_macos_default_menu(false);
+    #[cfg(feature = "desktop-e2e")]
+    {
+        let app = builder.build(tauri::generate_context!())
+            .expect("error while building isolated desktop test host");
+        #[cfg(all(target_os = "macos", not(feature = "desktop-e2e-os")))]
+        let mut app = app;
+        #[cfg(all(target_os = "macos", not(feature = "desktop-e2e-os")))]
+        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+        app.run(|handle, event| {
+            #[cfg(not(feature = "desktop-e2e-os"))]
+            if matches!(event, tauri::RunEvent::Ready) {
+                if let Err(error) = e2e::start_rendering(handle)
+                    .and_then(|_| e2e::record_input_isolation(handle))
+                {
+                    tracing::error!(%error, "isolated test host refused startup");
+                    handle.exit(1);
+                }
+            }
+            #[cfg(feature = "desktop-e2e-os")]
+            let _ = (handle, event);
+        });
+    }
+    #[cfg(not(feature = "desktop-e2e"))]
+    builder.run(tauri::generate_context!())
         .expect("error while running my-supervisor desktop");
 }
 
 /// Tray icon with show / quit; closing the window only hides it.
+#[cfg(any(not(feature = "desktop-e2e"), feature = "desktop-e2e-os"))]
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -753,6 +810,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
 
 /// Serve the operations Router on loopback for test automation; write the
 /// discovery file so an out-of-process harness can find the port.
+#[cfg(all(debug_assertions, not(feature = "desktop-e2e")))]
 async fn run_devbridge(router: axum::Router, port: u16, data_dir: PathBuf) {
     let addr = format!("127.0.0.1:{port}");
     let listener = match TcpListener::bind(&addr).await {

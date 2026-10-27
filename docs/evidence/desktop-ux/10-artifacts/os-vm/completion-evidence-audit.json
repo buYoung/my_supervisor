@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-27T08:29:37.718526+00:00",
+  "scope": "Evidence reconciliation only; no product test repeated",
+  "documents": 15,
+  "mandatoryScenarios": 66,
+  "missingLinks": [],
+  "automaticInput": {
+    "input": {
+      "cases": 7,
+      "nativeKeyEvents": 0
+    },
+    "ime-replay-final": {
+      "cases": 1,
+      "nativeKeyEvents": 0
+    }
+  },
+  "osFullCasesPassed": 2,
+  "nativeFocusCheckpoints": 2,
+  "vmStopped": true
+}

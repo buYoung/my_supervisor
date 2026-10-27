@@ -1,0 +1,23 @@
+
+Execution of 1 workers started at 2026-10-27T02:38:26.553Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/log.spec.mjs
+[0-0] Error in "Stable log navigation.LOG-03 [N-R] expanded groups and older pages stay still as new records arrive"
+Error: waitUntil condition timed out after 10000ms
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/log.spec.mjs:28:354)
+[0-0] TypeError in "Stable log navigation.LOG-04 [N-R] inspector, context and browser Back restore the query and position"
+TypeError: Cannot read properties of undefined (reading 'click')
+    at file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/log.spec.mjs:31:129
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/log.spec.mjs:31:84)
+[0-0] javascript error in "Stable log navigation.LOG-05 [N-R] custom-range and snapshot exports keep exact boundaries and report partial sources"
+javascript error: WebDriverError: Load failed when running "execute/sync" with method "POST"
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/log.spec.mjs:34:224)
+[0-0] Error in "Stable log navigation.LOG-06 [N-R] shared raw inspection and the 10000-entry fixture remain bounded"
+Error: Timeout of 30000ms exceeded. The execution in the test "Stable log navigation LOG-06 [N-R] shared raw inspection and the 10000-entry fixture remain bounded" took too long. Try to reduce the run time or increase your timeout for test specs (https://webdriver.io/docs/timeouts). (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/log.spec.mjs)
+    at createTimeoutError (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/mocha@10.8.2/node_modules/mocha/lib/errors.js:498:15)
+    at Runnable._timeoutError (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/mocha@10.8.2/node_modules/mocha/lib/runnable.js:429:10)
+    at Timeout.<anonymous> (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/mocha@10.8.2/node_modules/mocha/lib/runnable.js:244:24)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[0-0] Error in "AfterTest Hook"
+WebDriverError: Request timed out! Consider increasing the "connectionRetryTimeout" option. when running "execute/sync" with method "POST"

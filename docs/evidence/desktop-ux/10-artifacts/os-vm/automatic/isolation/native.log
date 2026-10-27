@@ -1,0 +1,18 @@
+
+Execution of 1 workers started at 2026-10-27T06:23:08.966Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/isolation.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/isolation.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 1a9d94c2-1330-463d-87c4-d10fbe9f4f51
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] 1 passing (545ms)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:01  
+

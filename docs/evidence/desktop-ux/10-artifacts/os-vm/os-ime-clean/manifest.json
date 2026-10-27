@@ -1,0 +1,13 @@
+{
+  "revision": "748537710413f224be9f25a65d114426b33c0770",
+  "sourceSha256": "0f6aca86343c52d790c7c7f89ac8a82b49b4c8ab1a82168bd2074085e2c4dc3b",
+  "root": "/private/var/folders/9m/b94f0mqn0d327g6_m6p0x0br0000gn/T/msv-desktop-ux-cH1gJ5",
+  "port": 49167,
+  "probe": "normal",
+  "isOsObservation": true,
+  "binary": "/Users/admin/msv/repo/target/desktop-e2e-os/debug/bundle/macos/my-supervisor.app/Contents/MacOS/my-supervisor",
+  "cwd": "/Users/admin/msv/repo/crates/desktop/ui",
+  "command": "pnpm test:native --os-observe --no-build --spec=ime-observe.spec.mjs",
+  "binarySha256": "9cb6c95571c16eab385948f23abf487cd9fbec09e6d1b92bdc7f2bf3b30d7cf3",
+  "sourceHashScope": "Git tracked and untracked crates, Cargo files and build-local.sh, excluding derived desktop/gen/schemas"
+}

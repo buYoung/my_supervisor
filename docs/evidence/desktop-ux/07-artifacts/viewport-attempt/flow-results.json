@@ -1,0 +1,863 @@
+[
+  {
+    "id": "FLOW-01",
+    "doc": {
+      "definition": {
+        "edges": [
+          {
+            "id": "native-edge-1",
+            "source": "native-trigger",
+            "sourceHandle": "out",
+            "target": "native-command"
+          },
+          {
+            "id": "native-edge-2",
+            "source": "native-command",
+            "sourceHandle": "out",
+            "target": "native-finish"
+          }
+        ],
+        "group": null,
+        "nodes": [
+          {
+            "data": {
+              "kind": "trigger",
+              "label": "시작"
+            },
+            "id": "native-trigger",
+            "position": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "args": [
+                "%s",
+                "native workflow"
+              ],
+              "kind": "command",
+              "label": "변경된 단계",
+              "program": "/usr/bin/printf"
+            },
+            "id": "native-command",
+            "position": {
+              "x": 250,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "kind": "finish",
+              "label": "완료",
+              "result": "succeeded"
+            },
+            "id": "native-finish",
+            "position": {
+              "x": 500,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "kind": "wait",
+              "label": "대기",
+              "maxAttempts": 1,
+              "seconds": 5,
+              "timeoutSeconds": 60
+            },
+            "id": "7372e082-34bd-430e-8796-336103b3f2a4",
+            "position": {
+              "x": 206.5,
+              "y": 215
+            }
+          }
+        ],
+        "settings": {
+          "admission": {
+            "max_concurrency": 1,
+            "max_queue": 0,
+            "overflow": "Skip"
+          },
+          "args": [
+            "%s",
+            "flow-edit"
+          ],
+          "command": "/usr/bin/printf",
+          "cwd": null,
+          "env": {},
+          "id": "ec23756e-5a50-4cbd-a5e7-f18a88b527a7",
+          "log_retention": {
+            "max_age_days": null,
+            "max_runs": null
+          },
+          "misfire_policy": "RunOnce",
+          "name": "flow-edit",
+          "on_dependency_failure": "Skip",
+          "on_overlap": "Skip",
+          "retry_policy": {
+            "initial_backoff": {
+              "nanos": 0,
+              "secs": 1
+            },
+            "jitter_percent": 20,
+            "max_attempts": 1,
+            "max_backoff": {
+              "nanos": 0,
+              "secs": 300
+            },
+            "multiplier": 2
+          },
+          "schedule_revision": 0,
+          "timeout": null,
+          "timezone": "Asia/Seoul",
+          "trigger": {
+            "OneShot": "2026-10-28T02:26:14.899Z"
+          },
+          "trigger_id": "0b5524ab-374e-471d-8255-a0bc8cd5eebc"
+        },
+        "version": 1
+      },
+      "revision": 3,
+      "saved_at": "2026-10-27T02:26:16.767967Z"
+    }
+  },
+  {
+    "id": "FLOW-02",
+    "outcome": {
+      "activeNodeIds": [],
+      "durationMs": 56,
+      "edges": [
+        "native-edge-1",
+        "edge-second"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T02:26:17.397250Z",
+      "id": "43db5f39-11b4-4e33-9d98-b702bc5a8dde",
+      "jobId": "flow-route",
+      "startedAt": "2026-10-27T02:26:17.341106Z",
+      "state": "succeeded",
+      "steps": {
+        "finish-first": {
+          "id": "finish-first",
+          "kind": "finish",
+          "label": "첫 결과",
+          "logs": [],
+          "state": "skipped"
+        },
+        "finish-second": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:17.396608Z",
+          "id": "finish-second",
+          "kind": "finish",
+          "label": "둘째 결과",
+          "logs": [
+            {
+              "message": "step: 둘째 결과",
+              "stream": "system",
+              "time": "2026-10-27T02:26:17.395246Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "out",
+          "startedAt": "2026-10-27T02:26:17.393214Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "",
+          "summary": "succeeded"
+        },
+        "native-command": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:17.392142Z",
+          "id": "native-command",
+          "kind": "command",
+          "label": "고정 출력",
+          "logs": [
+            {
+              "message": "step: 고정 출력",
+              "stream": "system",
+              "time": "2026-10-27T02:26:17.357387Z"
+            },
+            {
+              "message": "native workflow",
+              "stream": "stdout",
+              "time": "2026-10-27T02:26:17.378068Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "route-second",
+          "startedAt": "2026-10-27T02:26:17.356977Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "native workflow\n",
+          "summary": "succeeded"
+        },
+        "native-finish": {
+          "id": "native-finish",
+          "kind": "finish",
+          "label": "완료",
+          "logs": [],
+          "state": "skipped"
+        },
+        "native-trigger": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:17.356422Z",
+          "id": "native-trigger",
+          "kind": "trigger",
+          "label": "시작",
+          "logs": [
+            {
+              "message": "step: 시작",
+              "stream": "system",
+              "time": "2026-10-27T02:26:17.343041Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "out",
+          "startedAt": "2026-10-27T02:26:17.342482Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "",
+          "summary": "succeeded"
+        }
+      },
+      "summary": "succeeded",
+      "version": 2,
+      "workflow": {
+        "edges": [
+          {
+            "id": "native-edge-1",
+            "source": "native-trigger",
+            "sourceHandle": "out",
+            "target": "native-command"
+          },
+          {
+            "id": "native-edge-2",
+            "source": "native-command",
+            "sourceHandle": "out",
+            "target": "native-finish"
+          },
+          {
+            "id": "edge-first",
+            "source": "native-command",
+            "sourceHandle": "route-first",
+            "target": "finish-first"
+          },
+          {
+            "id": "edge-second",
+            "source": "native-command",
+            "sourceHandle": "route-second",
+            "target": "finish-second"
+          }
+        ],
+        "group": null,
+        "nodes": [
+          {
+            "data": {
+              "kind": "trigger",
+              "label": "시작"
+            },
+            "id": "native-trigger",
+            "position": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "args": [
+                "%s",
+                "native workflow"
+              ],
+              "kind": "command",
+              "label": "고정 출력",
+              "program": "/usr/bin/printf",
+              "resultRoutes": [
+                {
+                  "id": "route-second",
+                  "label": "둘째 경로",
+                  "operator": "equals",
+                  "source": "exit_code",
+                  "value": "0"
+                },
+                {
+                  "id": "route-first",
+                  "label": "첫 경로",
+                  "operator": "equals",
+                  "source": "exit_code",
+                  "value": "0"
+                }
+              ]
+            },
+            "id": "native-command",
+            "position": {
+              "x": 250,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "kind": "finish",
+              "label": "완료",
+              "result": "succeeded"
+            },
+            "id": "native-finish",
+            "position": {
+              "x": 500,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "kind": "finish",
+              "label": "첫 결과",
+              "result": "succeeded"
+            },
+            "id": "finish-first",
+            "position": {
+              "x": 500,
+              "y": 150
+            }
+          },
+          {
+            "data": {
+              "kind": "finish",
+              "label": "둘째 결과",
+              "result": "succeeded"
+            },
+            "id": "finish-second",
+            "position": {
+              "x": 500,
+              "y": 300
+            }
+          }
+        ],
+        "settings": {
+          "admission": {
+            "max_concurrency": 1,
+            "max_queue": 0,
+            "overflow": "Skip"
+          },
+          "args": [
+            "%s",
+            "flow-route"
+          ],
+          "command": "/usr/bin/printf",
+          "cwd": null,
+          "env": {},
+          "id": "9af3a63a-869b-4bdd-8f4c-23638ff4b9dc",
+          "log_retention": {
+            "max_age_days": null,
+            "max_runs": null
+          },
+          "misfire_policy": "RunOnce",
+          "name": "flow-route",
+          "on_dependency_failure": "Skip",
+          "on_overlap": "Skip",
+          "retry_policy": {
+            "initial_backoff": {
+              "nanos": 0,
+              "secs": 1
+            },
+            "jitter_percent": 20,
+            "max_attempts": 1,
+            "max_backoff": {
+              "nanos": 0,
+              "secs": 300
+            },
+            "multiplier": 2
+          },
+          "schedule_revision": 0,
+          "timeout": null,
+          "timezone": "Asia/Seoul",
+          "trigger": {
+            "OneShot": "2026-10-28T02:26:14.928Z"
+          },
+          "trigger_id": "5405d552-5e78-4abe-9c0e-e293815847fb"
+        },
+        "version": 1
+      }
+    }
+  },
+  {
+    "id": "FLOW-04",
+    "imported": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-command",
+    "reference": "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693",
+    "result": {
+      "activeNodeIds": [],
+      "durationMs": 89,
+      "edges": [
+        "native-edge-1",
+        "native-edge-2"
+      ],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T02:26:19.200043Z",
+      "id": "d645b872-0f9b-4d72-9dd5-ea448f53db31",
+      "jobId": "flow-copy",
+      "startedAt": "2026-10-27T02:26:19.110513Z",
+      "state": "succeeded",
+      "steps": {
+        "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:19.199693Z",
+          "id": "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693",
+          "kind": "job",
+          "label": "다른 작업 실행",
+          "logs": [
+            {
+              "message": "step: 다른 작업 실행",
+              "stream": "system",
+              "time": "2026-10-27T02:26:19.111582Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "out",
+          "startedAt": "2026-10-27T02:26:19.111032Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "",
+          "summary": "succeeded"
+        },
+        "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693/native-command": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:19.198Z",
+          "id": "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693/native-command",
+          "kind": "command",
+          "label": "원본 출력",
+          "logs": [
+            {
+              "message": "step: 원본 출력",
+              "stream": "system",
+              "time": "2026-10-27T02:26:19.137088Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "out",
+          "startedAt": "2026-10-27T02:26:19.135909Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "",
+          "summary": "succeeded"
+        },
+        "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693/native-finish": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:19.199275Z",
+          "id": "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693/native-finish",
+          "kind": "finish",
+          "label": "완료",
+          "logs": [
+            {
+              "message": "step: 완료",
+              "stream": "system",
+              "time": "2026-10-27T02:26:19.198824Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "out",
+          "startedAt": "2026-10-27T02:26:19.198479Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "",
+          "summary": "succeeded"
+        },
+        "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693/native-trigger": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:19.134397Z",
+          "id": "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693/native-trigger",
+          "kind": "trigger",
+          "label": "시작",
+          "logs": [
+            {
+              "message": "step: 시작",
+              "stream": "system",
+              "time": "2026-10-27T02:26:19.133905Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "out",
+          "startedAt": "2026-10-27T02:26:19.133541Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "",
+          "summary": "succeeded"
+        },
+        "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-command": {
+          "id": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-command",
+          "kind": "command",
+          "label": "flow-source / 원본 출력",
+          "logs": [],
+          "state": "skipped"
+        },
+        "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-finish": {
+          "id": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-finish",
+          "kind": "finish",
+          "label": "flow-source / 완료",
+          "logs": [],
+          "state": "skipped"
+        },
+        "native-command": {
+          "id": "native-command",
+          "kind": "command",
+          "label": "고정 출력",
+          "logs": [],
+          "state": "skipped"
+        },
+        "native-finish": {
+          "id": "native-finish",
+          "kind": "finish",
+          "label": "완료",
+          "logs": [],
+          "state": "skipped"
+        },
+        "native-trigger": {
+          "id": "native-trigger",
+          "kind": "trigger",
+          "label": "시작",
+          "logs": [],
+          "state": "skipped"
+        }
+      },
+      "summary": "succeeded",
+      "version": 0,
+      "workflow": {
+        "edges": [
+          {
+            "id": "native-edge-1",
+            "source": "native-trigger",
+            "sourceHandle": "out",
+            "target": "native-command"
+          },
+          {
+            "id": "native-edge-2",
+            "source": "native-command",
+            "sourceHandle": "out",
+            "target": "native-finish"
+          },
+          {
+            "id": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-edge-2",
+            "source": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-command",
+            "sourceHandle": "out",
+            "target": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-finish"
+          }
+        ],
+        "group": {
+          "members": [
+            "flow-copy",
+            "flow-source"
+          ],
+          "name": "flow-copy 그룹"
+        },
+        "nodes": [
+          {
+            "data": {
+              "kind": "trigger",
+              "label": "시작"
+            },
+            "id": "native-trigger",
+            "position": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "args": [
+                "%s",
+                "native workflow"
+              ],
+              "kind": "command",
+              "label": "고정 출력",
+              "program": "/usr/bin/printf"
+            },
+            "id": "native-command",
+            "position": {
+              "x": 250,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "kind": "finish",
+              "label": "완료",
+              "result": "succeeded"
+            },
+            "id": "native-finish",
+            "position": {
+              "x": 500,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "args": [
+                "-c",
+                "printf copy > '/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-vGaDB5/output/copy.txt'"
+              ],
+              "kind": "command",
+              "label": "flow-source / 원본 출력",
+              "program": "/bin/sh",
+              "sourceJob": "flow-source"
+            },
+            "id": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-command",
+            "position": {
+              "x": 770,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "kind": "finish",
+              "label": "flow-source / 완료",
+              "result": "succeeded",
+              "sourceJob": "flow-source"
+            },
+            "id": "flow-source-d35ed3fe-d4e6-40ff-ac44-7fe3a6ba8b25-native-finish",
+            "position": {
+              "x": 1020,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "jobId": "flow-source",
+              "kind": "job",
+              "label": "다른 작업 실행",
+              "maxAttempts": 1,
+              "timeoutSeconds": 60
+            },
+            "id": "9b00b9a6-7c71-4e8f-9aa7-8ad26fc15693",
+            "position": {
+              "x": 427.4830699774266,
+              "y": 47.50000000000001
+            }
+          }
+        ],
+        "settings": {
+          "admission": {
+            "max_concurrency": 1,
+            "max_queue": 0,
+            "overflow": "Skip"
+          },
+          "args": [
+            "%s",
+            "flow-copy"
+          ],
+          "command": "/usr/bin/printf",
+          "cwd": null,
+          "env": {},
+          "id": "77b0c745-f08e-4acd-b698-d77c2cb46c5e",
+          "log_retention": {
+            "max_age_days": null,
+            "max_runs": null
+          },
+          "misfire_policy": "RunOnce",
+          "name": "flow-copy",
+          "on_dependency_failure": "Skip",
+          "on_overlap": "Skip",
+          "retry_policy": {
+            "initial_backoff": {
+              "nanos": 0,
+              "secs": 1
+            },
+            "jitter_percent": 20,
+            "max_attempts": 1,
+            "max_backoff": {
+              "nanos": 0,
+              "secs": 300
+            },
+            "multiplier": 2
+          },
+          "schedule_revision": 0,
+          "timeout": null,
+          "timezone": "Asia/Seoul",
+          "trigger": {
+            "OneShot": "2026-10-28T02:26:14.941Z"
+          },
+          "trigger_id": "07fd937c-48a5-4d47-a965-5086e83a7566"
+        },
+        "version": 1
+      }
+    }
+  },
+  {
+    "id": "FLOW-05",
+    "result": {
+      "activeNodeIds": [],
+      "durationMs": 97,
+      "edges": [],
+      "exitCode": 0,
+      "finishedAt": "2026-10-27T02:26:20.104291Z",
+      "id": "0173ed44-d60e-4185-ab21-a58562239e6b",
+      "jobId": "flow-draft",
+      "startedAt": "2026-10-27T02:26:20.007249Z",
+      "state": "succeeded",
+      "steps": {
+        "native-command": {
+          "attempt": 1,
+          "exitCode": 0,
+          "finishedAt": "2026-10-27T02:26:20.103943Z",
+          "id": "native-command",
+          "kind": "command",
+          "label": "고정 출력",
+          "logs": [
+            {
+              "message": "step: 고정 출력",
+              "stream": "system",
+              "time": "2026-10-27T02:26:20.010780Z"
+            },
+            {
+              "message": "draft-only",
+              "stream": "stdout",
+              "time": "2026-10-27T02:26:20.072798Z"
+            }
+          ],
+          "outcome": "succeeded",
+          "selectedPort": "out",
+          "startedAt": "2026-10-27T02:26:20.008406Z",
+          "state": "succeeded",
+          "stderr": "",
+          "stdout": "draft-only\n",
+          "summary": "succeeded"
+        },
+        "native-finish": {
+          "id": "native-finish",
+          "kind": "finish",
+          "label": "완료",
+          "logs": [],
+          "state": "skipped"
+        },
+        "native-trigger": {
+          "id": "native-trigger",
+          "kind": "trigger",
+          "label": "시작",
+          "logs": [],
+          "state": "skipped"
+        }
+      },
+      "summary": "succeeded",
+      "version": 0,
+      "workflow": {
+        "edges": [
+          {
+            "id": "native-edge-1",
+            "source": "native-trigger",
+            "sourceHandle": "out",
+            "target": "native-command"
+          },
+          {
+            "id": "native-edge-2",
+            "source": "native-command",
+            "sourceHandle": "out",
+            "target": "native-finish"
+          }
+        ],
+        "group": null,
+        "nodes": [
+          {
+            "data": {
+              "kind": "trigger",
+              "label": "시작"
+            },
+            "id": "native-trigger",
+            "position": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "args": [
+                "%s",
+                "draft-only"
+              ],
+              "kind": "command",
+              "label": "고정 출력",
+              "program": "/usr/bin/printf"
+            },
+            "id": "native-command",
+            "position": {
+              "x": 250,
+              "y": 0
+            }
+          },
+          {
+            "data": {
+              "kind": "finish",
+              "label": "완료",
+              "result": "succeeded"
+            },
+            "id": "native-finish",
+            "position": {
+              "x": 500,
+              "y": 0
+            }
+          }
+        ],
+        "settings": {
+          "admission": {
+            "max_concurrency": 1,
+            "max_queue": 0,
+            "overflow": "Skip"
+          },
+          "args": [
+            "%s",
+            "flow-draft"
+          ],
+          "command": "/usr/bin/printf",
+          "cwd": null,
+          "env": {},
+          "id": "3522c88e-e6c0-48ab-ab16-e08762ceae45",
+          "log_retention": {
+            "max_age_days": null,
+            "max_runs": null
+          },
+          "misfire_policy": "RunOnce",
+          "name": "flow-draft",
+          "on_dependency_failure": "Skip",
+          "on_overlap": "Skip",
+          "retry_policy": {
+            "initial_backoff": {
+              "nanos": 0,
+              "secs": 1
+            },
+            "jitter_percent": 20,
+            "max_attempts": 1,
+            "max_backoff": {
+              "nanos": 0,
+              "secs": 300
+            },
+            "multiplier": 2
+          },
+          "schedule_revision": 0,
+          "timeout": null,
+          "timezone": "Asia/Seoul",
+          "trigger": {
+            "OneShot": "2026-10-28T02:26:14.951Z"
+          },
+          "trigger_id": "52800565-c647-44ab-b2dd-f6f001f1f5f6"
+        },
+        "version": 1
+      }
+    }
+  },
+  {
+    "id": "FLOW-07",
+    "keys": [
+      {
+        "key": "Enter",
+        "trusted": true
+      },
+      {
+        "key": "Enter",
+        "trusted": true
+      }
+    ]
+  }
+]

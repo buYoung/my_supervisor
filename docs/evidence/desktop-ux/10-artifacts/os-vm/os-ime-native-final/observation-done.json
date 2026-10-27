@@ -1,0 +1,1 @@
+{"method": "vm-hardware-keyboard", "vmModel": "VirtualMac2,1", "keyHoldMs": 80, "note": "Unexpected first-return state; retain events without claiming pass"}

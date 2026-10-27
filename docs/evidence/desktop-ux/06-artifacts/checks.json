@@ -1,0 +1,44 @@
+{
+  "checks": [
+    {
+      "command": "node crates/desktop/ui/tests/resource-store.test.mjs",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --dir crates/desktop/ui typecheck",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+      "exitCode": 0
+    },
+    {
+      "command": "cargo check --workspace",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+      "exitCode": 0
+    },
+    {
+      "command": "cargo check -p my-supervisor-app-desktop --features desktop-e2e",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --dir crates/desktop/ui build",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+      "exitCode": 0
+    },
+    {
+      "command": "node tests/operations-parity.test.mjs",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm test:follow-events",
+      "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+      "exitCode": 0
+    }
+  ],
+  "warnings": [
+    "Cargo cache auto-clean permission denied; compilation succeeded",
+    "Existing Vite HMR attempted 0.0.0.0:24678 and emitted EPERM; renderer parity/event assertions passed. Not a network integration result."
+  ],
+  "initialParityFailure": "New stopped-process removal confirmation required an explicit test response; the existing test now covers cancellation and non-forced confirmed removal."
+}

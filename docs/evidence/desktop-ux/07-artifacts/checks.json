@@ -1,0 +1,17 @@
+{
+  "checks": [
+    {
+      "command": "node crates/desktop/ui/tests/draft-history.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --dir crates/desktop/ui typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --dir crates/desktop/ui build",
+      "exitCode": 0
+    }
+  ],
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor"
+}

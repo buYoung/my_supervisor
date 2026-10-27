@@ -1,5 +1,6 @@
 export interface HelpOption {name:string;description:string;requiresValue:boolean;separator:string;scope:"runtime"|"script"}
-export interface ArgumentRow {id:string;name:string;value:string;separator:string;scope:"runtime"|"entry"|"script";isEmptyArgument?:boolean}
+export interface ArgumentRow {id:string;name:string;value:string;separator:string;scope:"runtime"|"entry"|"script";isEmptyArgument?:boolean;hasValue?:boolean}
+export interface CommandTextDraft {text:string;isValid:boolean}
 export const basename=(path:string)=>path.split(/[\\/]/).pop()||path;
 export function splitCommand(line:string):string[]{
   const words:string[]=[];let word="",quote="",escaped=false,started=false;
@@ -26,14 +27,23 @@ export function helpInvocation(program:string,args:string[]):string[]{
   }return [];
 }
 export function argumentRows(program:string,args:string[],help:HelpOption[]=[]):ArgumentRow[]{
-  const result:ArgumentRow[]=[];let hasEntry=false;const interpreter=/^(node|python[\d.]*|bun|java|ruby|deno)$/.test(basename(program));
+  const result:ArgumentRow[]=[];let hasEntry=false;let hasBoundary=false;const interpreter=/^(node|python[\d.]*|bun|java|ruby|deno)$/.test(basename(program));
   for(let i=0;i<args.length;i++){const arg=args[i];let name="",value=arg,separator=" ";let scope:ArgumentRow["scope"]=hasEntry?"script":"runtime";
+    let hasValue=false;
     const takesValue=(option:string)=>/^(sh|bash|zsh|fish)$/.test(basename(program))&&option==="-c"||/^(node|bun)$/.test(basename(program))&&["-e","-p","-r","--eval","--print","--require","--import","--loader"].includes(option)||/^python[\d.]*$/.test(basename(program))&&["-c","-m","-W","-X"].includes(option)||basename(program)==="java"&&["-cp","-classpath","--class-path","--module-path","-p","-m","--module","-jar"].includes(option);
-    if(arg.startsWith("-")&&arg!=="-"){const attached=arg.match(/^(-X(?:mx|ms|ss))(.+)$/);const equals=arg.indexOf("=");if(attached){name=attached[1];value=attached[2];separator="";}else if(equals>0){name=arg.slice(0,equals);value=arg.slice(equals+1);separator="=";}else {name=arg;value="";const option=help.find(o=>o.name===arg);const next=args[i+1];if(next&&(!next.startsWith("-")||/^-\d/.test(next))&&(option?.requiresValue||!option&&!/\.(m?js|cjs|py|jar)$/.test(next)&&!["--inspect","--watch","--help","-h","-v","--version"].includes(arg))){value=next;i++;}}
+    if(arg==="--"){name=arg;value="";hasBoundary=true;}
+    else if(arg.startsWith("-")&&arg!=="-"){const attached=arg.match(/^(-X(?:mx|ms|ss))(.+)$/);const equals=arg.indexOf("=");if(attached){name=attached[1];value=attached[2];separator="";hasValue=true;}else if(equals>0){name=arg.slice(0,equals);value=arg.slice(equals+1);separator="=";hasValue=true;}else {name=arg;value="";const option=help.find(o=>o.name===arg);const next=args[i+1];if(next!==undefined&&(!next.startsWith("-")||/^-\d/.test(next))&&(option?.requiresValue||!option&&!/\.(m?js|cjs|py|jar)$/.test(next)&&!["--inspect","--watch","--help","-h","-v","--version"].includes(arg))){value=next;hasValue=true;i++;}}
     }else{scope=interpreter&&!hasEntry?"entry":"script";hasEntry=hasEntry||scope==="entry";}
-    if(name&&!value&&takesValue(name)&&args[i+1]){value=args[++i];}
+    if(name&&!hasValue&&takesValue(name)&&args[i+1]!==undefined){value=args[++i];hasValue=true;}
     if(name==="-jar"&&value){scope="entry";hasEntry=true;}
-    result.push({id:crypto.randomUUID(),name,value,separator,scope,isEmptyArgument:arg===""});
+    if(hasBoundary)scope="script";
+    result.push({id:crypto.randomUUID(),name,value,separator,scope,isEmptyArgument:arg==="",hasValue});
   }return result;
 }
-export function rowsToArguments(rows:ArgumentRow[]):string[]{return ["runtime","entry","script"].flatMap(scope=>rows.filter(r=>r.scope===scope&&(r.name||r.value||r.isEmptyArgument)).flatMap(row=>{const separator=/^-X(?:mx|ms|ss)$/.test(row.name)||row.name==="-D"?"":row.name.startsWith("-D")?"=":row.separator;return !row.name?[row.value]:!row.value?[row.name]:separator===" "?[row.name,row.value]:[row.name+separator+row.value];}));}
+export function rowsToArguments(rows:ArgumentRow[]):string[]{
+  return rows.flatMap(row=>{
+    if(!row.name)return row.value||row.isEmptyArgument?[row.value]:[];
+    if(!row.hasValue&&!row.value)return [row.name];
+    return row.separator===" "?[row.name,row.value]:[row.name+row.separator+row.value];
+  });
+}

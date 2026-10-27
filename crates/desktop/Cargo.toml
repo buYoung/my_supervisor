@@ -12,6 +12,10 @@ path = "src/main.rs"
 architecture = "arm64-only"
 target = "aarch64-apple-darwin"
 
+[features]
+desktop-e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver", "dep:objc2"]
+desktop-e2e-os = ["desktop-e2e"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 serde_json = { workspace = true }
@@ -24,6 +28,8 @@ my-supervisor-app-daemon = { workspace = true }
 my-supervisor-infra-http = { workspace = true }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
+tauri-plugin-wdio = { version = "=1.5.1", optional = true }
+tauri-plugin-wdio-webdriver = { version = "=1.5.1", optional = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -33,3 +39,6 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "=0.6.4", optional = true }

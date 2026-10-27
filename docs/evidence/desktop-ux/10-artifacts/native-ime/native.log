@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T04:10:56.214Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/ime-observe.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/ime-observe.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: a6f7c561-24f3-44fb-8bad-0d4ed591fc33
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/ime-observe.spec.mjs
+[webkit 605.1.15 macos #0-0] Native Korean input observation
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-07 [O] native composition confirms text without adding a row or saving
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (1m 20.9s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:01:23  
+

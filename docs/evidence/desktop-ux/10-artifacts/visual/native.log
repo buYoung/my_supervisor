@@ -1,0 +1,25 @@
+
+Execution of 1 workers started at 2026-10-27T04:52:55.576Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/visual.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/visual.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 56198426-90d6-454c-be73-e1f3bfb97200
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/visual.spec.mjs
+[webkit 605.1.15 macos #0-0] Native layout and accessibility
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-01 [N-M] lifecycle layouts do not overlap for long and transitional rows
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-02 [N-R] selecting the last detail reveals it and returns focus on close
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-03 [N-R] DOM focus stays isolated and an inner lifecycle action keeps the selected target
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-04 [N-R] settled enabled text has minimum contrast in both themes
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-05 [N-M] error announcements preserve focus and dialogs focus their content
+[webkit 605.1.15 macos #0-0]    ✓ VISUAL-06 [N-R] theme shortcuts agree with settings and technical details remain available
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 6 passing (6s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:07  
+

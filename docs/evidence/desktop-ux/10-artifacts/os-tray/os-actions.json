@@ -1,0 +1,26 @@
+[
+  {
+    "phase": "picker-cancel",
+    "action": "CUA clicked native Cancel",
+    "observed": "No changed fields, original cwd retained",
+    "at": "2026-10-27T04:07:54.555606+00:00"
+  },
+  {
+    "phase": "picker-select",
+    "action": "CUA used native Go to Folder then Open",
+    "observed": "Exact selected path in editor; focus returned to folder button",
+    "at": "2026-10-27T04:08:11.825450+00:00"
+  },
+  {
+    "phase": "tray-close",
+    "action": "CUA clicked native close after failed picker draft was explicitly discarded",
+    "observed": "Native window closed; real Tauri visibility and running work checked by test",
+    "at": "2026-10-27T04:08:36.262553+00:00"
+  },
+  {
+    "phase": "tray-reopen",
+    "action": "User selected native tray Show Window",
+    "answer": "복귀 확인",
+    "at": "2026-10-27T04:09:08.328464+00:00"
+  }
+]

@@ -1,0 +1,1439 @@
+{
+  "light": {
+    "detail": {
+      "bottom": 1975,
+      "left": 141,
+      "right": 990,
+      "top": 675
+    },
+    "failures": [],
+    "height": 692,
+    "rows": [
+      {
+        "bounds": {
+          "bottom": -769,
+          "left": 142,
+          "right": 989,
+          "top": -844
+        },
+        "buttons": [
+          {
+            "bottom": -788,
+            "label": "visual-00-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -824
+          },
+          {
+            "bottom": -790,
+            "label": "visual-00-long-process-name 중지",
+            "left": 919,
+            "right": 976.765625,
+            "top": -822
+          },
+          {
+            "bottom": -790,
+            "label": "visual-00-long-process-name 재시작",
+            "left": 980.765625,
+            "right": 1048.90625,
+            "top": -822
+          },
+          {
+            "bottom": -790,
+            "label": "visual-00-long-process-name 더 보기",
+            "left": 1052.90625,
+            "right": 1084.90625,
+            "top": -822
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-00-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -694,
+          "left": 142,
+          "right": 989,
+          "top": -769
+        },
+        "buttons": [
+          {
+            "bottom": -713,
+            "label": "visual-01-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -749
+          },
+          {
+            "bottom": -715,
+            "label": "visual-01-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -747
+          },
+          {
+            "bottom": -715,
+            "label": "visual-01-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -747
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-01-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -619,
+          "left": 142,
+          "right": 989,
+          "top": -694
+        },
+        "buttons": [
+          {
+            "bottom": -638,
+            "label": "visual-02-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -674
+          },
+          {
+            "bottom": -640,
+            "label": "visual-02-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -672
+          },
+          {
+            "bottom": -640,
+            "label": "visual-02-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -672
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-02-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -544,
+          "left": 142,
+          "right": 989,
+          "top": -619
+        },
+        "buttons": [
+          {
+            "bottom": -563,
+            "label": "visual-03-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -599
+          },
+          {
+            "bottom": -565,
+            "label": "visual-03-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -597
+          },
+          {
+            "bottom": -565,
+            "label": "visual-03-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -597
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-03-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -469,
+          "left": 142,
+          "right": 989,
+          "top": -544
+        },
+        "buttons": [
+          {
+            "bottom": -488,
+            "label": "visual-04-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -524
+          },
+          {
+            "bottom": -490,
+            "label": "visual-04-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -522
+          },
+          {
+            "bottom": -490,
+            "label": "visual-04-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -522
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-04-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -394,
+          "left": 142,
+          "right": 989,
+          "top": -469
+        },
+        "buttons": [
+          {
+            "bottom": -413,
+            "label": "visual-05-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -449
+          },
+          {
+            "bottom": -415,
+            "label": "visual-05-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -447
+          },
+          {
+            "bottom": -415,
+            "label": "visual-05-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -447
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-05-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -319,
+          "left": 142,
+          "right": 989,
+          "top": -394
+        },
+        "buttons": [
+          {
+            "bottom": -338,
+            "label": "visual-06-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -374
+          },
+          {
+            "bottom": -340,
+            "label": "visual-06-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -372
+          },
+          {
+            "bottom": -340,
+            "label": "visual-06-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -372
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-06-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -244,
+          "left": 142,
+          "right": 989,
+          "top": -319
+        },
+        "buttons": [
+          {
+            "bottom": -263,
+            "label": "visual-07-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -299
+          },
+          {
+            "bottom": -265,
+            "label": "visual-07-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -297
+          },
+          {
+            "bottom": -265,
+            "label": "visual-07-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -297
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-07-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -169,
+          "left": 142,
+          "right": 989,
+          "top": -244
+        },
+        "buttons": [
+          {
+            "bottom": -188,
+            "label": "visual-08-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -224
+          },
+          {
+            "bottom": -190,
+            "label": "visual-08-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -222
+          },
+          {
+            "bottom": -190,
+            "label": "visual-08-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -222
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-08-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -94,
+          "left": 142,
+          "right": 989,
+          "top": -169
+        },
+        "buttons": [
+          {
+            "bottom": -113,
+            "label": "visual-09-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -149
+          },
+          {
+            "bottom": -115,
+            "label": "visual-09-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -147
+          },
+          {
+            "bottom": -115,
+            "label": "visual-09-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -147
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-09-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -19,
+          "left": 142,
+          "right": 989,
+          "top": -94
+        },
+        "buttons": [
+          {
+            "bottom": -38,
+            "label": "visual-10-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -74
+          },
+          {
+            "bottom": -40,
+            "label": "visual-10-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -72
+          },
+          {
+            "bottom": -40,
+            "label": "visual-10-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -72
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-10-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 56,
+          "left": 142,
+          "right": 989,
+          "top": -19
+        },
+        "buttons": [
+          {
+            "bottom": 37,
+            "label": "visual-11-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 1
+          },
+          {
+            "bottom": 35,
+            "label": "visual-11-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 3
+          },
+          {
+            "bottom": 35,
+            "label": "visual-11-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 3
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-11-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 131,
+          "left": 142,
+          "right": 989,
+          "top": 56
+        },
+        "buttons": [
+          {
+            "bottom": 112,
+            "label": "visual-12-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 76
+          },
+          {
+            "bottom": 110,
+            "label": "visual-12-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 78
+          },
+          {
+            "bottom": 110,
+            "label": "visual-12-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 78
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-12-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 206,
+          "left": 142,
+          "right": 989,
+          "top": 131
+        },
+        "buttons": [
+          {
+            "bottom": 187,
+            "label": "visual-13-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 151
+          },
+          {
+            "bottom": 185,
+            "label": "visual-13-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 153
+          },
+          {
+            "bottom": 185,
+            "label": "visual-13-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 153
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-13-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 281,
+          "left": 142,
+          "right": 989,
+          "top": 206
+        },
+        "buttons": [
+          {
+            "bottom": 262,
+            "label": "visual-14-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 226
+          },
+          {
+            "bottom": 260,
+            "label": "visual-14-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 228
+          },
+          {
+            "bottom": 260,
+            "label": "visual-14-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 228
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-14-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 356,
+          "left": 142,
+          "right": 989,
+          "top": 281
+        },
+        "buttons": [
+          {
+            "bottom": 337,
+            "label": "visual-15-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 301
+          },
+          {
+            "bottom": 335,
+            "label": "visual-15-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 303
+          },
+          {
+            "bottom": 335,
+            "label": "visual-15-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 303
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-15-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 431,
+          "left": 142,
+          "right": 989,
+          "top": 356
+        },
+        "buttons": [
+          {
+            "bottom": 412,
+            "label": "visual-16-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 376
+          },
+          {
+            "bottom": 410,
+            "label": "visual-16-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 378
+          },
+          {
+            "bottom": 410,
+            "label": "visual-16-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 378
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-16-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 506,
+          "left": 142,
+          "right": 989,
+          "top": 431
+        },
+        "buttons": [
+          {
+            "bottom": 487,
+            "label": "visual-17-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 451
+          },
+          {
+            "bottom": 485,
+            "label": "visual-17-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 453
+          },
+          {
+            "bottom": 485,
+            "label": "visual-17-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 453
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-17-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 581,
+          "left": 142,
+          "right": 989,
+          "top": 506
+        },
+        "buttons": [
+          {
+            "bottom": 562,
+            "label": "visual-18-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 526
+          },
+          {
+            "bottom": 560,
+            "label": "visual-18-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 528
+          },
+          {
+            "bottom": 560,
+            "label": "visual-18-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 528
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-18-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 656,
+          "left": 142,
+          "right": 989,
+          "top": 581
+        },
+        "buttons": [
+          {
+            "bottom": 637,
+            "label": "visual-19-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 601
+          },
+          {
+            "bottom": 635,
+            "label": "visual-19-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 603
+          },
+          {
+            "bottom": 635,
+            "label": "visual-19-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 603
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-19-long-process-name"
+      }
+    ],
+    "scrollWidth": 1156,
+    "textCount": 60,
+    "theme": "light",
+    "width": 1100
+  },
+  "dark": {
+    "detail": {
+      "bottom": 1975,
+      "left": 141,
+      "right": 990,
+      "top": 675
+    },
+    "failures": [
+      {
+        "background": [
+          31.9,
+          42.400000000000006,
+          34.9,
+          1
+        ],
+        "classes": "",
+        "color": "rgb(49, 91, 61)",
+        "font": "14px",
+        "ratio": 1.8946237407933357,
+        "tag": "SPAN",
+        "text": "프로세스"
+      },
+      {
+        "background": [
+          30,
+          37,
+          32,
+          1
+        ],
+        "classes": "",
+        "color": "rgb(105, 115, 101)",
+        "font": "14px",
+        "ratio": 3.163198572886238,
+        "tag": "SPAN",
+        "text": "작업"
+      },
+      {
+        "background": [
+          30,
+          37,
+          32,
+          1
+        ],
+        "classes": "",
+        "color": "rgb(105, 115, 101)",
+        "font": "14px",
+        "ratio": 3.163198572886238,
+        "tag": "SPAN",
+        "text": "로그"
+      },
+      {
+        "background": [
+          30,
+          37,
+          32,
+          1
+        ],
+        "classes": "",
+        "color": "rgb(105, 115, 101)",
+        "font": "14px",
+        "ratio": 3.163198572886238,
+        "tag": "SPAN",
+        "text": "데몬"
+      },
+      {
+        "background": [
+          30,
+          37,
+          32,
+          1
+        ],
+        "classes": "",
+        "color": "rgb(105, 115, 101)",
+        "font": "14px",
+        "ratio": 3.163198572886238,
+        "tag": "SPAN",
+        "text": "설정"
+      }
+    ],
+    "height": 692,
+    "rows": [
+      {
+        "bounds": {
+          "bottom": -769,
+          "left": 142,
+          "right": 989,
+          "top": -844
+        },
+        "buttons": [
+          {
+            "bottom": -788,
+            "label": "visual-00-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -824
+          },
+          {
+            "bottom": -790,
+            "label": "visual-00-long-process-name 중지",
+            "left": 919,
+            "right": 976.765625,
+            "top": -822
+          },
+          {
+            "bottom": -790,
+            "label": "visual-00-long-process-name 재시작",
+            "left": 980.765625,
+            "right": 1048.90625,
+            "top": -822
+          },
+          {
+            "bottom": -790,
+            "label": "visual-00-long-process-name 더 보기",
+            "left": 1052.90625,
+            "right": 1084.90625,
+            "top": -822
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-00-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -694,
+          "left": 142,
+          "right": 989,
+          "top": -769
+        },
+        "buttons": [
+          {
+            "bottom": -713,
+            "label": "visual-01-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -749
+          },
+          {
+            "bottom": -715,
+            "label": "visual-01-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -747
+          },
+          {
+            "bottom": -715,
+            "label": "visual-01-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -747
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-01-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -619,
+          "left": 142,
+          "right": 989,
+          "top": -694
+        },
+        "buttons": [
+          {
+            "bottom": -638,
+            "label": "visual-02-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -674
+          },
+          {
+            "bottom": -640,
+            "label": "visual-02-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -672
+          },
+          {
+            "bottom": -640,
+            "label": "visual-02-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -672
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-02-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -544,
+          "left": 142,
+          "right": 989,
+          "top": -619
+        },
+        "buttons": [
+          {
+            "bottom": -563,
+            "label": "visual-03-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -599
+          },
+          {
+            "bottom": -565,
+            "label": "visual-03-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -597
+          },
+          {
+            "bottom": -565,
+            "label": "visual-03-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -597
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-03-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -469,
+          "left": 142,
+          "right": 989,
+          "top": -544
+        },
+        "buttons": [
+          {
+            "bottom": -488,
+            "label": "visual-04-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -524
+          },
+          {
+            "bottom": -490,
+            "label": "visual-04-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -522
+          },
+          {
+            "bottom": -490,
+            "label": "visual-04-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -522
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-04-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -394,
+          "left": 142,
+          "right": 989,
+          "top": -469
+        },
+        "buttons": [
+          {
+            "bottom": -413,
+            "label": "visual-05-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -449
+          },
+          {
+            "bottom": -415,
+            "label": "visual-05-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -447
+          },
+          {
+            "bottom": -415,
+            "label": "visual-05-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -447
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-05-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -319,
+          "left": 142,
+          "right": 989,
+          "top": -394
+        },
+        "buttons": [
+          {
+            "bottom": -338,
+            "label": "visual-06-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -374
+          },
+          {
+            "bottom": -340,
+            "label": "visual-06-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -372
+          },
+          {
+            "bottom": -340,
+            "label": "visual-06-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -372
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-06-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -244,
+          "left": 142,
+          "right": 989,
+          "top": -319
+        },
+        "buttons": [
+          {
+            "bottom": -263,
+            "label": "visual-07-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -299
+          },
+          {
+            "bottom": -265,
+            "label": "visual-07-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -297
+          },
+          {
+            "bottom": -265,
+            "label": "visual-07-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -297
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-07-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -169,
+          "left": 142,
+          "right": 989,
+          "top": -244
+        },
+        "buttons": [
+          {
+            "bottom": -188,
+            "label": "visual-08-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -224
+          },
+          {
+            "bottom": -190,
+            "label": "visual-08-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -222
+          },
+          {
+            "bottom": -190,
+            "label": "visual-08-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -222
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-08-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -94,
+          "left": 142,
+          "right": 989,
+          "top": -169
+        },
+        "buttons": [
+          {
+            "bottom": -113,
+            "label": "visual-09-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -149
+          },
+          {
+            "bottom": -115,
+            "label": "visual-09-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -147
+          },
+          {
+            "bottom": -115,
+            "label": "visual-09-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -147
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-09-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": -19,
+          "left": 142,
+          "right": 989,
+          "top": -94
+        },
+        "buttons": [
+          {
+            "bottom": -38,
+            "label": "visual-10-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": -74
+          },
+          {
+            "bottom": -40,
+            "label": "visual-10-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": -72
+          },
+          {
+            "bottom": -40,
+            "label": "visual-10-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": -72
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-10-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 56,
+          "left": 142,
+          "right": 989,
+          "top": -19
+        },
+        "buttons": [
+          {
+            "bottom": 37,
+            "label": "visual-11-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 1
+          },
+          {
+            "bottom": 35,
+            "label": "visual-11-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 3
+          },
+          {
+            "bottom": 35,
+            "label": "visual-11-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 3
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-11-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 131,
+          "left": 142,
+          "right": 989,
+          "top": 56
+        },
+        "buttons": [
+          {
+            "bottom": 112,
+            "label": "visual-12-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 76
+          },
+          {
+            "bottom": 110,
+            "label": "visual-12-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 78
+          },
+          {
+            "bottom": 110,
+            "label": "visual-12-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 78
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-12-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 206,
+          "left": 142,
+          "right": 989,
+          "top": 131
+        },
+        "buttons": [
+          {
+            "bottom": 187,
+            "label": "visual-13-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 151
+          },
+          {
+            "bottom": 185,
+            "label": "visual-13-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 153
+          },
+          {
+            "bottom": 185,
+            "label": "visual-13-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 153
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-13-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 281,
+          "left": 142,
+          "right": 989,
+          "top": 206
+        },
+        "buttons": [
+          {
+            "bottom": 262,
+            "label": "visual-14-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 226
+          },
+          {
+            "bottom": 260,
+            "label": "visual-14-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 228
+          },
+          {
+            "bottom": 260,
+            "label": "visual-14-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 228
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-14-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 356,
+          "left": 142,
+          "right": 989,
+          "top": 281
+        },
+        "buttons": [
+          {
+            "bottom": 337,
+            "label": "visual-15-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 301
+          },
+          {
+            "bottom": 335,
+            "label": "visual-15-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 303
+          },
+          {
+            "bottom": 335,
+            "label": "visual-15-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 303
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-15-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 431,
+          "left": 142,
+          "right": 989,
+          "top": 356
+        },
+        "buttons": [
+          {
+            "bottom": 412,
+            "label": "visual-16-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 376
+          },
+          {
+            "bottom": 410,
+            "label": "visual-16-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 378
+          },
+          {
+            "bottom": 410,
+            "label": "visual-16-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 378
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-16-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 506,
+          "left": 142,
+          "right": 989,
+          "top": 431
+        },
+        "buttons": [
+          {
+            "bottom": 487,
+            "label": "visual-17-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 451
+          },
+          {
+            "bottom": 485,
+            "label": "visual-17-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 453
+          },
+          {
+            "bottom": 485,
+            "label": "visual-17-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 453
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-17-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 581,
+          "left": 142,
+          "right": 989,
+          "top": 506
+        },
+        "buttons": [
+          {
+            "bottom": 562,
+            "label": "visual-18-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 526
+          },
+          {
+            "bottom": 560,
+            "label": "visual-18-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 528
+          },
+          {
+            "bottom": 560,
+            "label": "visual-18-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 528
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-18-long-process-name"
+      },
+      {
+        "bounds": {
+          "bottom": 656,
+          "left": 142,
+          "right": 989,
+          "top": 581
+        },
+        "buttons": [
+          {
+            "bottom": 637,
+            "label": "visual-19-long-process-name 상세 보기",
+            "left": 899,
+            "right": 915,
+            "top": 601
+          },
+          {
+            "bottom": 635,
+            "label": "visual-19-long-process-name 시작",
+            "left": 919,
+            "right": 976.765625,
+            "top": 603
+          },
+          {
+            "bottom": 635,
+            "label": "visual-19-long-process-name 더 보기",
+            "left": 980.765625,
+            "right": 1012.765625,
+            "top": 603
+          }
+        ],
+        "grid": "561px 66px 82px 72px",
+        "name": "visual-19-long-process-name"
+      }
+    ],
+    "scrollWidth": 1156,
+    "textCount": 60,
+    "theme": "dark",
+    "width": 1100
+  }
+}

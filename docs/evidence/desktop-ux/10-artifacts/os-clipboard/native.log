@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T04:10:24.526Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/native-gates.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/native-gates.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: d58f94c2-a471-4ce2-a538-a81c24adf403
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/native-gates.spec.mjs
+[webkit 605.1.15 macos #0-0] Integrated native OS gates
+[webkit 605.1.15 macos #0-0]    ✓ GATE-08 [O] raw clipboard copy is pasted by the native keyboard unchanged
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (17.4s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:18  
+

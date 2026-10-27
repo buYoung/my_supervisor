@@ -1,0 +1,8 @@
+{
+  "code": "internal_error",
+  "details": {
+    "code": "invalid_request",
+    "message": "invalid request: workspace revision changed; reload before saving"
+  },
+  "message": "데몬 호출에 실패했습니다."
+}

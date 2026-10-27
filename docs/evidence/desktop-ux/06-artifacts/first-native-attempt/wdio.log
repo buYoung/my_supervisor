@@ -1,0 +1,1 @@
+2026-10-27T02:16:07.561Z ERROR webdriver: WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.runtime-events li*=state-crash · 실행 중 → 종료 감지' is not a valid selector. @ 2:48 when running "element" with method "POST"

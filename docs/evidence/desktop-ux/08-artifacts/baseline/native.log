@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T02:34:43.373Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/log-baseline.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/log-baseline.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: a3423108-35e2-4471-bc3c-a13333d24857
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/log-baseline.spec.mjs
+[webkit 605.1.15 macos #0-0] Log navigation baseline
+[webkit 605.1.15 macos #0-0]    ✓ records whole-log entry restrictions
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (541ms)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:01  
+

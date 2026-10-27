@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T01:59:44.081Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/save.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/save.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 9d2eadd2-10b2-46a4-bb41-1b0ea44e06d3
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/save.spec.mjs
+[webkit 605.1.15 macos #0-0] Reliable edit sessions
+[webkit 605.1.15 macos #0-0]    ✓ SAVE-04 [N-R] delayed success and failure lock edits and preserve the submitted draft
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (1.2s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:02  
+

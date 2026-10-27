@@ -1,0 +1,50 @@
+{
+  "tartVersion": "2.41.1",
+  "tartArchiveSha256": "e680a734febccfce7d4e910c1f7f13fc3b00f19a181c945e2d746de3214c32c2",
+  "image": "ghcr.io/cirruslabs/macos-sequoia-base:latest",
+  "vmName": "desktop-ux-os",
+  "vmRoot": "/private/tmp/msv-os-vm-zs6jbuxc",
+  "plannedRunArguments": [
+    "run",
+    "--no-graphics",
+    "--no-audio",
+    "--no-usb-accessories",
+    "--no-clipboard",
+    "--vnc-experimental",
+    "desktop-ux-os"
+  ],
+  "sharedDirectories": [
+    {
+      "path": "/private/tmp/msv-os-vm-zs6jbuxc/import",
+      "access": "read-only task payload"
+    },
+    {
+      "path": "/private/tmp/msv-os-vm-zs6jbuxc/exchange",
+      "access": "read-write task exchange only"
+    }
+  ],
+  "memoryMiB": 4096,
+  "cpus": 2,
+  "payloadSha256": "3ab573703825c093bb555fd4251435859d6e6b7548ba07f226a6a1c9bcfabc6a",
+  "payloadBytes": 162856340,
+  "status": "stopped-on-user-scope-reduction",
+  "network": "NAT attached; planned guest interface shutdown was not applied because bootstrap did not run",
+  "hostOnlyNetworkUnavailable": "Tart --net-host requires macOS 26; host is macOS 15.7.4",
+  "actualRunArguments": [
+    "/private/tmp/msv-os-vm-zs6jbuxc/tart.app/Contents/MacOS/tart",
+    "run",
+    "--no-graphics",
+    "--no-audio",
+    "--no-usb-accessories",
+    "--no-clipboard",
+    "--vnc-experimental",
+    "--dir=import:/private/tmp/msv-os-vm-zs6jbuxc/import:ro",
+    "--dir=exchange:/private/tmp/msv-os-vm-zs6jbuxc/exchange",
+    "desktop-ux-os"
+  ],
+  "networkIsolationApplied": false,
+  "guestVersionVerified": false,
+  "osProductScenariosExecuted": 0,
+  "vmStopped": true,
+  "temporaryEnvironmentRetained": "/private/tmp/msv-os-vm-zs6jbuxc"
+}

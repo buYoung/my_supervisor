@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-27T08:24:00.084965+00:00",
+  "osSourceSha256": "0f6aca86343c52d790c7c7f89ac8a82b49b4c8ab1a82168bd2074085e2c4dc3b",
+  "osBinarySha256": "9cb6c95571c16eab385948f23abf487cd9fbec09e6d1b92bdc7f2bf3b30d7cf3",
+  "method": "Reconstruct copied OS sources from the preserved payload plus final IME delta, recompute runner hash, and compare every source byte with the working tree",
+  "filesCompared": 306,
+  "differentFiles": [
+    "crates/desktop/ui/tests/e2e/ime-replay.spec.mjs"
+  ],
+  "differenceReason": "Replay-only script: readiness waits, current native trace, key-release/render-frame boundaries, first/second Enter assertions. No product change after the observed build.",
+  "productSourcesMatch": true,
+  "automaticInputManifest": "ime-frame-checks/input/manifest.json",
+  "automaticReplayManifest": "ime-frame-checks/ime-replay-final/manifest.json"
+}

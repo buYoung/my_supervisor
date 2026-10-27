@@ -1,0 +1,55 @@
+{
+  "layout": {
+    "columns": "448px 54px 70px 224px",
+    "focusedTag": "BODY",
+    "height": 692,
+    "restored": true,
+    "title": "my-supervisor",
+    "width": 1100
+  },
+  "commandRows": [
+    {
+      "name": "",
+      "value": "run"
+    },
+    {
+      "name": "",
+      "value": "start"
+    },
+    {
+      "name": "--",
+      "value": ""
+    },
+    {
+      "name": "--port",
+      "value": "3000"
+    }
+  ],
+  "afterPortEdit": "run start -- --port 4000",
+  "delimiterDraft": "native-dependency",
+  "correctedObservations": [
+    {
+      "id": "CMD-01",
+      "expected": "run start -- --port 4000",
+      "actual": "run start -- --port 4000"
+    },
+    {
+      "id": "INPUT-01",
+      "expected": "native-dependency selected, next row focused",
+      "actual": "native-dependency"
+    },
+    {
+      "id": "VISUAL-01",
+      "expected": "at least 200px actions column",
+      "actual": "448px 54px 70px 224px"
+    }
+  ],
+  "limitations": [
+    "WebDriver text input is not native Korean IME proof",
+    "Native file dialog, clipboard and close-to-tray require OS observations"
+  ],
+  "initial": {
+    "width": 1100,
+    "height": 720
+  }
+}

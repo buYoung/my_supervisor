@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "mode": "O",
+  "nativeSignal": "native-229-replacement",
+  "humanObservation": "완료: 첫 Enter는 조합 확정, 두 번째는 다음 행",
+  "observation": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-zMIQvV/output/native-ime.json",
+  "command": "/Users/buyonglee/.nvm/versions/node/v24.14.0/bin/node /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/verify-native-ime.mjs /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-zMIQvV/output/native-ime.json docs/evidence/desktop-ux/03-artifacts/native-ime-validation.json",
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor"
+}

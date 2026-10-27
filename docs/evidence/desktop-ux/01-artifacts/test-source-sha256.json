@@ -1,0 +1,5 @@
+{
+  "crates/desktop/ui/tests/e2e/harness.spec.mjs": "309d15a91dae97ae5075f99835e470c87225451641195a098dadad052ff86a1b",
+  "crates/desktop/ui/tests/e2e/run-native.mjs": "8d3acd6f602888d9157c87d057c412715577daae87aad5ace9552a1f174eec75",
+  "crates/desktop/ui/tests/e2e/guardian.mjs": "710d2038dfa344a32cc116c06c49723f18199a79d435bd2c2ee72c035f253284"
+}

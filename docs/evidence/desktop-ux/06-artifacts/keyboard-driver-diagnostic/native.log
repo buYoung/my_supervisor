@@ -1,0 +1,46 @@
+
+Execution of 1 workers started at 2026-10-27T02:18:11.443Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/state.spec.mjs
+[0-0] Error in "Truthful operator state.STATE-06 [N-R] keyboard lifecycle controls operate once without selecting another row"
+Error: {"active":"<button class=\"inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45 border-border bg-surface text-foreground hover:bg-background \" type=\"button\" aria-label=\"state-key-a 시작\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-play\"><polygon points=\"6 3 20 12 6 21 6 3\"></polygon></svg>시작</button>","events":[{"code":13,"key":"Enter","target":"state-key-a 시작","trusted":false,"type":"keydown"},{"code":13,"key":"Enter","target":"state-key-a 시작","trusted":false,"type":"keyup"}],"starts":1}
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:51:1493)
+[0-0] Error in "Truthful operator state.STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances"
+Error: Can't call isEnabled on element with selector "button[aria-label='state-key-a 중지']" because element wasn't found
+    at process.processTimers (node:internal/timers:538:9)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:54:474)
+[0-0] FAILED in undefined - file:///tests/e2e/state.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 09c52d68-ac7c-4cb3-883a-474403c29450
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/state.spec.mjs
+[webkit 605.1.15 macos #0-0] Truthful operator state
+[webkit 605.1.15 macos #0-0]    ✓ STATE-01 [N-R] loading, empty, search-empty, real storage failure and partial results differ
+[webkit 605.1.15 macos #0-0]    ✓ STATE-02 [N-R] header refresh and a newer mutation supersede a delayed old page
+[webkit 605.1.15 macos #0-0]    ✓ STATE-03 [N-R] switching targets clears old logs, runs and instances even if the new read fails
+[webkit 605.1.15 macos #0-0]    ✓ STATE-04 [N-R] real rolling readiness failure reports failed and unattempted capacity
+[webkit 605.1.15 macos #0-0]    ✓ STATE-05 [N-R] actual start, crash and stop events use payload transitions
+[webkit 605.1.15 macos #0-0]    ✖ STATE-06 [N-R] keyboard lifecycle controls operate once without selecting another row
+[webkit 605.1.15 macos #0-0]    ✖ STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances
+[webkit 605.1.15 macos #0-0]    ✓ STATE-08 [N-R] 250 jobs and 50 real instances remain bounded and inspectable
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 6 passing (37.4s)
+[webkit 605.1.15 macos #0-0] 2 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Truthful operator state STATE-06 [N-R] keyboard lifecycle controls operate once without selecting another row
+[webkit 605.1.15 macos #0-0] {"active":"<button class=\"inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45 border-border bg-surface text-foreground hover:bg-background \" type=\"button\" aria-label=\"state-key-a 시작\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-play\"><polygon points=\"6 3 20 12 6 21 6 3\"></polygon></svg>시작</button>","events":[{"code":13,"key":"Enter","target":"state-key-a 시작","trusted":false,"type":"keydown"},{"code":13,"key":"Enter","target":"state-key-a 시작","trusted":false,"type":"keyup"}],"starts":1}
+[webkit 605.1.15 macos #0-0] Error: {"active":"<button class=\"inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45 border-border bg-surface text-foreground hover:bg-background \" type=\"button\" aria-label=\"state-key-a 시작\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-play\"><polygon points=\"6 3 20 12 6 21 6 3\"></polygon></svg>시작</button>","events":[{"code":13,"key":"Enter","target":"state-key-a 시작","trusted":false,"type":"keydown"},{"code":13,"key":"Enter","target":"state-key-a 시작","trusted":false,"type":"keyup"}],"starts":1}
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:51:1493)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2) Truthful operator state STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances
+[webkit 605.1.15 macos #0-0] Can't call isEnabled on element with selector "button[aria-label='state-key-a 중지']" because element wasn't found
+[webkit 605.1.15 macos #0-0] Error: Can't call isEnabled on element with selector "button[aria-label='state-key-a 중지']" because element wasn't found
+[webkit 605.1.15 macos #0-0]     at process.processTimers (node:internal/timers:538:9)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/state.spec.mjs:54:474)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:38  
+

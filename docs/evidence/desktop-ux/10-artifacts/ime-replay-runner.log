@@ -1,0 +1,24 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:native /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/e2e/run-native.mjs --no-build --spec\=ime-replay.spec.mjs
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-i01Bs9/output
+
+Execution of 1 workers started at 2026-10-27T04:50:49.815Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/ime-replay.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/ime-replay.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 55927c66-f56a-4852-bfd0-c7db18012277
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] 1 passing (2.2s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:03  
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-i01Bs9/output; cleanup: PASS

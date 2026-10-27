@@ -1,0 +1,4 @@
+{
+  "phase": "clipboard-paste",
+  "expected": "{\"message\":\"native 한글, clipboard\"}"
+}

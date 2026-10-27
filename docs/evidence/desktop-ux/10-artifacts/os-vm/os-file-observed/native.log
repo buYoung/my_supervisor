@@ -1,0 +1,28 @@
+
+Execution of 1 workers started at 2026-10-27T07:32:07.649Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/native-gates.spec.mjs
+[0-0] Error in "Integrated native OS gates.GATE-10 [O] native executable selection and cancellation preserve argv without execution"
+Error: waitUntil condition timed out after 10000ms
+    at async Context.<anonymous> (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:103:5)
+[0-0] FAILED in undefined - file:///tests/e2e/native-gates.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: f2eae16a-862e-4815-9988-44e67dcdc258
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/native-gates.spec.mjs
+[webkit 605.1.15 macos #0-0] Integrated native OS gates
+[webkit 605.1.15 macos #0-0]    ✖ GATE-10 [O] native executable selection and cancellation preserve argv without execution
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 failing (1m 8.9s)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Integrated native OS gates GATE-10 [O] native executable selection and cancellation preserve argv without execution
+[webkit 605.1.15 macos #0-0] waitUntil condition timed out after 10000ms
+[webkit 605.1.15 macos #0-0] Error: waitUntil condition timed out after 10000ms
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:103:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:01:09  
+

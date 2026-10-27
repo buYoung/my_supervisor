@@ -1,15 +1,19 @@
+import {RawLogInspector} from "../logs/RawLogInspector";
+import {logEntryUrl} from "../logs/log-navigation";
+import {useSessionValue} from "../../shared/editor-session";
 import {useDisplayTime} from "../../shared/display-time";
 import {MoreHorizontal, Play, Plus, RotateCcw, Square, Settings2, FileText, Search, X, Trash2} from "lucide-react";
 import {useCallback, useEffect, useRef, useState} from "react";
 import {Badge, Button, EmptyState, IconButton} from "../../components/ui/primitives";
-import {useOperationsClient, usePolledResource, toErrorMessage} from "../../services/use-operations";
+import {useOperationsClient, useProcessResource, useResource, refreshResources, toErrorMessage} from "../../services/use-operations";
 import type {OperationsClient} from "../../services/operations-client";
 import type {ProcessConfigDto} from "../../services/wire-types";
-import type {ProcessStatus, ProcessInstanceStatus} from "../../shared/types";
+import type {ProcessStatus, ProcessOperation} from "../../shared/types";
 import {ProcessEditor, type ProcessEditorSection} from "./ProcessEditor";
 import {LogRow} from "../logs/LogRows";
 import type {LogEntry} from "../../services/log-mapping";
-import {Modal} from "../../components/ui/Modal";
+import {ResourceState} from "../../components/ui/ResourceState";
+import {OperationResult} from "./OperationResult";
 import {PathField} from "../../components/ui/PathField";
 import "./process-controls.css";
 
@@ -34,7 +38,7 @@ export function ProcessLifecycleActions({client, process, isBusy, onAction}: {cl
 
 export function getProcessRemovalAction(client: Pick<OperationsClient, "removeProcess">, process: Pick<ProcessStatus, "name" | "state">) {
   const hasActiveProcess = process.state === "running" || process.state === "starting" || process.state === "stopping";
-  if (hasActiveProcess && !confirmForceProcessRemoval(process.name)) return null;
+  if (hasActiveProcess ? !confirmForceProcessRemoval(process.name) : !window.confirm(`중지된 ${process.name}의 등록과 저장된 설정을 삭제할까요?`)) return null;
   return () => client.removeProcess(process.name, hasActiveProcess);
 }
 
@@ -90,8 +94,9 @@ function PolicySummary({process, config, onEdit}: {process: ProcessStatus; confi
       <dl className="policy-summary-list">
         <dt>응답 확인</dt><dd>{config.liveness ? guardStates[process.guard?.liveness ?? "unknown"] : "사용 안 함"}</dd>
         <dt>준비 상태</dt><dd>{config.readiness ? guardStates[process.guard?.readiness ?? "unknown"] : "사용 안 함"}</dd>
-        {process.guard?.lastRestartCause && <><dt>최근 감시 재시작 원인</dt><dd>{restartCauses[process.guard.lastRestartCause]}</dd></>}
+        {process.guard?.lastRestartCause && <><dt>최근 감시 재시작 원인</dt><dd>{restartCauses[process.guard.lastRestartCause]??process.guard.lastRestartCause}</dd></>}
       </dl>
+      {process.guard?.lastError&&<p role="alert" className="text-danger">최근 상태 검사 오류: {process.guard.lastError}</p>}
       {process.guard?.isHistorical && <p className="section-description">이전 실행의 기록입니다. 현재 상태를 다시 확인하는 중입니다.</p>}
       <p className="section-description">응답 확인 실패는 재시작으로 이어집니다. 준비 상태 실패는 재시작하지 않습니다.</p>
     </section>
@@ -105,75 +110,80 @@ function PolicySummary({process, config, onEdit}: {process: ProcessStatus; confi
 export function ProcessesView() {
   const {dateTime} = useDisplayTime();
   const client = useOperationsClient();
-  const list = usePolledResource(useCallback(() => client.listProcesses(), [client]), 2000);
-  const [selected, setSelected] = useState<string | null>(() => new URLSearchParams(location.search).get("selected"));
-  const [tab, setTab] = useState("overview");
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [config, setConfig] = useState<ProcessConfigDto | null>(null);
+  const list = useProcessResource();
+  const [selected, setSelected] = useSessionValue<string|null>("process.selected",null,new URLSearchParams(location.search).get("selected")??undefined);
+  const [tab, setTab] = useSessionValue("process.tab","overview");
+  const [query, setQuery] = useSessionValue("process.query","");
+  const [filter, setFilter] = useSessionValue("process.filter","all");
+
+  const detailElement=useRef<HTMLElement>(null),returnFocus=useRef<HTMLElement|null>(null),shouldFocusDetail=useRef(false);
+  function showDetail(name:string,focus=false,origin?:HTMLElement){returnFocus.current=origin??document.activeElement as HTMLElement;shouldFocusDetail.current=focus;setSelected(name);setTab("overview");if(focus&&selected===name)detailElement.current?.querySelector<HTMLElement>("h2")?.focus({preventScroll:true});}
+  function closeDetail(){setSelected(null);queueMicrotask(()=>returnFocus.current?.focus());}
   const [editor, setEditor] = useState<{initial: ProcessConfigDto; section: ProcessEditorSection; isNew: boolean} | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [isBusy, setIsBusy] = useState(false);
-  const [instances, setInstances] = useState<ProcessInstanceStatus[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [busy,setBusy]=useState<Record<string,boolean>>({});const activeActions=useRef(new Set<string>());
+  const [actionMessages,setActionMessages]=useState<Record<string,{error:boolean;text:string}>>({});
+  const [operations,setOperations]=useState<Record<string,ProcessOperation>>({});const rollingIds=useRef<Record<string,string>>({});
   const [raw, setRaw] = useState<LogEntry | null>(null);
   const processes = list.data ?? [];
-  const process = processes.find(item => item.name === selected);
-
-  useEffect(() => {
-    setConfig(null); setInstances([]);
-    if (!selected) return;
-    let isCancelled = false;
-    Promise.all([client.getProcessConfig(selected), client.processInstances(selected)]).then(([value, result]) => {
-      if (!isCancelled) {setConfig(value); setInstances(result.instances);}
-    }).catch(error => {if (!isCancelled) setError(toErrorMessage(error));});
-    return () => {isCancelled = true;};
-  }, [selected, client, editor, process?.pid, process?.state]);
-
-  useEffect(() => {
-    if (!selected || tab !== "logs") return;
-    let isCancelled = false;
-    const read = () => client.queryLogs({kind: "process", source: selected, level: "all", grouping: "none", limit: 50}).then(result => {if (!isCancelled) setLogs(result.records.map(row => row.entry));}).catch(error => {if (!isCancelled) setError(toErrorMessage(error));});
-    void read(); const interval = window.setInterval(() => void read(), 3000);
-    return () => {isCancelled = true; clearInterval(interval);};
-  }, [selected, tab, client]);
-
-  async function act(action: () => Promise<unknown>, successNotice: string) {
-    setIsBusy(true); setError(""); setNotice("");
-    try {await action(); await list.refresh(); setNotice(successNotice);}
-    catch (error) {setError(toErrorMessage(error));}
-    finally {setIsBusy(false);}
+  const resourceKey="process:"+JSON.stringify(selected);
+  const selectedStatus=useResource(resourceKey+":status",()=>selected?client.getProcess(selected):Promise.resolve(null),selected?2000:0);
+  const configuration=useResource(resourceKey+":config",()=>selected?client.getProcessConfig(selected):Promise.resolve(null),selected?5000:0);
+  const instanceResource=useResource(resourceKey+":instances",()=>selected?client.processInstances(selected):Promise.resolve(null),selected?2000:0);
+  const logResource=useResource(resourceKey+":logs:"+tab,()=>selected&&tab==="logs"?client.queryLogs({kind:"process",source:selected,level:"all",grouping:"none",limit:50}):Promise.resolve(null),selected&&tab==="logs"?3000:0);
+  const process=selectedStatus.data??processes.find(item=>item.name===selected);
+  useEffect(()=>{if(!selected)return;detailElement.current?.scrollIntoView({block:"nearest"});if(shouldFocusDetail.current){detailElement.current?.querySelector<HTMLElement>('h2')?.focus({preventScroll:true});shouldFocusDetail.current=false;}},[selected,Boolean(process)]);
+  const config=configuration.data;
+  const instances=instanceResource.data?.instances??[];
+  const logs=logResource.data?.records.map(row=>row.entry)??[];
+  async function act(name:string,action:()=>Promise<unknown>,successNotice:string){
+    if(activeActions.current.has(name))return;activeActions.current.add(name);setBusy(value=>({...value,[name]:true}));setError("");
+    setActionMessages(current=>{const next={...current};delete next[name];return next;});
+    try{const result=await action();const operation=result&&typeof result==="object"&&"outcomes" in result?result as ProcessOperation:undefined;
+      if(operation)setOperations(current=>({...current,[name]:operation}));
+      const hasFailure=operation&&(operation.phase==="failed_closed"||operation.outcomes.some(item=>item.state!=="completed"));
+      setActionMessages(current=>({...current,[name]:{error:Boolean(hasFailure),text:hasFailure?name+" 작업에 실패하거나 시도하지 않은 항목이 있습니다.":successNotice}}));
+      await refreshResources(client,key=>key==="processes"||key==="daemon"||key.startsWith("process:"+JSON.stringify(name)+":"));
+    }catch(cause){setActionMessages(current=>({...current,[name]:{error:true,text:name+": "+toErrorMessage(cause)}}));}
+    finally{activeActions.current.delete(name);setBusy(value=>({...value,[name]:false}));}
   }
+  const actionFor=(name:string):RunAction=>(action,message)=>void act(name,action,message);
+  const roll=(name:string)=>{const operationId=rollingIds.current[name]??crypto.randomUUID();rollingIds.current[name]=operationId;void act(name,async()=>{const result=await client.rollingRestartProcess(name,operationId);delete rollingIds.current[name];return result;},name+" 순차 재시작을 완료했습니다.");};
+  const selection=useRef(selected);selection.current=selected;const opening=useRef(0);
+  useEffect(()=>()=>{opening.current++;},[]);
   async function openEditor(name: string, section: ProcessEditorSection = "execution") {
+    const request=++opening.current;setSelected(name);
     try {
       const initial = selected === name && config ? config : await client.getProcessConfig(name);
-      setSelected(name); setEditor({initial, section, isNew: false}); setError("");
+      if(request===opening.current&&selection.current===name){setEditor({initial, section, isNew: false});setError("");}
     } catch (error) {setError(toErrorMessage(error));}
   }
-  const runAction: RunAction = (action, successNotice) => void act(action, successNotice);
-  const logsUrl = "?page=logs&kind=process&source=" + encodeURIComponent(process?.name ?? "");
+  const logsUrl = logEntryUrl({kind:"process",source:process?.name??""});
 
   return <div className="process-workspace">
-    <div className="workspace-heading"><div><h1>프로세스</h1><p>{processes.filter(item => item.state === "running").length}개 실행 중 · {processes.length}개 등록됨</p></div><Button variant="primary" onClick={() => setEditor({initial: {name: "", command: "node", args: [], cwd: "", env: {}, autostart: false, instances: 1}, section: "execution", isNew: true})}><Plus size={15}/>프로세스 추가</Button></div>
-    {(error || list.errorMessage) && <p role="alert" className="workspace-alert">{error || list.errorMessage}</p>}
+    <div className="workspace-heading"><div><h1>프로세스</h1><p>{list.data===null?"목록 확인 중":`${processes.filter(item => item.state === "running").length}개 실행 중 · ${processes.length}${list.hasMore?"+":""}개 확인${list.isStale?" · 마지막 확인 값":""}`}</p></div><Button variant="primary" onClick={() => setEditor({initial: {name: "", command: "node", args: [], cwd: "", env: {}, autostart: false, instances: 1}, section: "execution", isNew: true})}><Plus size={15}/>프로세스 추가</Button></div>
+    {error&&<p role="alert" className="workspace-alert">{error}</p>}<ResourceState resource={list} label="프로세스 목록"/>{Object.entries(actionMessages).map(([name,message])=><p key={name} role={message.error?"alert":"status"} className={message.error?"workspace-alert":"workspace-notice"}>{message.text}{processes.some(item=>item.name===name)&&<Button onClick={event=>showDetail(name,true,event.currentTarget)}>대상 보기</Button>}</p>)}
     {notice && <p role="status" className="workspace-notice">{notice}</p>}
     <div className={"process-split " + (process ? "has-detail" : "")}>
       <section className="workspace-panel">
         <div className="workspace-toolbar"><label className="search-box"><Search size={15}/><input aria-label="프로세스 검색" placeholder="프로세스 검색" value={query} onChange={event => setQuery(event.target.value)}/></label><select aria-label="프로세스 상태" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">모든 상태</option><option value="running">실행 중</option><option value="stopped">중지됨</option><option value="crashed">종료 감지</option></select></div>
         <div className="process-list-head"><span>이름 / 상태</span><span>CPU</span><span>메모리</span><span className="process-action-heading">실행 제어</span></div>
-        {processes.filter(item => item.name.includes(query) && (filter === "all" || item.state === filter)).map(item => <div className={"process-list-row " + (selected === item.name ? "is-selected" : "")} role="button" tabIndex={0} key={item.name} onClick={() => {setSelected(item.name); setTab("overview");}} onKeyDown={event => {if (event.key === "Enter" || event.key === " ") {event.preventDefault(); setSelected(item.name); setTab("overview");}}}>
+        {processes.filter(item => item.name.includes(query) && (filter === "all" || item.state === filter)).map(item => <div className={"process-list-row " + (selected === item.name ? "is-selected" : "")} role="group" aria-label={item.name+" 프로세스 선택"} tabIndex={0} data-process-row={item.name} key={item.name} onClick={event => showDetail(item.name,false,event.currentTarget)} onKeyDown={event => {if(event.target!==event.currentTarget)return;if (event.key === "Enter" || event.key === " ") {event.preventDefault(); showDetail(item.name,false,event.currentTarget);}}}>
           <div className="process-row-name"><strong title={item.name}>{item.name}</strong><small><i className={"state-dot " + item.state}/>{states[item.state]} · {item.managementMode.type === "direct" ? "직접 관리" : "시스템 서비스"}</small></div>
           <span>{item.cpuPercent.toFixed(1)}%</span><span>{(item.memoryBytes / 1048576).toFixed(1)} MiB</span>
-          <Actions process={item} isBusy={isBusy} onAction={runAction} onEdit={() => void openEditor(item.name)}/>
+          <div className="flex gap-1" onClick={event=>event.stopPropagation()} onKeyDown={event=>event.stopPropagation()}><IconButton label={item.name+" 상세 보기"} aria-pressed={selected===item.name} onClick={event=>showDetail(item.name,true,event.currentTarget)}><FileText size={14}/></IconButton><Actions process={item} isBusy={Boolean(busy[item.name])} onAction={actionFor(item.name)} onEdit={() => void openEditor(item.name)}/></div>
         </div>)}
-        {!processes.length && <div className="p-5"><EmptyState title="등록된 프로세스가 없습니다" description="실행할 프로그램을 추가해 관리하세요."/></div>}
+        {list.data!==null&&!list.errorMessage&&!list.partial&&!processes.length && <div className="p-5"><EmptyState title="등록된 프로세스가 없습니다" description="실행할 프로그램을 추가해 관리하세요."/></div>}
+        {processes.length>0&&!processes.some(item=>item.name.includes(query)&&(filter==="all"||item.state===filter))&&<div className="p-5"><p>조건에 맞는 프로세스가 없습니다.</p><Button onClick={()=>{setQuery("");setFilter("all");}}>검색·필터 초기화</Button></div>}
+        {list.hasMore&&<div className="p-5"><p>현재 불러온 {processes.length}개에서 검색합니다.</p><Button disabled={list.isRefreshing} onClick={()=>void list.loadMore()}>프로세스 더 불러오기</Button></div>}
       </section>
-      {process && <aside className="workspace-panel process-detail">
-        <header><div><h2>{process.name}</h2><small>{states[process.state]} · PID {process.pid ?? "—"}</small></div><IconButton label="상세 닫기" onClick={() => setSelected(null)}><X size={16}/></IconButton></header>
-        <div className="process-detail-actions"><div><ProcessLifecycleActions client={client} process={process} isBusy={isBusy} onAction={runAction}/></div><Button className="process-settings-button" disabled={isBusy || !config} onClick={() => void openEditor(process.name)}><Settings2 size={14}/>설정 편집</Button></div>
+      {selected&&!process&&<aside className="workspace-panel"><ResourceState resource={selectedStatus} label="선택한 프로세스"/></aside>}
+      {process && <aside ref={detailElement} className="workspace-panel process-detail">
+        <header><div><h2 tabIndex={-1}>{process.name}</h2><small>{states[process.state]} · PID {process.pid ?? "—"}</small></div><IconButton label="상세 닫기" onClick={closeDetail}><X size={16}/></IconButton></header>
+        <div className="process-detail-actions"><div><ProcessLifecycleActions client={client} process={process} isBusy={Boolean(busy[process.name])||Boolean(selectedStatus.errorMessage)} onAction={actionFor(process.name)}/></div><Button className="process-settings-button" disabled={Boolean(busy[process.name]) || !config} onClick={() => void openEditor(process.name)}><Settings2 size={14}/>설정 편집</Button></div>
         <div className="editor-tabs" aria-label="프로세스 상세 보기"><button type="button" aria-pressed={tab === "overview"} onClick={() => setTab("overview")}>개요</button><button type="button" aria-pressed={tab === "logs"} onClick={() => setTab("logs")}>로그</button></div>
-        {tab === "overview" ? <div className="process-detail-body">
+        {tab === "overview" ? <div className="process-detail-body"><ResourceState resource={selectedStatus} label="프로세스 상태"/><ResourceState resource={configuration} label="프로세스 설정"/>{operations[process.name]&&<OperationResult operation={operations[process.name]} instances={instances}/>}
           <div className="metric-grid"><div><span>CPU</span><strong>{process.cpuPercent.toFixed(1)}%</strong></div><div><span>메모리</span><strong>{(process.memoryBytes / 1048576).toFixed(1)} MiB</strong></div><div><span>가동 시간</span><strong>{process.uptime}</strong></div><div><span>재시작</span><strong>{process.restartCount}회</strong></div></div>
           {config ? <>
             <dl className="detail-values"><dt>실행 명령</dt><dd><code>{config.command} {config.args?.join(" ")}</code></dd><dt>시작 시간</dt><dd>{process.startedAt ? dateTime(process.startedAt) : "—"}</dd><dt>인스턴스</dt><dd>{config.instances ?? 1}개</dd></dl>
@@ -182,15 +192,15 @@ export function ProcessesView() {
             <div className="process-environment-keys">{Object.keys(config.env ?? {}).map(key => <code key={key}>{key} <span className="text-muted">••••</span></code>)}</div>
             <PolicySummary process={process} config={config} onEdit={section => void openEditor(process.name, section)}/>
           </> : <p className="editor-note">설정을 불러오는 중입니다…</p>}
-          <section className="process-summary-section"><div className="process-section-heading"><h3>인스턴스 상태</h3></div>{instances.map(slot => <div className="instance-row" key={slot.instanceId}><span>#{slot.ordinal} · PID {slot.pid ?? "—"}</span><Badge tone={slot.state === "running" ? "success" : "neutral"}>{states[slot.state]}</Badge></div>)}</section>
-          <div className="process-detail-links">{config?.rolling && process.managementMode.type === "direct" && <Button disabled={isBusy} onClick={() => runAction(() => client.rollingRestartProcess(process.name), process.name + " 순차 재시작을 요청했습니다.")}><RotateCcw size={14}/>순차 재시작</Button>}<a href={logsUrl}><FileText size={14}/>전체 로그</a></div>
-        </div> : <div className="process-log-preview">{logs.map(entry => <LogRow key={entry.id} entry={entry} onInspect={setRaw}/>)}<a href={logsUrl}>로그 탐색기에서 열기</a></div>}
+          <section className="process-summary-section"><div className="process-section-heading"><h3>인스턴스 상태</h3></div><ResourceState resource={instanceResource} label="인스턴스"/>{instances.map(slot => <div className="instance-row" key={slot.instanceId}><span>#{slot.ordinal} · PID {slot.pid ?? "—"}</span><Badge tone={slot.state === "running" ? "success" : "neutral"}>{states[slot.state]??`알 수 없는 상태 (${slot.state})`}</Badge></div>)}</section>
+          <div className="process-detail-links">{config?.rolling && process.managementMode.type === "direct" && <Button disabled={Boolean(busy[process.name])} onClick={()=>roll(process.name)}><RotateCcw size={14}/>{rollingIds.current[process.name]?"순차 재시작 응답 확인":"순차 재시작"}</Button>}<a href={logsUrl}><FileText size={14}/>전체 로그</a></div>
+        </div> : <div className="process-log-preview"><ResourceState resource={logResource} label="프로세스 로그"/>{logResource.data!==null&&!logResource.errorMessage&&!logs.length&&<p>기록된 로그가 없습니다.</p>}{logs.map(entry => <LogRow key={entry.id} entry={entry} onInspect={setRaw}/>)}<a href={logsUrl}>로그 탐색기에서 열기</a></div>}
       </aside>}
     </div>
-    {editor && <ProcessEditor initial={editor.initial} initialSection={editor.section} isNew={editor.isNew} onClose={() => setEditor(null)} onSave={async next => {
-      const result = editor.isNew ? await client.addProcess(next) : await client.updateProcessConfig(editor.initial.name, next, editor.initial);
-      setSelected(result.name); setConfig(next); await list.refresh(); setNotice("프로세스 설정을 적용했습니다.");
+    {editor && <ProcessEditor initial={editor.initial} initialSection={editor.section} isNew={editor.isNew} onClose={() => setEditor(null)} onSave={async (next,expected) => {
+      const result = editor.isNew ? await client.addProcess(next) : await client.updateProcessConfig(editor.initial.name, next, expected??editor.initial);
+      setSelected(result.name); await refreshResources(client,key=>key==="processes"||key==="daemon"||key.startsWith("process:"+JSON.stringify(result.name)+":")); setNotice("프로세스 설정을 적용했습니다.");
     }}/>}
-    {raw && <Modal title="로그 원본" onClose={() => setRaw(null)}><pre className="editor-body">{raw.raw.line}</pre></Modal>}
+    {raw && <RawLogInspector entry={raw} onClose={()=>setRaw(null)}/>}
   </div>;
 }

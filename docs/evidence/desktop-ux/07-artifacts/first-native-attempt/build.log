@@ -1,0 +1,56 @@
+        Warn --no-sign flag detected: Signing will be skipped.
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `pnpm build:e2e`
+
+> my-supervisor-desktop-ui@0.1.0 build:e2e /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> tsc -b && vite build --mode desktop-e2e --outDir dist-e2e
+
+vite v6.4.3 building for desktop-e2e...
+transforming...
+✓ 1802 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-e2e/index.html                           0.51 kB │ gzip:   0.32 kB
+dist-e2e/assets/JobsView-BnuhLJ6X.css        15.87 kB │ gzip:   2.67 kB
+dist-e2e/assets/index-4U6Jfr4A.css           55.14 kB │ gzip:  11.01 kB
+dist-e2e/assets/index-C9sv6Wbx.js             0.21 kB │ gzip:   0.19 kB
+dist-e2e/assets/tauri-core-RniafzC5.js        0.60 kB │ gzip:   0.39 kB
+dist-e2e/assets/event-CZ4R04xs.js             1.41 kB │ gzip:   0.67 kB
+dist-e2e/assets/event-C_pQPlB4.js             1.52 kB │ gzip:   0.69 kB
+dist-e2e/assets/core-BwOj0H_U.js              2.56 kB │ gzip:   1.06 kB
+dist-e2e/assets/native-harness-BTuMDrU-.js   35.83 kB │ gzip:   9.40 kB
+dist-e2e/assets/JobsView-B9hHLs1V.js        247.61 kB │ gzip:  80.62 kB
+dist-e2e/assets/index-B4wtzLeF.js           349.07 kB │ gzip: 106.01 kB
+✓ built in 2.18s
+warning: failed to auto-clean cache data
+
+failed to clean entries from the global cache
+
+Caused by:
+  failed to remove file `/Users/buyonglee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-webpki-0.103.10/Cargo.toml`
+
+Caused by:
+  Permission denied (os error 13)
+   Compiling ring v0.17.14
+   Compiling libsqlite3-sys v0.30.1
+   Compiling my-supervisor-app-desktop v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop)
+warning: my-supervisor-app-desktop@0.1.0: STATIC_VCRUNTIME is deprecated; use build.windows.staticVCRuntime in tauri.conf.json or tauri_build::WindowsAttributes::static_vc_runtime instead.
+   Compiling rustls v0.23.42
+   Compiling sqlx-sqlite v0.8.6
+   Compiling rustls-webpki v0.103.13
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.9
+   Compiling sqlx v0.8.6
+   Compiling reqwest v0.12.28
+   Compiling my-supervisor-infra-sqlite v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/infra/sqlite)
+   Compiling my-supervisor-platform-macos v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/platform/macos)
+   Compiling my-supervisor-app-daemon v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/daemon)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.85s
+       Built application at: /Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/my-supervisor
+    Bundling my-supervisor.app (/Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/bundle/macos/my-supervisor.app)
+        Warn Skipping signing due to --no-sign flag.
+    Finished 1 bundle at:
+        /Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/bundle/macos/my-supervisor.app
+

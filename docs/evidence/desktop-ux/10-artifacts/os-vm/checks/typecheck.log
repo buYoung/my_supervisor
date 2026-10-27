@@ -1,0 +1,4 @@
+
+> my-supervisor-desktop-ui@0.1.0 typecheck /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> tsc -b --pretty false
+

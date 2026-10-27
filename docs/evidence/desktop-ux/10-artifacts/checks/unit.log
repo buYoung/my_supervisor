@@ -1,0 +1,19 @@
+command model: 28 exact round trips, ordered edit, scope edit and invalid syntax passed
+✔ tests/command-model.test.mjs (515.204166ms)
+draft history: immutable IDs/raw drafts, redo branch and 100-frame bound passed
+✔ tests/draft-history.test.mjs (487.34ms)
+log navigation: scoped links, dates, paging and return position passed
+✔ tests/log-navigation.test.mjs (500.898542ms)
+draft reconciliation: independent fields, explicit conflicts, identity/order and deletion passed
+✔ tests/reconcile-draft.test.mjs (504.431417ms)
+resource store: single-flight, latest response, stale data and opaque page boundaries passed
+event payload: crash severity and explicit unknown/unsupported states passed
+✔ tests/resource-store.test.mjs (525.328292ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 536.402791

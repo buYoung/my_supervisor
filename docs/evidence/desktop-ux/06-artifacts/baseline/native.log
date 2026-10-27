@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T02:10:04.533Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/state-baseline.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/state-baseline.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 00e8e1fe-9714-41ed-bb5d-f3388e07dfd4
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/state-baseline.spec.mjs
+[webkit 605.1.15 macos #0-0] Operator state baseline
+[webkit 605.1.15 macos #0-0]    ✓ records refresh scope, shared busy state, stale logs and flat invoke error
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (968ms)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:01  
+

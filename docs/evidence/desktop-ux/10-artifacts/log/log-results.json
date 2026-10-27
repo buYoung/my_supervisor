@@ -1,0 +1,69 @@
+[
+  {
+    "id": "LOG-01",
+    "url": "tauri://localhost?page=logs&level=all&range=all&kind=job&source=log-job&run=7a86b3c8-b705-4e84-b92e-95a5945fca6f&step=native-command&grouping=repeat&order=desc&offset=0&position=0"
+  },
+  {
+    "id": "LOG-02",
+    "dates": [
+      "2026-10-25",
+      "2026-10-26"
+    ],
+    "visible": "2026-10-26 08:38:57.669"
+  },
+  {
+    "id": "LOG-03",
+    "stableExpanded": true,
+    "stableOlderPage": true
+  },
+  {
+    "id": "LOG-04",
+    "parent": "tauri://localhost?page=logs&kind=process&source=log-alpha&level=all&range=all&grouping=none&order=desc&offset=50&position=277&snapshot=2026-10-27T04%3A52%3A42.804783Z&focus=process%3Alog-alpha%3A%3A9946%3A1793003397669000000&inspect=process%3Alog-alpha%3A%3A9946%3A1793003397669000000",
+    "returned": "tauri://localhost?page=logs&kind=process&source=log-alpha&level=all&range=all&grouping=none&order=desc&offset=50&position=277&snapshot=2026-10-27T04%3A52%3A42.804783Z&focus=process%3Alog-alpha%3A%3A9946%3A1793003397669000000"
+  },
+  {
+    "id": "LOG-05",
+    "exported": {
+      "count": 6886,
+      "first": {
+        "id": "process:log-alpha::6886:1792972797669000000",
+        "instance": null,
+        "kind": "process",
+        "level": "info",
+        "message": "group-5",
+        "raw": {
+          "line": "{\"level\":\"info\",\"message\":\"group-5\"}",
+          "sequence": 6886,
+          "stream": "stderr",
+          "timestamp": "2026-10-25T23:59:57.669Z"
+        },
+        "run_id": null,
+        "source": "log-alpha",
+        "step": null
+      },
+      "last": {
+        "id": "process:log-alpha::1:1792903947669000000",
+        "instance": null,
+        "kind": "process",
+        "level": "info",
+        "message": "group-0",
+        "raw": {
+          "line": "{\"level\":\"info\",\"message\":\"group-0\"}",
+          "sequence": 1,
+          "stream": "stderr",
+          "timestamp": "2026-10-25T04:52:27.669Z"
+        },
+        "run_id": null,
+        "source": "log-alpha",
+        "step": null
+      },
+      "max": "2026-10-25T23:59:57.669Z",
+      "min": "2026-10-25T04:52:27.669Z"
+    }
+  },
+  {
+    "id": "LOG-06",
+    "visibleRows": 50,
+    "copied": "process exited: exit status: 0"
+  }
+]

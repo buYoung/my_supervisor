@@ -1,0 +1,10 @@
+{
+  "ordinaryRustIncludesWdio": false,
+  "ordinaryFrontendTestHooks": {
+    "__MSV_E2E__": [],
+    "wdioTauri": [],
+    "__wdio_mocks__": [],
+    "native-harness": []
+  },
+  "normalCspUnchanged": true
+}

@@ -1,0 +1,322 @@
+{
+  "portClosed": true,
+  "httpPortClosed": true,
+  "appStopped": true,
+  "ownedProcesses": [
+    {
+      "name": "state owned instance",
+      "pid": 82234,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 82236,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84892,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84893,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84894,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84895,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84896,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84897,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84898,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84899,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84900,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84901,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84902,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84903,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84904,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84905,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84906,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84907,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84908,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84909,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84910,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84911,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84912,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84913,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84914,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84915,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84916,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84917,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84918,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84919,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84920,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84921,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84923,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84924,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84925,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84926,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84928,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84929,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84930,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84931,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84932,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84933,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84934,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84935,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84937,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84938,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84939,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84940,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84942,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84943,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84944,
+      "requiredCleanup": false,
+      "stopped": true
+    },
+    {
+      "name": "state owned instance",
+      "pid": 84945,
+      "requiredCleanup": false,
+      "stopped": true
+    }
+  ],
+  "interrupted": false,
+  "probe": "normal",
+  "retainedFixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-C9TN1X"
+}

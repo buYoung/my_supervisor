@@ -1,0 +1,5 @@
+{
+  "code": "invalid_request",
+  "details": null,
+  "message": "invalid request: workspace revision changed; reload before saving"
+}

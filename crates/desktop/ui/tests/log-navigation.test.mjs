@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/features/logs/log-navigation.ts',import.meta.url),'utf8');const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {parseLogNavigation,logNavigationUrl,logEntryUrl,parseLogContext}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const entry={kind:'job',source:'a,b / 한글',runId:'run/id',step:'step:id'};const link=logEntryUrl(entry,'2026-10-27T00:00:00Z');const params=new URL(link,'https://test.invalid').searchParams;const nav=parseLogNavigation(params);assert.equal(nav.level,'all');assert.equal(nav.range,'all');assert.equal(nav.source,entry.source);assert.equal(nav.runId,entry.runId);assert.equal(nav.step,entry.step);assert.equal(parseLogContext(params,nav).timestamp,'2026-10-27T00:00:00Z');
+const state={...nav,search:'trace with spaces',range:'custom',from:'2026-10-01',to:'2026-10-03',offset:50,snapshot:'2026-10-03T23:59:59Z',scrollTop:320,ascending:true,grouping:'none'};assert.deepEqual(parseLogNavigation(logNavigationUrl(state,'https://test.invalid').searchParams),state);assert.equal(parseLogNavigation(new URLSearchParams('range=bad')).range,'7');console.log('log navigation: scoped links, dates, paging and return position passed');

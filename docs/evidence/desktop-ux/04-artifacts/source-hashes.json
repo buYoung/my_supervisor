@@ -1,0 +1,6 @@
+{
+  "crates/desktop/ui/tests/e2e/save.spec.mjs": "4cb0f6dfd8b02c26482a3ad8a7338c7553560dd6ad2b5da6719197a70560e4f4",
+  "crates/desktop/ui/tests/e2e/command.spec.mjs": "0518699b3355862fda2c0e783e05e3fe841ee5d10a372deb6b4257db7a689c79",
+  "crates/desktop/ui/src/shared/editor-session.tsx": "6b3433f3bcdfd3c3f156661cc5c137bb62c4283d586e26011651ee0aaa91c352",
+  "crates/desktop/ui/src/shared/reconcile-draft.ts": "c0b27048c9b21a5514129e616aee2b2841541388f0db69ffadba7c1d3721cf16"
+}

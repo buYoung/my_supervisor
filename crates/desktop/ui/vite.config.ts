@@ -51,13 +51,23 @@ const localRequestsOnly: Plugin = {
   },
 };
 
-export default defineConfig({
+export default defineConfig(({mode}) => ({
+  resolve: {alias: mode === "desktop-e2e" ? [{
+    find: /^@tauri-apps\/api\/core$/,
+    replacement: new URL("./src/testing/tauri-core.ts", import.meta.url).pathname,
+  }] : []},
   plugins: [react(), localRequestsOnly],
-  define: { "import.meta.env.VITE_NATIVE_PROXY": JSON.stringify(hasNativeProxy) },
+  define: {
+    "import.meta.env.VITE_NATIVE_PROXY": JSON.stringify(hasNativeProxy),
+    "import.meta.env.VITE_DESKTOP_E2E": JSON.stringify(mode === "desktop-e2e"),
+    "import.meta.env.VITE_E2E_OS_OBSERVE": JSON.stringify(mode === "desktop-e2e" && process.env.MSV_E2E_OS_OBSERVE === "1"),
+    "import.meta.env.VITE_E2E_REVISION": JSON.stringify(mode === "desktop-e2e" ? process.env.MSV_E2E_REVISION : null),
+    "import.meta.env.VITE_E2E_SOURCE_SHA256": JSON.stringify(mode === "desktop-e2e" ? process.env.MSV_E2E_SOURCE_SHA256 : null),
+  },
   server: {
     host: "127.0.0.1",
     port: 1420,
     strictPort: true,
     proxy: proxy ? { "/api": proxy } : undefined,
   },
-});
+}));

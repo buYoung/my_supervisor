@@ -1,0 +1,14 @@
+[
+  {
+    "phase": "clipboard-copy",
+    "action": "CUA clicked actual raw-copy button",
+    "observed": "원본 로그를 복사했습니다.",
+    "at": "2026-10-27T04:10:35.025053+00:00"
+  },
+  {
+    "phase": "clipboard-paste",
+    "action": "CUA pressed native Cmd+V into process search",
+    "observed": "{\"message\":\"native 한글, clipboard\"}",
+    "at": "2026-10-27T04:10:42.515862+00:00"
+  }
+]

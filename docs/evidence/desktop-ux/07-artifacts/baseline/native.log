@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T02:22:17.123Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/flow-baseline.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/flow-baseline.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: c067f022-e800-40d1-9425-d7f085fa62e3
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/flow-baseline.spec.mjs
+[webkit 605.1.15 macos #0-0] Workflow baseline
+[webkit 605.1.15 macos #0-0]    ✓ captures the current edit controls and viewport reset
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (532ms)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:01  
+

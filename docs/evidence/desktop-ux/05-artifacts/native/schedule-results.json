@@ -1,0 +1,41 @@
+[
+  {
+    "id": "SCHEDULE-01",
+    "guiTimezone": "Asia/Seoul",
+    "httpToInvokeTimezone": "Asia/Seoul"
+  },
+  {
+    "id": "SCHEDULE-02",
+    "omittedTimeout": null,
+    "explicitTimeoutSec": 1,
+    "elapsedMs": 1317,
+    "pid": 8635
+  },
+  {
+    "id": "SCHEDULE-03",
+    "expected": [
+      "2026-10-27T19:00:00Z",
+      "2026-10-28T19:00:00Z",
+      "2026-10-29T19:00:00Z"
+    ]
+  },
+  {
+    "id": "SCHEDULE-04",
+    "instant": "2027-11-09T12:00:00Z"
+  },
+  {
+    "id": "SCHEDULE-05",
+    "expression": "0 9 * * 1-5",
+    "dates": [
+      "2026-10-28T00:00:00Z",
+      "2026-10-29T00:00:00Z",
+      "2026-10-30T00:00:00Z"
+    ]
+  },
+  {
+    "id": "SCHEDULE-06",
+    "beforeRevision": 0,
+    "afterRevision": 1,
+    "triggerId": "81dd669e-2373-4862-8d3a-a4691f2be151"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/private/tmp/msv-os-vm-zs6jbuxc/os-observation.app/Contents/MacOS/my-supervisor"
+  ],
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+  "binarySha256": "c5af6b4916a211e52abc2db486b60020d54c42f2755fb3a24839dcc78d8d66a6",
+  "returncode": 101,
+  "stdout": "",
+  "stderr": "\nthread 'main' (339569013) panicked at crates/desktop/src/main.rs:643:20:\ninvalid isolated desktop-e2e configuration: OS observation build refuses a physical Mac: Mac15,6\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+  "passed": true
+}

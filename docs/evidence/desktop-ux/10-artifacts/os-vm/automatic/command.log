@@ -1,0 +1,31 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:native /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/e2e/run-native.mjs --no-build --spec\=command.spec.mjs
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/output
+
+Execution of 1 workers started at 2026-10-27T06:23:28.491Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/command.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/command.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 649026fb-3880-4b0b-a710-acc56ed078e9
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/command.spec.mjs
+[webkit 605.1.15 macos #0-0] Safe command editing
+[webkit 605.1.15 macos #0-0]    ✓ CMD-01 [N-R] ordered port edit reaches the real child argv and environment
+[webkit 605.1.15 macos #0-0]    ✓ CMD-02 [N-R] empty, literal, repeated and executable-name arguments round trip
+[webkit 605.1.15 macos #0-0]    ✓ CMD-03 [N-M] invalid drafts never submit and survive editor tabs
+[webkit 605.1.15 macos #0-0]    ✓ CMD-04 [N-R] editing is inert and help is an explicit execution
+[webkit 605.1.15 macos #0-0]    ✓ CMD-05 [N-R] cancelled slow help is bounded and does not replace newer input
+[webkit 605.1.15 macos #0-0]    ✓ CMD-06 [N-R] job, workflow and exec health consumers reject invalid drafts
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 6 passing (16.4s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:17  
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-5Q8sBX/output; cleanup: PASS

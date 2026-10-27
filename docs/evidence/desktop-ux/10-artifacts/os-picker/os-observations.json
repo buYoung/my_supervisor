@@ -1,0 +1,20 @@
+[
+  {
+    "phase": "picker-cancel",
+    "action": "CUA native Cancel",
+    "observed": "Original cwd and no changes retained",
+    "at": "2026-10-27T04:10:03.907841+00:00"
+  },
+  {
+    "phase": "picker-select",
+    "action": "CUA native Go to Folder then Open",
+    "observed": "Modal cwd matches chosen directory; focus returned to invoking folder button",
+    "at": "2026-10-27T04:10:13.941866+00:00"
+  },
+  {
+    "phase": "picker-final-consumer",
+    "cancelledValue": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-6MG33k",
+    "expectedDirectory": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-6MG33k/native, 경로",
+    "selectedAndSaved": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-6MG33k/native, 경로"
+  }
+]

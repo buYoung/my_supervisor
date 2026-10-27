@@ -1,0 +1,17 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:follow-events /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/follow-events.test.mjs
+
+WebSocket server error:
+Error: listen EPERM: operation not permitted 0.0.0.0:24678
+    at Server.setupListenHandle [as _listen2] (node:net:1926:21)
+    at listenInCluster (node:net:2005:12)
+    at Server.listen (node:net:2110:7)
+    at Object.listen (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/vite@6.4.3_@types+node@22.20.5_jiti@1.21.7_tsx@4.23.15_yaml@2.9.1/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:32577:23)
+    at Object.listen (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/vite@6.4.3_@types+node@22.20.5_jiti@1.21.7_tsx@4.23.15_yaml@2.9.1/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:39229:30)
+    at DevEnvironment.listen (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/vite@6.4.3_@types+node@22.20.5_jiti@1.21.7_tsx@4.23.15_yaml@2.9.1/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:48066:14)
+    at file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/vite@6.4.3_@types+node@22.20.5_jiti@1.21.7_tsx@4.23.15_yaml@2.9.1/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:38870:52
+    at Array.map (<anonymous>)
+    at file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/vite@6.4.3_@types+node@22.20.5_jiti@1.21.7_tsx@4.23.15_yaml@2.9.1/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:38870:39
+    at async _createServer (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/vite@6.4.3_@types+node@22.20.5_jiti@1.21.7_tsx@4.23.15_yaml@2.9.1/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:38890:5)
+desktop followEvents HTTP/Tauri dedupe passed

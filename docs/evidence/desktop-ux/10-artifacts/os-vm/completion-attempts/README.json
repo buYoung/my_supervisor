@@ -1,0 +1,6 @@
+{
+  "ime-clean.log": "Inactive guest window: first snapshot empty, observation timed out; not a pass.",
+  "ime-clean-activated.log": "Guest-control socket unavailable to the sandbox invocation; no new product observation.",
+  "ime-replay-final.log": "Sandbox denied loopback listen before app launch; authorized invocation subsequently passed.",
+  "os-ime-frame": "Positive native IME and focus checkpoints, but whole case failed after an extra Escape opened the unsaved-change dialog. Raw results are preserved; os-ime-clean is the final full-case pass."
+}

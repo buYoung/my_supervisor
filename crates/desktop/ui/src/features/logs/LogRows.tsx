@@ -1,58 +1,17 @@
-import {useDisplayTime} from "../../shared/display-time";
-import { useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
-import { Button } from "../../components/ui/primitives";
-import { useOperationsClient, toErrorMessage } from "../../services/use-operations";
-import type { LogEntry, LogGroup, LogQuery } from "../../services/log-mapping";
-
-export function Level({ value }: { value: string }) { return <span className={`log-level log-level-${value}`}>{value === "unknown" ? "미분류" : value.toUpperCase()}</span>; }
-
-export function LogRow({ entry, onInspect }: { entry: LogEntry; onInspect: (entry: LogEntry) => void }) {
-  const {dateTime: formatDateTime, time: timeOnly} = useDisplayTime();
-  const dateTime = (value: string) => formatDateTime(value, true);
-  return <button className="log-single" onClick={() => onInspect(entry)}><span /><time title={dateTime(entry.raw.timestamp)}>{timeOnly(entry.raw.timestamp)}</time><Level value={entry.level} /><span className="log-source">{entry.source}{entry.runId && <small>실행 {entry.runId.slice(0, 8)}{entry.step?` · ${entry.step}`:""}</small>}</span><code className="log-message">{entry.message}</code><ChevronRight size={14} /></button>;
+import {useDisplayTime} from '../../shared/display-time';
+import {useEffect,useRef,useState} from 'react';
+import {ChevronRight} from 'lucide-react';
+import {Button} from '../../components/ui/primitives';
+import {useOperationsClient,toErrorMessage} from '../../services/use-operations';
+import type {LogEntry,LogGroup,LogQuery} from '../../services/log-mapping';
+export function Level({value}:{value:string}){return <span className={`log-level log-level-${value}`}>{value==='unknown'?'미분류':value.toUpperCase()}</span>;}
+export function LogRow({entry,onInspect}:{entry:LogEntry;onInspect:(entry:LogEntry)=>void}){
+ const {dateTime}=useDisplayTime();return <button className="log-single" data-log-id={entry.id} onClick={()=>onInspect(entry)}><span/><time dateTime={entry.raw.timestamp}>{dateTime(entry.raw.timestamp,true)}</time><Level value={entry.level}/><span className="log-source">{entry.source}{entry.runId&&<small>실행 {entry.runId.slice(0,8)}{entry.step?` · ${entry.step}`:''}</small>}</span><code className="log-message">{entry.message}</code><ChevronRight size={14}/></button>;
 }
-
-export function RepeatGroup({ group, query, onInspect }: { group: LogGroup; query: LogQuery; onInspect: (entry: LogEntry) => void }) {
-  const client = useOperationsClient();
-  const {dateTime: formatDateTime, time: timeOnly} = useDisplayTime();
-  const dateTime = (value: string) => formatDateTime(value, true);
-  const [isOpen, setIsOpen] = useState(false);
-  const [members, setMembers] = useState<LogEntry[]>([]);
-  const [nextOffset, setNextOffset] = useState<number>();
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const requestRef = useRef<LogQuery>(query);
-  requestRef.current = { ...query, source: group.entry.source, runId: group.entry.runId,
-    level: group.entry.level, stream: group.entry.raw.stream, message: group.entry.message,
-    instance: group.entry.instance, step: group.entry.step, grouping: "none", offset: 0, limit: 50 };
-  useEffect(() => {
-    if (!isOpen) return;
-    let isCancelled = false;
-    setIsLoading(true);
-    client.queryLogs(requestRef.current).then(result => {
-      if (isCancelled) return;
-      setMembers(result.records.map(record => record.entry)); setNextOffset(result.nextOffset); setError("");
-    }).catch(cause => { if (!isCancelled) setError(toErrorMessage(cause)); })
-      .finally(() => { if (!isCancelled) setIsLoading(false); });
-    return () => { isCancelled = true; };
-  }, [client, isOpen, group.count, group.lastSeen]);
-  async function loadMore() {
-    if (nextOffset === undefined) return;
-    setIsLoading(true);
-    try {
-      const result = await client.queryLogs({ ...requestRef.current, offset: nextOffset });
-      setMembers(previous => [...previous, ...result.records.map(record => record.entry)]); setNextOffset(result.nextOffset);
-    } catch (cause) { setError(toErrorMessage(cause)); } finally { setIsLoading(false); }
-  }
-  return <details className="log-repeat" onToggle={event => setIsOpen(event.currentTarget.open)}>
-    <summary><ChevronRight size={14} className="repeat-chevron" /><time title={dateTime(group.lastSeen)}>{timeOnly(group.lastSeen)}</time><Level value={group.entry.level} />
-      <span className="log-source" title={group.entry.source}>{group.entry.source}{group.entry.runId && <small>실행 {group.entry.runId.slice(0, 8)}{group.entry.step?` · ${group.entry.step}`:""}</small>}</span>
-      <span className="log-message">{group.entry.message}<span className="log-repeat-period">최초 {dateTime(group.firstSeen)} <span>→</span> 최근 {dateTime(group.lastSeen)}</span></span>
-      <span className="repeat-count">× {group.count.toLocaleString("ko-KR")}</span>
-    </summary><div className="repeat-members"><p>같은 소스·실행·수준·스트림·내용의 로그 {group.count.toLocaleString("ko-KR")}건</p>
-      {members.map(entry => <button className="repeat-member" key={entry.id} onClick={() => onInspect(entry)}><time>{dateTime(entry.raw.timestamp)}</time><code>{entry.raw.line}</code><ChevronRight size={14} /></button>)}
-      {error && <p role="alert" className="text-danger">{error}</p>}
-      {isLoading ? <p role="status">원본 로그를 불러오는 중…</p> : nextOffset !== undefined && <Button onClick={() => void loadMore()}>50건 더 보기</Button>}
-    </div></details>;
+export function RepeatGroup({group,query,onInspect,onOpenChange}:{group:LogGroup;query:LogQuery;onInspect:(entry:LogEntry)=>void;onOpenChange?:(isOpen:boolean)=>void}){
+ const client=useOperationsClient(),{dateTime}=useDisplayTime();const [isOpen,setIsOpen]=useState(false),[members,setMembers]=useState<LogEntry[]>([]),[offset,setOffset]=useState(0),[nextOffset,setNextOffset]=useState<number>(),[error,setError]=useState(''),[isLoading,setIsLoading]=useState(false),[partial,setPartial]=useState<string[]>([]);
+ const callback=useRef(onOpenChange);callback.current=onOpenChange;const opened=useRef(false);useEffect(()=>()=>{if(opened.current)callback.current?.(false);},[]);
+ const queryKey=JSON.stringify(query);
+ useEffect(()=>{if(!isOpen)return;let isCancelled=false;setIsLoading(true);client.queryLogs({...query,source:group.entry.source,runId:group.entry.runId,level:group.entry.level,stream:group.entry.raw.stream,message:group.entry.message,instance:group.entry.instance,step:group.entry.step,grouping:'none',offset,limit:50}).then(result=>{if(!isCancelled){setMembers(result.records.map(record=>record.entry));setNextOffset(result.nextOffset);setPartial(result.partialSources);setError('');}}).catch(cause=>{if(!isCancelled)setError(toErrorMessage(cause));}).finally(()=>{if(!isCancelled)setIsLoading(false);});return()=>{isCancelled=true;};},[client,isOpen,offset,queryKey]);
+ return <details className="log-repeat" onToggle={event=>{const next=event.currentTarget.open;opened.current=next;setIsOpen(next);callback.current?.(next);}}><summary><ChevronRight size={14} className="repeat-chevron"/><time dateTime={group.lastSeen}>{dateTime(group.lastSeen,true)}</time><Level value={group.entry.level}/><span className="log-source">{group.entry.source}{group.entry.runId&&<small>실행 {group.entry.runId.slice(0,8)}{group.entry.step?` · ${group.entry.step}`:''}</small>}</span><span className="log-message">{group.entry.message}<span className="log-repeat-period">최초 {dateTime(group.firstSeen,true)} → 최근 {dateTime(group.lastSeen,true)}</span></span><span className="repeat-count">× {group.count.toLocaleString('ko-KR')}</span></summary><div className="repeat-members"><p>같은 소스·실행·수준·스트림·내용 {group.count.toLocaleString('ko-KR')}건 · 한 번에 50건 표시</p>{members.map(entry=><button className="repeat-member" key={entry.id} onClick={()=>onInspect(entry)}><time>{dateTime(entry.raw.timestamp,true)}</time><code>{entry.raw.line}</code><ChevronRight size={14}/></button>)}{error&&<p role="alert" className="text-danger">{error}</p>}{partial.length>0&&<p role="alert">일부 기록만 조회됨: {partial.join(', ')}</p>}{isLoading?<p role="status">원본 로그를 불러오는 중…</p>:<div><Button disabled={offset===0} onClick={()=>setOffset(value=>Math.max(0,value-50))}>이전 50건</Button><Button disabled={nextOffset===undefined} onClick={()=>setOffset(nextOffset??0)}>다음 50건</Button></div>}</div></details>;
 }

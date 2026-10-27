@@ -1,0 +1,9 @@
+{
+  "blankNumber": "0",
+  "resetUrl": "http://127.0.0.1:3000/health",
+  "visibleKeys": [
+    "DATABASE"
+  ],
+  "invalidKey": "DATABASE",
+  "intervalAfterSwitch": "3600"
+}

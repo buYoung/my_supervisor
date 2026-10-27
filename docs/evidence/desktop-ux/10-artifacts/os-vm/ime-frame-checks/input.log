@@ -1,0 +1,113 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:native /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/e2e/run-native.mjs --spec\=input.spec.mjs
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-CAKWEu/output
+warning: failed to auto-clean cache data
+
+failed to clean entries from the global cache
+
+Caused by:
+  failed to remove file `/Users/buyonglee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-webpki-0.103.10/Cargo.toml`
+
+Caused by:
+  Permission denied (os error 13)
+   Compiling ring v0.17.14
+   Compiling libsqlite3-sys v0.30.1
+   Compiling rustls v0.23.42
+   Compiling sqlx-sqlite v0.8.6
+   Compiling rustls-webpki v0.103.13
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.9
+   Compiling my-supervisor-infra-sqlite v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/infra/sqlite)
+   Compiling reqwest v0.12.28
+   Compiling my-supervisor-platform-macos v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/platform/macos)
+   Compiling my-supervisor-app-daemon v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/daemon)
+   Compiling my-supervisor-app-cli v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.75s
+        Warn --no-sign flag detected: Signing will be skipped.
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `pnpm build:e2e`
+
+> my-supervisor-desktop-ui@0.1.0 build:e2e /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> tsc -b && vite build --mode desktop-e2e --outDir dist-e2e
+
+vite v6.4.3 building for desktop-e2e...
+transforming...
+✓ 1806 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-e2e/index.html                           0.51 kB │ gzip:   0.32 kB
+dist-e2e/assets/JobsView-BnuhLJ6X.css        15.87 kB │ gzip:   2.67 kB
+dist-e2e/assets/index-mOXkym3I.css           57.80 kB │ gzip:  11.39 kB
+dist-e2e/assets/index-C9sv6Wbx.js             0.21 kB │ gzip:   0.19 kB
+dist-e2e/assets/tauri-core-RniafzC5.js        0.60 kB │ gzip:   0.39 kB
+dist-e2e/assets/event-CZ4R04xs.js             1.41 kB │ gzip:   0.67 kB
+dist-e2e/assets/event-C_pQPlB4.js             1.52 kB │ gzip:   0.69 kB
+dist-e2e/assets/core-BwOj0H_U.js              2.56 kB │ gzip:   1.06 kB
+dist-e2e/assets/native-harness-BSlRk2KL.js   36.16 kB │ gzip:   9.53 kB
+dist-e2e/assets/JobsView-6kPXgCDw.js        249.00 kB │ gzip:  81.08 kB
+dist-e2e/assets/index-DIzCRQsU.js           357.63 kB │ gzip: 108.92 kB
+✓ built in 2.23s
+warning: failed to auto-clean cache data
+
+failed to clean entries from the global cache
+
+Caused by:
+  failed to remove file `/Users/buyonglee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustls-webpki-0.103.10/Cargo.toml`
+
+Caused by:
+  Permission denied (os error 13)
+   Compiling ring v0.17.14
+   Compiling libsqlite3-sys v0.30.1
+   Compiling my-supervisor-app-desktop v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop)
+warning: my-supervisor-app-desktop@0.1.0: STATIC_VCRUNTIME is deprecated; use build.windows.staticVCRuntime in tauri.conf.json or tauri_build::WindowsAttributes::static_vc_runtime instead.
+   Compiling rustls v0.23.42
+   Compiling sqlx-sqlite v0.8.6
+   Compiling rustls-webpki v0.103.13
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.9
+   Compiling sqlx v0.8.6
+   Compiling reqwest v0.12.28
+   Compiling my-supervisor-infra-sqlite v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/infra/sqlite)
+   Compiling my-supervisor-platform-macos v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/platform/macos)
+   Compiling my-supervisor-app-daemon v0.1.0 (/Users/buyonglee/Documents/work/private/my_supervisor/crates/daemon)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.20s
+       Built application at: /Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/my-supervisor
+    Bundling my-supervisor.app (/Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/bundle/macos/my-supervisor.app)
+        Warn Skipping signing due to --no-sign flag.
+    Finished 1 bundle at:
+        /Users/buyonglee/Documents/work/private/my_supervisor/target/desktop-e2e/debug/bundle/macos/my-supervisor.app
+
+
+Execution of 1 workers started at 2026-10-27T08:05:05.086Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/input.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/input.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 585d4934-922e-47ef-a0fe-a5eeab0f3783
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/input.spec.mjs
+[webkit 605.1.15 macos #0-0] Predictable repeated and draft input
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-03 [N-R] comma-bearing absolute paths stay literal and invalid exclusions block save
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-04 [N-R] blank numeric drafts remain blank and 5000/3000ms reaches HTTP checks
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-05 [N-R] inactive HTTP, TCP and interval drafts restore without serialization
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-06 [N-R] environment rows stay visible, validate, undo and import multiline values
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-08 [N-R] unsupported symlinks and rolling prerequisites are explicit
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 7 passing (15s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:15  
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-CAKWEu/output; cleanup: PASS

@@ -1,0 +1,50 @@
+
+Execution of 1 workers started at 2026-10-27T04:39:24.432Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/command.spec.mjs
+[0-0] AssertionError in "Safe command editing.CMD-03 [N-M] invalid drafts never submit and survive editor tabs"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ "으'unclosed"
+- "'unclosed"
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/command.spec.mjs:82:12)
+[0-0] FAILED in undefined - file:///tests/e2e/command.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: f68be419-603f-482e-833b-799e8e3fc9ee
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/command.spec.mjs
+[webkit 605.1.15 macos #0-0] Safe command editing
+[webkit 605.1.15 macos #0-0]    ✓ CMD-01 [N-R] ordered port edit reaches the real child argv and environment
+[webkit 605.1.15 macos #0-0]    ✓ CMD-02 [N-R] empty, literal, repeated and executable-name arguments round trip
+[webkit 605.1.15 macos #0-0]    ✖ CMD-03 [N-M] invalid drafts never submit and survive editor tabs
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2 passing (9s)
+[webkit 605.1.15 macos #0-0] 1 failing
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Safe command editing CMD-03 [N-M] invalid drafts never submit and survive editor tabs
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
++ actual - expected
+
++ "으'unclosed"
+- "'unclosed"
+      
+      actual expected
+      
+      '으\'unclosed'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + "으'unclosed"
+[webkit 605.1.15 macos #0-0] - "'unclosed"
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/command.spec.mjs:82:12)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:10  
+

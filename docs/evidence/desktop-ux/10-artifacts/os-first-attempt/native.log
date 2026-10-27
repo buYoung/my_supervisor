@@ -1,0 +1,67 @@
+
+Execution of 1 workers started at 2026-10-27T03:55:48.821Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/native-gates.spec.mjs
+[0-0] Error in "Integrated native OS gates.GATE-03 [O] native folder cancellation and selection preserve exact paths"
+Error: waitUntil condition timed out after 10000ms
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:50:5)
+[0-0] AssertionError in "Integrated native OS gates.GATE-03 [O] raw clipboard copy is pasted by the native keyboard unchanged"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'process exited: exit status: 0'
+- '{"message":"native 한글, clipboard"}'
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:64:12)
+[0-0] Error in "Integrated native OS gates.GATE-03 [O] close to tray keeps owned work alive and Show Window restores state"
+Error: Native observation missing: tray-reopen
+    at async observe (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:13:3)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:105:5)
+[0-0] FAILED in undefined - file:///tests/e2e/native-gates.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: f95c19b3-5adf-451a-a7fe-5b958c2089f2
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/native-gates.spec.mjs
+[webkit 605.1.15 macos #0-0] Integrated native OS gates
+[webkit 605.1.15 macos #0-0]    ✖ GATE-03 [O] native folder cancellation and selection preserve exact paths
+[webkit 605.1.15 macos #0-0]    ✖ GATE-03 [O] raw clipboard copy is pasted by the native keyboard unchanged
+[webkit 605.1.15 macos #0-0]    ✖ GATE-03 [O] close to tray keeps owned work alive and Show Window restores state
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 3 failing (4m 19.1s)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Integrated native OS gates GATE-03 [O] native folder cancellation and selection preserve exact paths
+[webkit 605.1.15 macos #0-0] waitUntil condition timed out after 10000ms
+[webkit 605.1.15 macos #0-0] Error: waitUntil condition timed out after 10000ms
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:50:5)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 2) Integrated native OS gates GATE-03 [O] raw clipboard copy is pasted by the native keyboard unchanged
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
++ actual - expected
+
++ 'process exited: exit status: 0'
+- '{"message":"native 한글, clipboard"}'
+      
+      actual expected
+      
+      'process exited{"message":"native exit한글, status: 0clipboard"}'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + 'process exited: exit status: 0'
+[webkit 605.1.15 macos #0-0] - '{"message":"native 한글, clipboard"}'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:64:12)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 3) Integrated native OS gates GATE-03 [O] close to tray keeps owned work alive and Show Window restores state
+[webkit 605.1.15 macos #0-0] Native observation missing: tray-reopen
+[webkit 605.1.15 macos #0-0] Error: Native observation missing: tray-reopen
+[webkit 605.1.15 macos #0-0]     at async observe (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:13:3)
+[webkit 605.1.15 macos #0-0]     at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/native-gates.spec.mjs:105:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:04:20  
+

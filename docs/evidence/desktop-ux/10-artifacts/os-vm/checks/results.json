@@ -1,0 +1,52 @@
+[
+  {
+    "name": "typecheck",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "typecheck"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "build",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "build"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "parity",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "command": [
+      "node",
+      "tests/operations-parity.test.mjs"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "events",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "command": [
+      "pnpm",
+      "test:follow-events"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "cargo-check",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "command": [
+      "cargo",
+      "check",
+      "--workspace"
+    ],
+    "exit": 0
+  }
+]

@@ -1,0 +1,26 @@
+
+Execution of 1 workers started at 2026-10-27T02:40:36.340Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/log.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/log.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 30040f1c-e9a1-4e50-99a4-0a7c95d324cb
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/log.spec.mjs
+[webkit 605.1.15 macos #0-0] Stable log navigation
+[webkit 605.1.15 macos #0-0]    ✓ LOG-01 [N-R] process, job and step links show the declared all-level scope
+[webkit 605.1.15 macos #0-0]    ✓ LOG-02 [N-R] multi-day records show dates in the display timezone
+[webkit 605.1.15 macos #0-0]    ✓ LOG-03 [N-R] expanded groups and older pages stay still as new records arrive
+[webkit 605.1.15 macos #0-0]    ✓ LOG-04 [N-R] inspector, context and browser Back restore the query and position
+[webkit 605.1.15 macos #0-0]    ✓ LOG-05 [N-R] custom-range and snapshot exports keep exact boundaries and report partial sources
+[webkit 605.1.15 macos #0-0]    ✓ LOG-06 [N-R] shared raw inspection and the 10000-entry fixture remain bounded
+[webkit 605.1.15 macos #0-0]    ✓ LOG-07 [N-R] a real failed query keeps its source and offers retry
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 7 passing (21.8s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:22  
+

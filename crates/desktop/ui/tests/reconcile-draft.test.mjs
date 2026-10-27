@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/shared/reconcile-draft.ts',import.meta.url),'utf8');
+const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {reconcileDraft}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const base={nodes:[{id:'a:1',data:{label:'before',args:['first']}},{id:'b',data:{label:'finish'}}],settings:{timezone:'UTC'}};
+const local=structuredClone(base);local.nodes[0].data.label='local';
+const saved=structuredClone(base);saved.settings.timezone='Asia/Seoul';saved.nodes[0].data.args=['remote'];
+const merged=reconcileDraft(base,local,saved);assert.deepEqual(merged.conflicts,[]);assert.equal(merged.value.nodes[0].data.label,'local');assert.deepEqual(merged.value.nodes[0].data.args,['remote']);assert.equal(merged.value.settings.timezone,'Asia/Seoul');assert.equal(merged.value.nodes[0].id,'a:1');
+saved.nodes[0].data.label='external';const conflict=reconcileDraft(base,local,saved);assert.equal(conflict.conflicts.length,1);assert.equal(conflict.conflicts[0].path,'/nodes/a%3A1/data/label');assert.equal(reconcileDraft(base,local,saved,{[conflict.conflicts[0].path]:'saved'}).value.nodes[0].data.label,'external');
+const reordered=structuredClone(base);reordered.nodes.reverse();const orderConflict=reconcileDraft(base,reordered,saved);assert.equal(orderConflict.conflicts[0].path,'/nodes');assert.deepEqual(orderConflict.value.nodes.map(n=>n.id),['b','a:1']);
+const deleting=reconcileDraft({a:1,b:2},{a:1},{a:3,b:2});assert.deepEqual(deleting.value,{a:3});assert.equal(deleting.conflicts.length,0);
+console.log('draft reconciliation: independent fields, explicit conflicts, identity/order and deletion passed');

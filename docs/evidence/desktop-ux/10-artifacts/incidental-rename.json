@@ -1,0 +1,10 @@
+{
+  "fixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-90fxRa",
+  "scenario": "INPUT-05 attempt with unexpected fixture rename",
+  "expectedName": "native-input",
+  "actualTargetName": "native-inputㄱ",
+  "definitionIdPreserved": true,
+  "stage": "\"forward_recovery\"",
+  "error": "internal error: repository: error returned from database: (code: 787) FOREIGN KEY constraint failed",
+  "scope": "Not the intended policy-only mutation; retained as an unresolved existing rename observation"
+}

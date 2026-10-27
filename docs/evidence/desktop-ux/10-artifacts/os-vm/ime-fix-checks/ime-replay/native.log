@@ -1,0 +1,21 @@
+
+Execution of 1 workers started at 2026-10-27T07:46:18.960Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/ime-replay.spec.mjs
+[0-0] javascript error in "INPUT-07 [N-R] isolated replay of the recorded Korean composition preserves row boundaries"
+javascript error: WebDriverError: null is not an object (evaluating 'input.value='depends_on'') when running "execute/sync" with method "POST"
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/ime-replay.spec.mjs:12:3)
+[0-0] FAILED in undefined - file:///tests/e2e/ime-replay.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 296e140c-6ce3-4548-9069-c6ed43c153ff
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] (root)
+[webkit 605.1.15 macos #0-0] 1 failing (811ms)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:01  
+

@@ -3,9 +3,11 @@
   --color-surface: 255 255 255;
   --color-panel: 255 255 255;
   --color-foreground: 34 43 37;
-  --color-muted: 105 115 101;
+  --color-muted: 96 108 93;
   --color-border: 220 225 215;
   --color-primary: 49 91 61;
+  --color-action: 49 91 61;
+  --color-on-action: 255 255 255;
   --color-success: 40 112 69;
   --color-warning: 136 96 22;
   --color-danger: 162 62 53;
@@ -19,7 +21,7 @@
   --color-foreground: 228 233 223;
   --color-muted: 162 175 156;
   --color-border: 52 62 53;
-  --color-primary: 78 130 81;
+  --color-primary: 153 201 164;
   --color-success: 153 201 164;
   --color-warning: 226 190 121;
   --color-danger: 237 173 161;

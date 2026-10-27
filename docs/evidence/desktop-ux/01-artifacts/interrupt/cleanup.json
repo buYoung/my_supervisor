@@ -1,0 +1,15 @@
+{
+  "portClosed": true,
+  "appStopped": true,
+  "ownedProcesses": [
+    {
+      "name": "native-owned-sleeper",
+      "pid": 51508,
+      "requiredCleanup": true,
+      "stopped": true
+    }
+  ],
+  "interrupted": true,
+  "probe": "interrupt",
+  "retainedFixtureRoot": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UgF61O"
+}

@@ -1,0 +1,20 @@
+
+Execution of 1 workers started at 2026-10-27T04:09:54.760Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/native-gates.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/native-gates.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 52cbaf9a-d7a3-47b9-bd30-4d31a1a04de8
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/native-gates.spec.mjs
+[webkit 605.1.15 macos #0-0] Integrated native OS gates
+[webkit 605.1.15 macos #0-0]    ✓ GATE-07 [O] native folder cancellation and selection preserve exact paths
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 passing (18.7s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:19  
+

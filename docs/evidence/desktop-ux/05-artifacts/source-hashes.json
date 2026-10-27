@@ -1,0 +1,6 @@
+{
+  "crates/desktop/src/e2e.rs": "911f9dd3e189ee8628333106e7fafea65ce215ecb4469e5372694e1d67d6149a",
+  "crates/infra/scheduler/src/lib.rs": "60ac60a8b82ec9ce4498d7a4d57bf6fbb611e72ec74101adf8237c83081e49f7",
+  "crates/desktop/ui/src/features/jobs/JobEditor.tsx": "cd8701f2dcc81bbe35222f616d753319d51f952289e4d51731cbcdc469370b82",
+  "crates/desktop/ui/tests/e2e/schedule.spec.mjs": "3fcc25f7aeffc9fdf3cec1919ed57b980d6b74791c125fa010afc225f51cf34d"
+}

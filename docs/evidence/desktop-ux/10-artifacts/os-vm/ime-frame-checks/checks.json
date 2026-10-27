@@ -1,0 +1,24 @@
+[
+  {
+    "name": "typecheck",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "typecheck"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0
+  },
+  {
+    "name": "build",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "build"
+    ],
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exit": 0
+  }
+]

@@ -1,0 +1,28 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:native /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/e2e/run-native.mjs --no-build --spec\=harness.spec.mjs
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/output
+
+Execution of 1 workers started at 2026-10-27T06:23:15.165Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/harness.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/harness.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: f5d42bb5-5819-4a25-a83e-3217d974f3c9
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/harness.spec.mjs
+[webkit 605.1.15 macos #0-0] Isolated native host
+[webkit 605.1.15 macos #0-0]    ✓ HARNESS-01 [N-R] real main window and invoke persistence
+[webkit 605.1.15 macos #0-0]    ✓ HARNESS-02 [N-M] module invoke rejection and complete restoration
+[webkit 605.1.15 macos #0-0]    ✓ HARNESS-04 [N-R] records integrated native layout and input capabilities
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 3 passing (7.3s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:08  
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-Yf81o6/output; cleanup: PASS

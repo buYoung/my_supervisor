@@ -1,0 +1,6 @@
+{
+  "probe": "failure",
+  "code": 1,
+  "expectedFailure": true,
+  "runnerCode": 0
+}

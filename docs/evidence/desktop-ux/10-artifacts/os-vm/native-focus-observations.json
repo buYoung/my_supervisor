@@ -1,0 +1,101 @@
+{
+  "observedAt": "2026-10-27",
+  "method": "VM VNC virtual hardware keyboard; no host UI or clipboard",
+  "platform": {
+    "os": "macOS 15.7.7",
+    "build": "24G720",
+    "arch": "arm64",
+    "model": "VirtualMac2,1"
+  },
+  "manifest": "os-ime-frame/manifest.json",
+  "sourceSha256": "0f6aca86343c52d790c7c7f89ac8a82b49b4c8ab1a82168bd2074085e2c4dc3b",
+  "binarySha256": "9cb6c95571c16eab385948f23abf487cd9fbec09e6d1b92bdc7f2bf3b30d7cf3",
+  "rawEvents": "os-ime-frame/native-ime.json",
+  "scope": "Only the two focus checkpoints are accepted from this session. The later Escape opened an unsaved-change dialog, so the original whole IME case remains failed. Final IME acceptance comes from os-ime-clean/results.jsonl.",
+  "observations": [
+    {
+      "component": "RepeatedField",
+      "mode": "O",
+      "passed": true,
+      "action": "Guest native Shift+Tab then Tab within the delayed-blur interval; inspect after 350 ms",
+      "delayedBlurMs": 100,
+      "observedAfterMs": 350,
+      "rawEventIndices": [
+        34,
+        37
+      ],
+      "nativeEvents": [
+        {
+          "code": "Tab",
+          "data": null,
+          "focused": "선행 작업 1 삭제",
+          "inputType": null,
+          "isComposing": false,
+          "isTrusted": true,
+          "key": "Tab",
+          "keyCode": 9,
+          "rowCount": 2,
+          "type": "keyup",
+          "value": ""
+        },
+        {
+          "code": "Tab",
+          "data": null,
+          "focused": "선행 작업 2",
+          "inputType": null,
+          "isComposing": false,
+          "isTrusted": true,
+          "key": "Tab",
+          "keyCode": 9,
+          "rowCount": 2,
+          "type": "keyup",
+          "value": ""
+        }
+      ],
+      "screenshot": "os-ime-frame/repeated-native-focus-return.png",
+      "visibleResult": "Input focus ring and candidate list remain visible after return"
+    },
+    {
+      "component": "CommandEditor",
+      "mode": "O",
+      "passed": true,
+      "action": "Guest native Shift+Tab then Tab within the delayed-blur interval; inspect after 350 ms",
+      "delayedBlurMs": 150,
+      "observedAfterMs": 350,
+      "rawEventIndices": [
+        88,
+        91
+      ],
+      "nativeEvents": [
+        {
+          "code": "Tab",
+          "data": null,
+          "focused": "인수 전달 대상",
+          "inputType": null,
+          "isComposing": false,
+          "isTrusted": true,
+          "key": "Tab",
+          "keyCode": 9,
+          "rowCount": 2,
+          "type": "keyup",
+          "value": "script"
+        },
+        {
+          "code": "Tab",
+          "data": null,
+          "focused": "옵션 이름",
+          "inputType": null,
+          "isComposing": false,
+          "isTrusted": true,
+          "key": "Tab",
+          "keyCode": 9,
+          "rowCount": 2,
+          "type": "keyup",
+          "value": ""
+        }
+      ],
+      "screenshot": "os-ime-frame/command-native-focus-return.png",
+      "visibleResult": "Input focus ring and candidate list remain visible after return"
+    }
+  ]
+}

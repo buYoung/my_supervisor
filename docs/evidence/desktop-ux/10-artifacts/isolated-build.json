@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "tauri",
+    "build",
+    "--debug",
+    "--no-sign",
+    "--bundles",
+    "app",
+    "--features",
+    "desktop-e2e",
+    "--config",
+    "tauri.e2e.conf.json"
+  ],
+  "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop",
+  "sourceSha256": "5f9eb779006278b9027490e1b4e7e4765a4c86ac590617ead5238c819809ddd5",
+  "revision": "748537710413f224be9f25a65d114426b33c0770",
+  "exitCode": 0,
+  "helpers": "Existing unchanged CLI helper build reused"
+}

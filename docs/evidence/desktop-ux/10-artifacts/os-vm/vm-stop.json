@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-10-27T08:24:00.084965+00:00",
+  "command": "TART_HOME=/private/tmp/msv-os-vm-zs6jbuxc/state /private/tmp/msv-os-vm-zs6jbuxc/tart.app/Contents/MacOS/tart stop desktop-ux-os --timeout 5",
+  "exitCode": 0,
+  "verificationCommand": "tart list --format json (same task-owned TART_HOME)",
+  "vm": {
+    "Running": false,
+    "Source": "local",
+    "State": "stopped",
+    "Size": 29,
+    "Accessed": "2026-10-27T08:22:02Z",
+    "Name": "desktop-ux-os",
+    "Disk": 50
+  },
+  "temporaryEnvironmentRetained": "/private/tmp/msv-os-vm-zs6jbuxc"
+}

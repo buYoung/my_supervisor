@@ -1,0 +1,1 @@
+2026-10-27T04:08:13.305Z ERROR webdriver: WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.process-log-preview .log-single*=native 한글, clipboard' is not a valid selector. @ 2:48 when running "element" with method "POST"

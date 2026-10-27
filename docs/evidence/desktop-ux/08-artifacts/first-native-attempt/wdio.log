@@ -1,0 +1,16 @@
+2026-10-27T02:38:43.642Z ERROR webdriver: WebDriverError: Load failed when running "execute/sync" with method "POST"
+2026-10-27T02:38:59.791Z ERROR webdriver: WebDriverError: Request timed out! Consider increasing the "connectionRetryTimeout" option. when running "execute/sync" with method "POST"
+2026-10-27T02:39:14.797Z ERROR webdriver: WebDriverError: Request timed out! Consider increasing the "connectionRetryTimeout" option. when running "screenshot" with method "GET"
+2026-10-27T02:39:28.715Z ERROR webdriver: WebDriverError: Request timed out! Consider increasing the "connectionRetryTimeout" option. when running "execute/sync" with method "POST"
+2026-10-27T02:39:29.802Z ERROR webdriver: WebDriverError: Request timed out! Consider increasing the "connectionRetryTimeout" option. when running "execute/sync" with method "POST"
+2026-10-27T02:39:29.822Z ERROR @wdio/utils:shim: Error: WebDriverError: Request timed out! Consider increasing the "connectionRetryTimeout" option. when running "execute/sync" with method "POST"
+    at FetchRequest._libRequest (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/webdriver@9.31.9/node_modules/webdriver/build/node.js:2244:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async FetchRequest._request (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/webdriver@9.31.9/node_modules/webdriver/build/node.js:2274:20)
+    at async Browser.wrapCommandFn (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+utils@9.31.9/node_modules/@wdio/utils/build/index.js:1077:23)
+    at async Browser.wrapCommandFn (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+utils@9.31.9/node_modules/@wdio/utils/build/index.js:1077:23)
+    at async Object.restoreAllMocks (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+tauri-service@1.5.1_expect-webdriverio@6.1.0_tsx@4.23.15_webdriverio@9.31.9/node_modules/@wdio/tauri-service/dist/esm/index.js:3833:5)
+    at async Object.afterTest (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/wdio.conf.mjs:58:5)
+    at async Promise.all (index 0)
+    at async executeHooksWithArgs (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+utils@9.31.9/node_modules/@wdio/utils/build/index.js:1060:18)
+    at async Context.testFrameworkFnWrapper (/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/node_modules/.pnpm/@wdio+utils@9.31.9/node_modules/@wdio/utils/build/index.js:1320:38)

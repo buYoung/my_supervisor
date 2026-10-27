@@ -1,0 +1,5 @@
+{
+  "probe": "interrupt",
+  "code": 130,
+  "expectedFailure": true
+}

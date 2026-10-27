@@ -251,6 +251,9 @@ impl Scheduler for TokioScheduler {
         if job.timezone.parse::<Tz>().is_err() {
             return Err(SchedulerError::InvalidTimezone(job.timezone.clone()));
         }
+        if let JobTrigger::Cron(expression) = &job.trigger {
+            parse_cron(expression)?;
+        }
         let mut results = Vec::with_capacity(count as usize);
         let mut cursor = after;
         for _ in 0..count {

@@ -1,0 +1,26 @@
+[
+  {
+    "command": "pnpm --dir crates/desktop/ui typecheck",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0
+  },
+  {
+    "command": "pnpm --dir crates/desktop/ui build",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "exitCode": 0
+  },
+  {
+    "command": "node tests/operations-parity.test.mjs",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "exitCode": 0,
+    "classification": "R",
+    "warning": "Vite HMR listen EPERM 0.0.0.0:24678; parity assertions passed"
+  },
+  {
+    "command": "pnpm test:follow-events",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui",
+    "exitCode": 0,
+    "classification": "R",
+    "warning": "Vite HMR listen EPERM 0.0.0.0:24678; event assertions passed"
+  }
+]

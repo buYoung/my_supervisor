@@ -1,0 +1,19 @@
+{
+  "query": {
+    "ascending": false,
+    "grouping": "repeat",
+    "kind": "process",
+    "level": "attention",
+    "limit": 50,
+    "offset": 0,
+    "runId": null,
+    "search": null,
+    "since": "2026-10-20T02:34:44.523Z",
+    "source": "log-baseline",
+    "step": null,
+    "stream": null,
+    "timeZone": "UTC",
+    "until": null
+  },
+  "body": "\n    본문으로 이동my-supervisor로컬 프로세스 운영 콘솔프로세스작업로그데몬설정데몬 연결됨PID 41247로컬 데몬PID 41247로그0/1 실행 중새로고침테마자동다크라이트로그실행 기록에서 문제의 원인과 반복 패턴을 확인합니다.원본 내보내기프로세스 로그1작업 로그0프로세스1모든 프로세스log-baselinestdout · stderr · system원본 스트림과 로그 수준은 별도로 구분합니다.최근 24시간최근 7일최근 30일최근 7개월보관된 전체기간 지정주의 필요전체 수준INFO 제외모든 스트림stdoutstderrsystemTRACE0DEBUG0INFO1WARN0ERROR0FATAL0미분류0기본: WARN · ERROR · FATAL · 미분류보관 기간별 발생량1건 조회10-270건 · 0개 항목반복 묶기개별 로그줄바꿈최신 순실시간 보기조건에 맞는 로그가 없습니다기간이나 로그 수준을 조정하세요. 수집된 실제 기록만 표시합니다.2026-10-27 02:34:44.527 기준이전1다음\n  \n\n"
+}

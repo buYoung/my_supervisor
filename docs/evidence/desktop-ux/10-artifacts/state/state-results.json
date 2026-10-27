@@ -1,0 +1,156 @@
+[
+  {
+    "id": "STATE-01",
+    "realDatabaseFailureRecovered": true
+  },
+  {
+    "id": "STATE-02",
+    "newMutationRetained": true
+  },
+  {
+    "id": "STATE-04",
+    "result": {
+      "batch": 1,
+      "compensation": "old healthy instance retained after readiness failure",
+      "completed": true,
+      "deadline": "2026-10-27T04:51:41.780270Z",
+      "kind": "rolling_restart",
+      "name": "state-rolling",
+      "operationId": "70a3084f-1534-4421-a598-a75de022c71a",
+      "outcomes": [
+        {
+          "failedStage": "readiness_timeout",
+          "instanceId": "05920eb8-a719-4cfc-8b41-b12b241bbf39",
+          "ordinal": 2,
+          "retryable": true,
+          "state": "failed"
+        }
+      ],
+      "phase": "failed_closed",
+      "targetInstances": 2
+    },
+    "before": {
+      "desiredInstances": 2,
+      "instances": [
+        {
+          "cpuPercent": 0.7,
+          "generation": 1,
+          "instanceId": "13105718-a756-45fb-9a9b-2659ac5b391e",
+          "memoryBytes": 1081344,
+          "ordinal": 0,
+          "pid": 29512,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:37.855972Z",
+          "state": "running"
+        },
+        {
+          "cpuPercent": 0.6,
+          "generation": 1,
+          "instanceId": "0eaf1950-73f8-4bfa-9235-cb7b703bb642",
+          "memoryBytes": 1048576,
+          "ordinal": 1,
+          "pid": 29513,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:37.860052Z",
+          "state": "running"
+        }
+      ],
+      "name": "state-rolling"
+    },
+    "after": {
+      "desiredInstances": 2,
+      "instances": [
+        {
+          "cpuPercent": 0,
+          "generation": 1,
+          "instanceId": "13105718-a756-45fb-9a9b-2659ac5b391e",
+          "memoryBytes": 458752,
+          "ordinal": 0,
+          "pid": 29512,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:37.855972Z",
+          "state": "running"
+        },
+        {
+          "cpuPercent": 0,
+          "generation": 1,
+          "instanceId": "0eaf1950-73f8-4bfa-9235-cb7b703bb642",
+          "memoryBytes": 442368,
+          "ordinal": 1,
+          "pid": 29513,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:37.860052Z",
+          "state": "running"
+        }
+      ],
+      "name": "state-rolling"
+    }
+  },
+  {
+    "id": "STATE-07",
+    "committed": {
+      "desiredInstances": 2,
+      "instances": [
+        {
+          "cpuPercent": 0.3,
+          "generation": 1,
+          "instanceId": "42d3631c-67cc-4170-883e-1fa61eea417f",
+          "memoryBytes": 1163264,
+          "ordinal": 0,
+          "pid": 30680,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:45.822740Z",
+          "state": "running"
+        },
+        {
+          "cpuPercent": 0.3,
+          "generation": 1,
+          "instanceId": "8105035a-58f9-4d50-8be3-7c54c246316c",
+          "memoryBytes": 1048576,
+          "ordinal": 1,
+          "pid": 30681,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:45.982394Z",
+          "state": "running"
+        }
+      ],
+      "name": "state-rolling"
+    },
+    "replayed": {
+      "desiredInstances": 2,
+      "instances": [
+        {
+          "cpuPercent": 0.1,
+          "generation": 1,
+          "instanceId": "42d3631c-67cc-4170-883e-1fa61eea417f",
+          "memoryBytes": 1163264,
+          "ordinal": 0,
+          "pid": 30680,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:45.822740Z",
+          "state": "running"
+        },
+        {
+          "cpuPercent": 0.1,
+          "generation": 1,
+          "instanceId": "8105035a-58f9-4d50-8be3-7c54c246316c",
+          "memoryBytes": 1048576,
+          "ordinal": 1,
+          "pid": 30681,
+          "restartCount": 0,
+          "startedAt": "2026-10-27T04:51:45.982394Z",
+          "state": "running"
+        }
+      ],
+      "name": "state-rolling"
+    }
+  },
+  {
+    "id": "STATE-08",
+    "jobs": 250,
+    "instances": 50,
+    "pages": 3,
+    "registerMs": 952,
+    "totalMs": 12023
+  }
+]

@@ -1,4 +1,5 @@
 import type {ProcessConfigDto} from "../../services/wire-types";
+import {NumberField} from "../../components/ui/NumberField";
 import {PolicyToggle, RestartGuards} from "./GuardControls";
 
 export function RestartControls({config, onChange, onOpenHealth}: {
@@ -28,11 +29,11 @@ export function RestartControls({config, onChange, onOpenHealth}: {
       <fieldset disabled={isSystemManaged || !hasRestartCondition}>
         <p className="editor-note">{hasRestartCondition ? "켜둔 자동 재시작 조건에 공통으로 적용합니다. 반복 실패로 인한 무한 재시작을 조절합니다." : "자동 재시작 조건을 켜면 아래 설정이 적용됩니다."}</p>
         <div className="editor-columns">
-          <label className="editor-field"><span>처음 재시작하기 전 대기 (ms)</span><input type="number" min={0} value={config.restart?.backoff_initial_ms ?? 1000} onChange={event => updateRestart({backoff_initial_ms: Number(event.target.value)})}/></label>
-          <label className="editor-field"><span>반복 실패 시 최대 대기 (ms)</span><input type="number" min={0} value={config.restart?.backoff_max_ms ?? 60000} onChange={event => updateRestart({backoff_max_ms: Number(event.target.value)})}/></label>
-          <label className="editor-field"><span>실패할 때마다 대기 시간 증가 배수</span><input type="number" min={1} value={config.restart?.backoff_multiplier ?? 2} onChange={event => updateRestart({backoff_multiplier: Number(event.target.value)})}/></label>
-          <label className="editor-field"><span>최대 재시작 횟수</span><input type="number" min={0} placeholder="제한 없음" value={config.restart?.max_retries ?? ""} onChange={event => updateRestart({max_retries: event.target.value === "" ? undefined : Number(event.target.value)})}/><small>비워두면 횟수를 제한하지 않습니다.</small></label>
-          <label className="editor-field"><span>안정 실행 후 재시작 횟수 초기화 (ms)</span><input type="number" min={0} value={config.restart?.reset_after_ms ?? 60000} onChange={event => updateRestart({reset_after_ms: Number(event.target.value)})}/></label>
+          <label className="editor-field"><span>처음 재시작하기 전 대기 (ms)</span><NumberField name="restart.backoff_initial_ms" min={0} value={config.restart?.backoff_initial_ms ?? 1000} onValueChange={value=>updateRestart({backoff_initial_ms:value})}/></label>
+          <label className="editor-field"><span>반복 실패 시 최대 대기 (ms)</span><NumberField name="restart.backoff_max_ms" min={0} value={config.restart?.backoff_max_ms ?? 60000} onValueChange={value=>updateRestart({backoff_max_ms:value})}/></label>
+          <label className="editor-field"><span>실패할 때마다 대기 시간 증가 배수</span><NumberField name="restart.backoff_multiplier" min={1} integer={false} value={config.restart?.backoff_multiplier ?? 2} onValueChange={value=>updateRestart({backoff_multiplier:value})}/></label>
+          <label className="editor-field"><span>최대 재시작 횟수</span><NumberField name="restart.max_retries" min={0} allowEmpty placeholder="제한 없음" value={config.restart?.max_retries} onValueChange={max_retries=>updateRestart({max_retries})}/><small>비워두면 횟수를 제한하지 않습니다.</small></label>
+          <label className="editor-field"><span>안정 실행 후 재시작 횟수 초기화 (ms)</span><NumberField name="restart.reset_after_ms" min={0} value={config.restart?.reset_after_ms ?? 60000} onValueChange={value=>updateRestart({reset_after_ms:value})}/></label>
         </div>
         <label className="editor-check"><input type="checkbox" checked={config.restart?.jitter ?? true} onChange={event => updateRestart({jitter: event.target.checked})}/>여러 프로세스의 재시작 시각 분산</label>
       </fieldset>

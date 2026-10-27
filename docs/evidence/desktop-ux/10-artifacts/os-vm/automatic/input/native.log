@@ -1,0 +1,26 @@
+
+Execution of 1 workers started at 2026-10-27T06:23:50.859Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/input.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/input.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: c69b6af4-5376-4971-859b-46734a62fc17
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/input.spec.mjs
+[webkit 605.1.15 macos #0-0] Predictable repeated and draft input
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-01 [N-R] comma and Enter commit exact dependencies into successive rows
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-02 [N-R] duplicate, self, literal comma, empty delimiter and paste retain intent
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-03 [N-R] comma-bearing absolute paths stay literal and invalid exclusions block save
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-04 [N-R] blank numeric drafts remain blank and 5000/3000ms reaches HTTP checks
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-05 [N-R] inactive HTTP, TCP and interval drafts restore without serialization
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-06 [N-R] environment rows stay visible, validate, undo and import multiline values
+[webkit 605.1.15 macos #0-0]    ✓ INPUT-08 [N-R] unsupported symlinks and rolling prerequisites are explicit
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 7 passing (15.3s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:16  
+

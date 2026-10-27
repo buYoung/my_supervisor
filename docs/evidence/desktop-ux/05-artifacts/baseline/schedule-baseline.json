@@ -1,0 +1,16 @@
+{
+  "serverTimezone": "Asia/Seoul",
+  "guiTimezone": "UTC",
+  "shownTimeout": "3600",
+  "savedTimeout": null,
+  "oldDates": [
+    "2026-10-27 03:00:00 · UTC",
+    "2026-10-28 03:00:00 · UTC",
+    "2026-10-29 03:00:00 · UTC"
+  ],
+  "newDates": [
+    "2026-10-27 03:00:00 · UTC",
+    "2026-10-28 03:00:00 · UTC",
+    "2026-10-29 03:00:00 · UTC"
+  ]
+}

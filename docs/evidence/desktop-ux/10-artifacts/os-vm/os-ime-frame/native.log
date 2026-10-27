@@ -1,0 +1,49 @@
+
+Execution of 1 workers started at 2026-10-27T07:51:08.054Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/ime-observe.spec.mjs
+[0-0] AssertionError in "Native Korean input observation.INPUT-07 [O] native composition confirms text without adding a row or saving"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ '저장하지 않은 변경'
+- '선행 작업 2'
+
+    at verifyNativeIme (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/verify-native-ime.mjs:21:78)
+    at Context.<anonymous> (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/ime-observe.spec.mjs:36:5)
+[0-0] FAILED in undefined - file:///tests/e2e/ime-observe.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 96453595-288e-40c8-a5a7-74c53a5ae2fa
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/ime-observe.spec.mjs
+[webkit 605.1.15 macos #0-0] Native Korean input observation
+[webkit 605.1.15 macos #0-0]    ✖ INPUT-07 [O] native composition confirms text without adding a row or saving
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 failing (3m 43.7s)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Native Korean input observation INPUT-07 [O] native composition confirms text without adding a row or saving
+[webkit 605.1.15 macos #0-0] Expected values to be strictly equal:
++ actual - expected
+
++ '저장하지 않은 변경'
+- '선행 작업 2'
+      
+      actual expected
+      
+      '저장하지선행 않은작업 변경2'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+[webkit 605.1.15 macos #0-0] + actual - expected
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] + '저장하지 않은 변경'
+[webkit 605.1.15 macos #0-0] - '선행 작업 2'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at verifyNativeIme (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/verify-native-ime.mjs:21:78)
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/admin/msv/repo/crates/desktop/ui/tests/e2e/ime-observe.spec.mjs:36:5)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:03:44  
+

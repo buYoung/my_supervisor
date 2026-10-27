@@ -1,0 +1,11 @@
+{
+  "time": "2026-10-27T02:49:09.788916+00:00",
+  "nativeToolError": "The Mac is locked and automatic unlock could not unlock it. Ask the user to unlock the Mac manually before continuing.",
+  "webviewObservation": {
+    "active": "프로세스 검색",
+    "hasFocus": false,
+    "matchesFocusWithin": false,
+    "outline": "none"
+  },
+  "action": "Asked user to unlock; no unlock or focus-appearance pass was fabricated."
+}

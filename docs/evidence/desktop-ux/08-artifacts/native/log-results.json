@@ -1,0 +1,69 @@
+[
+  {
+    "id": "LOG-01",
+    "url": "tauri://localhost?page=logs&level=all&range=all&kind=job&source=log-job&run=8bfbaef5-846c-4494-9345-084fdea8601c&step=native-command&grouping=repeat&order=desc&offset=0&position=0"
+  },
+  {
+    "id": "LOG-02",
+    "dates": [
+      "2026-10-25",
+      "2026-10-26"
+    ],
+    "visible": "2026-10-26 06:27:07.081"
+  },
+  {
+    "id": "LOG-03",
+    "stableExpanded": true,
+    "stableOlderPage": true
+  },
+  {
+    "id": "LOG-04",
+    "parent": "tauri://localhost?page=logs&kind=process&source=log-alpha&level=all&range=all&grouping=none&order=desc&offset=50&position=277&snapshot=2026-10-27T02%3A40%3A50.408100Z&inspect=process%3Alog-alpha%3A%3A9946%3A1792995487081000000",
+    "returned": "tauri://localhost?page=logs&kind=process&source=log-alpha&level=all&range=all&grouping=none&order=desc&offset=50&position=277&snapshot=2026-10-27T02%3A40%3A50.408100Z"
+  },
+  {
+    "id": "LOG-05",
+    "exported": {
+      "count": 7677,
+      "first": {
+        "id": "process:log-alpha::7677:1792972797081000000",
+        "instance": null,
+        "kind": "process",
+        "level": "info",
+        "message": "group-16",
+        "raw": {
+          "line": "{\"level\":\"info\",\"message\":\"group-16\"}",
+          "sequence": 7677,
+          "stream": "stdout",
+          "timestamp": "2026-10-25T23:59:57.081Z"
+        },
+        "run_id": null,
+        "source": "log-alpha",
+        "step": null
+      },
+      "last": {
+        "id": "process:log-alpha::1:1792896037081000000",
+        "instance": null,
+        "kind": "process",
+        "level": "info",
+        "message": "group-0",
+        "raw": {
+          "line": "{\"level\":\"info\",\"message\":\"group-0\"}",
+          "sequence": 1,
+          "stream": "stderr",
+          "timestamp": "2026-10-25T02:40:37.081Z"
+        },
+        "run_id": null,
+        "source": "log-alpha",
+        "step": null
+      },
+      "max": "2026-10-25T23:59:57.081Z",
+      "min": "2026-10-25T02:40:37.081Z"
+    }
+  },
+  {
+    "id": "LOG-06",
+    "visibleRows": 50,
+    "copied": "process exited: exit status: 0"
+  }
+]

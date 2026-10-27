@@ -1,0 +1,59 @@
+[
+  {
+    "phase": "file-picker-cancel",
+    "action": "Guest native Escape",
+    "observed": "Original /bin/sleep retained before re-opening"
+  },
+  {
+    "phase": "file-picker-select",
+    "action": "Guest native slash path navigation and Return confirmation",
+    "observed": "/usr/bin/printf selected with argv 600 retained"
+  },
+  {
+    "phase": "file-picker-final-consumer",
+    "saved": {
+      "config": {
+        "args": [
+          "600"
+        ],
+        "autostart": false,
+        "command": "/usr/bin/printf",
+        "cwd": "/private/var/folders/9m/b94f0mqn0d327g6_m6p0x0br0000gn/T/msv-desktop-ux-xtpCZC",
+        "definition_id": "ae89e775-a35b-3bb7-28dd-a3a865606638",
+        "env": {},
+        "instances": 1,
+        "lifecycle": "tied",
+        "management_mode": {
+          "type": "direct"
+        },
+        "name": "native-os",
+        "restart": {
+          "backoff_initial_ms": 1000,
+          "backoff_max_ms": 60000,
+          "backoff_multiplier": 2,
+          "enabled": false,
+          "jitter": true,
+          "reset_after_ms": 60000
+        },
+        "shutdown": {
+          "grace_period_ms": 10000,
+          "signal": "term"
+        }
+      },
+      "status": {
+        "cpuPercent": 0,
+        "guard": null,
+        "managementMode": {
+          "type": "direct"
+        },
+        "memoryBytes": 0,
+        "name": "native-os",
+        "pid": null,
+        "restartCount": 0,
+        "startedAt": null,
+        "state": "stopped",
+        "uptime": "-"
+      }
+    }
+  }
+]

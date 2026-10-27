@@ -1,0 +1,41 @@
+
+Execution of 1 workers started at 2026-10-27T02:47:15.480Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/visual.spec.mjs
+[0-0] AssertionError in "Native layout and accessibility.VISUAL-03 [N-R] focus is visible and an inner lifecycle action keeps the selected target"
+AssertionError [ERR_ASSERTION]: {"active":"프로세스 검색","hasFocus":false,"matches":false,"outline":"none"}
+
+'none' !== 'solid'
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/visual.spec.mjs:21:538)
+[0-0] FAILED in undefined - file:///tests/e2e/visual.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: b6f76f65-3c61-47fc-9759-a069de1483d0
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/visual.spec.mjs
+[webkit 605.1.15 macos #0-0] Native layout and accessibility
+[webkit 605.1.15 macos #0-0]    ✖ VISUAL-03 [N-R] focus is visible and an inner lifecycle action keeps the selected target
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1 failing (783ms)
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 1) Native layout and accessibility VISUAL-03 [N-R] focus is visible and an inner lifecycle action keeps the selected target
+[webkit 605.1.15 macos #0-0] {"active":"프로세스 검색","hasFocus":false,"matches":false,"outline":"none"}
+
+'none' !== 'solid'
+      
+      actual expected
+      
+      'nonesolid'
+      
+[webkit 605.1.15 macos #0-0] AssertionError [ERR_ASSERTION]: {"active":"프로세스 검색","hasFocus":false,"matches":false,"outline":"none"}
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 'none' !== 'solid'
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0]     at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/visual.spec.mjs:21:538)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:00:01  
+

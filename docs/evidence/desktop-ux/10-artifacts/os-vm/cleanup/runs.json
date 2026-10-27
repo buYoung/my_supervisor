@@ -1,0 +1,44 @@
+[
+  {
+    "probe": "startup",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--probe=startup"
+    ],
+    "exit": 0,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-MF6A7E/output"
+  },
+  {
+    "probe": "failure",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--probe=failure"
+    ],
+    "exit": 0,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-6XU0Pq/output"
+  },
+  {
+    "probe": "interrupt",
+    "cwd": "/Users/buyonglee/Documents/work/private/my_supervisor",
+    "command": [
+      "pnpm",
+      "--dir",
+      "crates/desktop/ui",
+      "test:native",
+      "--no-build",
+      "--probe=interrupt"
+    ],
+    "exit": 0,
+    "sourceOutput": "/private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-7DQ3fj/output"
+  }
+]

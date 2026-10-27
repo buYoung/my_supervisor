@@ -1,0 +1,33 @@
+
+> my-supervisor-desktop-ui@0.1.0 test:native /Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui
+> node tests/e2e/run-native.mjs --no-build --spec\=state.spec.mjs
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UztCFS/output
+
+Execution of 1 workers started at 2026-10-27T04:51:31.743Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/state.spec.mjs
+[0-0] PASSED in undefined - file:///tests/e2e/state.spec.mjs
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webkit 605.1.15 macos #0-0] Running: webkit (v605.1.15) on macos
+[webkit 605.1.15 macos #0-0] Session ID: 80e573aa-ca3a-4d27-ba1e-2468d5533ae8
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] » tests/e2e/state.spec.mjs
+[webkit 605.1.15 macos #0-0] Truthful operator state
+[webkit 605.1.15 macos #0-0]    ✓ STATE-01 [N-R] loading, empty, search-empty, real storage failure and partial results differ
+[webkit 605.1.15 macos #0-0]    ✓ STATE-02 [N-R] header refresh and a newer mutation supersede a delayed old page
+[webkit 605.1.15 macos #0-0]    ✓ STATE-03 [N-R] switching targets clears old logs, runs and instances even if the new read fails
+[webkit 605.1.15 macos #0-0]    ✓ STATE-04 [N-R] real rolling readiness failure reports failed and unattempted capacity
+[webkit 605.1.15 macos #0-0]    ✓ STATE-05 [N-R] actual start, crash and stop events use payload transitions
+[webkit 605.1.15 macos #0-0]    ✓ STATE-06 [N-R] DOM-focused lifecycle activation operates once without selecting another row
+[webkit 605.1.15 macos #0-0]    ✓ STATE-07 [N-R] slow A permits B and replaying a completed rolling operation changes no instances
+[webkit 605.1.15 macos #0-0]    ✓ STATE-08 [N-R] 250 jobs and 50 real instances remain bounded and inspectable
+[webkit 605.1.15 macos #0-0]
+[webkit 605.1.15 macos #0-0] 8 passing (26s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:27  
+
+Native evidence: /private/var/folders/qm/x2f4lqqj5ms9n3z4f_gtc2140000gn/T/msv-desktop-ux-UztCFS/output; cleanup: PASS

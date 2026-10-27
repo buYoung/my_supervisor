@@ -1,0 +1,1292 @@
+{
+  "source": "/Users/buyonglee/Documents/work/private/my_supervisor/docs/evidence/desktop-ux/10-artifacts/native-ime/native-ime.json",
+  "mode": "recorded event replay, not a new OS observation",
+  "result": {
+    "active": "선행 작업 2",
+    "nativeKeys": 0,
+    "snapshots": [
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 71,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅅ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅓ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅅ",
+        "keyCode": 84,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ㅓ",
+        "keyCode": 74,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 83,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 71,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅐ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅐ",
+        "keyCode": 79,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅇ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅇ",
+        "keyCode": 68,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅈ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅈ",
+        "keyCode": 87,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "w",
+        "keyCode": 87,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "w",
+        "keyCode": 87,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "t",
+        "keyCode": 84,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "t",
+        "keyCode": 84,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅈ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅈ",
+        "keyCode": 87,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅅ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅅ",
+        "keyCode": 84,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅅ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅓ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅅ",
+        "keyCode": 84,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ㅓ",
+        "keyCode": 74,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 83,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 71,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅐ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅐ",
+        "keyCode": 79,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅇ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅇ",
+        "keyCode": 68,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅈ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅏ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅏ",
+        "keyCode": 75,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄱ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅈ",
+        "keyCode": 87,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ㄱ",
+        "keyCode": 82,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅇ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅓ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅇ",
+        "keyCode": 68,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅂ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅓ",
+        "keyCode": 74,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ㅂ",
+        "keyCode": 81,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "1",
+        "keyCode": 49,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "1",
+        "keyCode": 49,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ArrowLeft",
+        "keyCode": 37,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowLeft",
+        "keyCode": 37,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ArrowLeft",
+        "keyCode": 37,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowLeft",
+        "keyCode": 37,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ArrowLeft",
+        "keyCode": 37,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowLeft",
+        "keyCode": 37,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": " ",
+        "keyCode": 32,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": " ",
+        "keyCode": 32,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ArrowRight",
+        "keyCode": 39,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Backspace",
+        "keyCode": 8,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅎ",
+        "keyCode": 71,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅏ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㅏ",
+        "keyCode": 75,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄱ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄴ",
+        "keyCode": 83,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㅡ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄱ",
+        "keyCode": 82,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": "ㅡ",
+        "keyCode": 77,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "ㄹ",
+        "keyCode": 229,
+        "rows": 1,
+        "type": "keydown"
+      },
+      {
+        "key": "ㄹ",
+        "keyCode": 70,
+        "rows": 1,
+        "type": "keyup"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "beforeinput"
+      },
+      {
+        "key": null,
+        "keyCode": null,
+        "rows": 1,
+        "type": "input"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 2,
+        "type": "keydown"
+      },
+      {
+        "key": "Enter",
+        "keyCode": 13,
+        "rows": 2,
+        "type": "keyup"
+      }
+    ],
+    "values": [
+      "한글",
+      ""
+    ]
+  }
+}

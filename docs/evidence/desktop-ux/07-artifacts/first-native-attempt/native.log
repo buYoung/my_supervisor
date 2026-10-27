@@ -1,0 +1,24 @@
+
+Execution of 1 workers started at 2026-10-27T02:24:01.725Z
+
+[0-0] RUNNING in undefined - file:///tests/e2e/flow.spec.mjs
+[0-0] javascript error in "Reversible workflow drafts.FLOW-01 [N-R] add, delete, settings and reconnect undo/redo preserve graph identities"
+javascript error: WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.step-palette button*=대기' is not a valid selector. @ 2:48 when running "element" with method "POST"
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:17:65)
+[0-0] javascript error in "Reversible workflow drafts.FLOW-02 [N-R] reordered matching routes drive the actual first-match result"
+javascript error: WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.workflow-heading button=저장' is not a valid selector. @ 2:48 when running "element" with method "POST"
+    at async save (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:8:23)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:22:114)
+[0-0] javascript error in "Reversible workflow drafts.FLOW-04 [N-R] copied nodes stay independent and a job reference reads the saved source"
+javascript error: WebDriverError: A JavaScript exception occurred (code 4): SyntaxError: '.workflow-heading button=저장' is not a valid selector. @ 2:48 when running "element" with method "POST"
+    at async save (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:8:23)
+    at async Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:28:226)
+[0-0] AssertionError in "Reversible workflow drafts.FLOW-05 [N-R] an unsaved command executes only its declared snapshot and step scope"
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'draft-only\n'
+- 'draft-only'
+             ^
+
+    at Context.<anonymous> (file:///Users/buyonglee/Documents/work/private/my_supervisor/crates/desktop/ui/tests/e2e/flow.spec.mjs:32:207)
